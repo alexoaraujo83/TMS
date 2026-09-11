@@ -1,19 +1,29 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { verifyAccessToken } from '@tms/auth';
+import { verifyTenantMembership } from '@tms/database';
+import type { Pool } from 'pg';
 import type { RequestContext } from './request-context.js';
+import { DATABASE_POOL } from './database.provider.js';
 
 interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
   context?: RequestContext;
 }
 
+function headerValue(request: RequestLike, name: string): string | undefined {
+  const value = request.headers[name];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
 @Injectable()
 export class AuthGuard implements CanActivate {
+  constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
+
   async canActivate(executionContext: ExecutionContext): Promise<boolean> {
     const request = executionContext.switchToHttp().getRequest<RequestLike>();
-    const authorization = request.headers.authorization;
+    const authorization = headerValue(request, 'authorization');
 
-    if (typeof authorization !== 'string' || !authorization.startsWith('Bearer ')) {
+    if (!authorization?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Authentication required');
     }
 
@@ -28,15 +38,27 @@ export class AuthGuard implements CanActivate {
 
     try {
       const claims = await verifyAccessToken(token, { secret, issuer, audience });
+      const selectedTenantId = headerValue(request, 'x-tenant-id') ?? claims.tenantId;
+
+      if (!selectedTenantId) {
+        throw new UnauthorizedException('Tenant selection is required');
+      }
+
+      const membership = await verifyTenantMembership(this.pool, claims.sub, selectedTenantId);
+      if (!membership?.active) {
+        throw new ForbiddenException('Active tenant membership required');
+      }
+
       request.context = {
-        requestId: typeof request.headers['x-request-id'] === 'string' ? request.headers['x-request-id'] : '',
+        requestId: headerValue(request, 'x-request-id') ?? '',
         userId: claims.sub,
-        tenantId: claims.tenantId,
-        roles: claims.roles,
-        permissions: claims.permissions,
+        tenantId: membership.tenantId,
+        roles: [membership.role],
+        permissions: membership.permissions,
       };
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException || error instanceof ForbiddenException) throw error;
       throw new UnauthorizedException('Invalid access token');
     }
   }
