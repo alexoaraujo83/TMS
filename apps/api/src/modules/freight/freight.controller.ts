@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../../common/auth.guard.js';
 import { CurrentUser } from '../../common/current-user.decorator.js';
 import { PermissionGuard } from '../../common/permission.guard.js';
 import { RequirePermission } from '../../common/permission.decorator.js';
 import type { RequestContext } from '../../common/request-context.js';
-import { CreateFreightDto } from './freight.dto.js';
+import { CreateFreightDto, UpdateFreightStatusDto } from './freight.dto.js';
 import { FreightService } from './freight.service.js';
 
 @Controller('freights')
@@ -28,5 +28,15 @@ export class FreightController {
   @RequirePermission('freight:read')
   get(@CurrentUser() context: RequestContext, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.service.get(context, id);
+  }
+
+  @Patch(':id/status')
+  @RequirePermission('freight:update')
+  updateStatus(
+    @CurrentUser() context: RequestContext,
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateFreightStatusDto,
+  ) {
+    return this.service.updateStatus(context, id, dto);
   }
 }
