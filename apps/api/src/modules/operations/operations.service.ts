@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CarrierRepository, DriverRepository, VehicleRepository } from '@tms/database';
 import type { RequestContext } from '../../common/request-context.js';
 import { DATABASE_POOL } from '../../common/database.provider.js';
