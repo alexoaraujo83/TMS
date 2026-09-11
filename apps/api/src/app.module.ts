@@ -3,8 +3,10 @@ import { createDatabasePool } from '@tms/database';
 import { HealthController } from './health.controller.js';
 import { RequestContextMiddleware } from './common/request-context.middleware.js';
 import { DATABASE_POOL } from './common/database.provider.js';
+import { FreightModule } from './modules/freight/freight.module.js';
 
 @Module({
+  imports: [FreightModule],
   controllers: [HealthController],
   providers: [
     {
