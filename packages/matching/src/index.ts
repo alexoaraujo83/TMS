@@ -1,0 +1,105 @@
+import type { BodyType, Freight, VehicleType } from '@tms/freight';
+
+export interface MatchCandidate {
+  driverId: string;
+  tenantId: string;
+  vehicleType: VehicleType;
+  bodyType: BodyType;
+  capacityKg: number;
+  available: boolean;
+  distanceKm: number;
+  routeCompatibility: number;
+  historicalReliability?: number;
+  offeredPriceCents?: bigint;
+}
+
+export interface MatchBreakdown {
+  total: number;
+  distance: number;
+  vehicleCompatibility: number;
+  capacity: number;
+  availability: number;
+  route: number;
+  price: number;
+  reliability: number;
+}
+
+export interface MatchResult extends MatchBreakdown {
+  candidate: MatchCandidate;
+  reasons: readonly string[];
+}
+
+const clamp = (value: number): number => Math.max(0, Math.min(100, value));
+
+function vehicleScore(freight: Freight, candidate: MatchCandidate): number {
+  const types = freight.vehicleRequirement.types;
+  const bodies = freight.vehicleRequirement.bodies;
+  const typeOk = !types?.length || types.includes(candidate.vehicleType);
+  const bodyOk = !bodies?.length || bodies.includes(candidate.bodyType);
+  if (typeOk && bodyOk) return 100;
+  if (typeOk || bodyOk) return 50;
+  return 0;
+}
+
+function capacityScore(freight: Freight, candidate: MatchCandidate): number {
+  const required = freight.cargo.weightKg;
+  if (candidate.capacityKg < required) return 0;
+  const excess = candidate.capacityKg - required;
+  return clamp(100 - (excess / Math.max(required, 1)) * 25);
+}
+
+function distanceScore(distanceKm: number): number {
+  return clamp(100 - distanceKm / 2);
+}
+
+export function scoreCandidate(freight: Freight, candidate: MatchCandidate): MatchResult {
+  if (freight.tenantId !== candidate.tenantId) {
+    throw new Error('Cross-tenant matching is forbidden');
+  }
+
+  const distance = distanceScore(candidate.distanceKm);
+  const vehicleCompatibility = vehicleScore(freight, candidate);
+  const capacity = capacityScore(freight, candidate);
+  const availability = candidate.available ? 100 : 0;
+  const route = clamp(candidate.routeCompatibility);
+  const reliability = clamp(candidate.historicalReliability ?? 50);
+
+  const price = candidate.offeredPriceCents === undefined || freight.driverPrice === undefined
+    ? 50
+    : clamp(100 - Math.abs(Number(candidate.offeredPriceCents - freight.driverPrice.amountCents)) / 10000);
+
+  const total =
+    distance * 0.20 +
+    vehicleCompatibility * 0.20 +
+    capacity * 0.15 +
+    availability * 0.15 +
+    route * 0.15 +
+    price * 0.10 +
+    reliability * 0.05;
+
+  const reasons: string[] = [];
+  if (vehicleCompatibility === 100) reasons.push('vehicle-compatible');
+  if (capacity === 100) reasons.push('capacity-suitable');
+  if (availability === 100) reasons.push('available');
+  if (route >= 80) reasons.push('route-compatible');
+  if (reliability >= 80) reasons.push('high-reliability');
+
+  return {
+    candidate,
+    total: Math.round(total * 100) / 100,
+    distance,
+    vehicleCompatibility,
+    capacity,
+    availability,
+    route,
+    price,
+    reliability,
+    reasons,
+  };
+}
+
+export function rankCandidates(freight: Freight, candidates: readonly MatchCandidate[]): MatchResult[] {
+  return candidates
+    .map((candidate) => scoreCandidate(freight, candidate))
+    .sort((a, b) => b.total - a.total);
+}
