@@ -1,5 +1,26 @@
 import type { Pool } from 'pg';
+import { assertUuid } from './query.js';
 import { withTransaction } from './transaction.js';
+
+export interface CreateFreightInput {
+  tenantId: string;
+  freightType: string;
+  originCity: string;
+  originState: string;
+  destinationCity: string;
+  destinationState: string;
+  cargoDescription: string;
+  quantity: number;
+  weightKg: number;
+  volumeM3?: number;
+  linearMeters?: number;
+  customerPriceCents?: number;
+  driverPriceCents?: number;
+  vehicleTypes?: readonly string[];
+  bodyTypes?: readonly string[];
+  minimumFreeMeters?: number;
+  minimumCapacityKg?: number;
+}
 
 export interface FreightRow {
   id: string;
@@ -17,32 +38,81 @@ export interface FreightRow {
   linearMeters: string | null;
   customerPriceCents: string | null;
   driverPriceCents: string | null;
+  vehicleTypes: readonly string[];
+  bodyTypes: readonly string[];
+  minimumFreeMeters: string | null;
+  minimumCapacityKg: string | null;
 }
+
+const FREIGHT_COLUMNS = `id,
+  tenant_id as "tenantId",
+  status,
+  freight_type as "freightType",
+  origin_city as "originCity",
+  origin_state as "originState",
+  destination_city as "destinationCity",
+  destination_state as "destinationState",
+  cargo_description as "cargoDescription",
+  quantity,
+  weight_kg as "weightKg",
+  volume_m3 as "volumeM3",
+  linear_meters as "linearMeters",
+  customer_price_cents as "customerPriceCents",
+  driver_price_cents as "driverPriceCents",
+  vehicle_types as "vehicleTypes",
+  body_types as "bodyTypes",
+  minimum_free_meters as "minimumFreeMeters",
+  minimum_capacity_kg as "minimumCapacityKg"`;
 
 export class PostgresFreightRepository {
   constructor(private readonly pool: Pool) {}
 
+  async create(input: CreateFreightInput): Promise<FreightRow> {
+    assertUuid(input.tenantId, 'tenantId');
+    return withTransaction(this.pool, { tenantId: input.tenantId }, async (client) => {
+      const result = await client.query<FreightRow>(
+        `insert into freights (
+          tenant_id, freight_type, origin_city, origin_state,
+          destination_city, destination_state, cargo_description,
+          quantity, weight_kg, volume_m3, linear_meters,
+          customer_price_cents, driver_price_cents,
+          vehicle_types, body_types, minimum_free_meters, minimum_capacity_kg
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        returning ${FREIGHT_COLUMNS}`,
+        [
+          input.tenantId,
+          input.freightType,
+          input.originCity,
+          input.originState,
+          input.destinationCity,
+          input.destinationState,
+          input.cargoDescription,
+          input.quantity,
+          input.weightKg,
+          input.volumeM3 ?? null,
+          input.linearMeters ?? null,
+          input.customerPriceCents ?? null,
+          input.driverPriceCents ?? null,
+          input.vehicleTypes ?? [],
+          input.bodyTypes ?? [],
+          input.minimumFreeMeters ?? null,
+          input.minimumCapacityKg ?? null,
+        ],
+      );
+      const row = result.rows[0];
+      if (!row) throw new Error('Freight creation failed');
+      return row;
+    });
+  }
+
   async findById(tenantId: string, freightId: string): Promise<FreightRow | null> {
+    assertUuid(tenantId, 'tenantId');
+    assertUuid(freightId, 'freightId');
     return withTransaction(this.pool, { tenantId }, async (client) => {
       const result = await client.query<FreightRow>(
-        `select id,
-                tenant_id as "tenantId",
-                status,
-                freight_type as "freightType",
-                origin_city as "originCity",
-                origin_state as "originState",
-                destination_city as "destinationCity",
-                destination_state as "destinationState",
-                cargo_description as "cargoDescription",
-                quantity,
-                weight_kg as "weightKg",
-                volume_m3 as "volumeM3",
-                linear_meters as "linearMeters",
-                customer_price_cents as "customerPriceCents",
-                driver_price_cents as "driverPriceCents"
+        `select ${FREIGHT_COLUMNS}
            from freights
-          where id = $1
-            and tenant_id = $2
+          where id = $1 and tenant_id = $2
           limit 1`,
         [freightId, tenantId],
       );
@@ -51,23 +121,10 @@ export class PostgresFreightRepository {
   }
 
   async list(tenantId: string): Promise<readonly FreightRow[]> {
+    assertUuid(tenantId, 'tenantId');
     return withTransaction(this.pool, { tenantId }, async (client) => {
       const result = await client.query<FreightRow>(
-        `select id,
-                tenant_id as "tenantId",
-                status,
-                freight_type as "freightType",
-                origin_city as "originCity",
-                origin_state as "originState",
-                destination_city as "destinationCity",
-                destination_state as "destinationState",
-                cargo_description as "cargoDescription",
-                quantity,
-                weight_kg as "weightKg",
-                volume_m3 as "volumeM3",
-                linear_meters as "linearMeters",
-                customer_price_cents as "customerPriceCents",
-                driver_price_cents as "driverPriceCents"
+        `select ${FREIGHT_COLUMNS}
            from freights
           where tenant_id = $1
           order by created_at desc`,
