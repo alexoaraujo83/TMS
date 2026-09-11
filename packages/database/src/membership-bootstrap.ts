@@ -4,6 +4,7 @@ export interface MembershipBootstrapRecord {
   userId: string;
   tenantId: string;
   role: string;
+  permissions: readonly string[];
   active: boolean;
 }
 
@@ -16,6 +17,7 @@ export async function verifyTenantMembership(
     `select user_id as "userId",
             tenant_id as "tenantId",
             role,
+            permissions,
             active
        from public.check_tenant_membership($1, $2)
       limit 1`,
