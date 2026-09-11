@@ -1,0 +1,6 @@
+{
+  "name":"@tms/database","private":true,"version":"0.1.0","type":"module",
+  "scripts":{"build":"tsc -p tsconfig.json","lint":"tsc -p tsconfig.json --noEmit","typecheck":"tsc -p tsconfig.json --noEmit","test":"node --test"},
+  "dependencies":{"@tms/shared":"workspace:*"},
+  "devDependencies":{"typescript":"^5.9.2"}
+}
