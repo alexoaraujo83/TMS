@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tms_dev
+      POSTGRES_USER: tms
+      POSTGRES_PASSWORD: tms
+    ports:
+      - "5432:5432"
+    volumes:
+      - tms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tms -d tms_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - tms_redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+volumes:
+  tms_postgres_data:
+  tms_redis_data:
