@@ -4,6 +4,14 @@ import { withTransaction } from './transaction.js';
 export interface CarrierRecord { id: string; tenantId: string; legalName: string; documentNumber: string | null; status: string; }
 export interface DriverRecord { id: string; tenantId: string; carrierId: string | null; name: string; documentNumber: string | null; phone: string | null; rntrc: string | null; anttStatus: string; status: string; }
 export interface VehicleRecord { id: string; tenantId: string; driverId: string | null; plate: string; vehicleType: string; bodyType: string; capacityKg: string; freeMeters: string | null; status: string; }
+export interface MatchingCandidateRecord {
+  driverId: string;
+  tenantId: string;
+  vehicleType: string;
+  bodyType: string;
+  capacityKg: string;
+  freeMeters: string | null;
+}
 
 function assertUuid(value: string, field: string): void {
   if (!/^[0-9a-fA-F-]{36}$/.test(value)) throw new Error(`Invalid ${field}`);
@@ -94,6 +102,28 @@ export class VehicleRepository {
     return withTransaction(this.pool, { tenantId }, async (client) => {
       const result = await client.query<VehicleRecord>(`select id, tenant_id as "tenantId", driver_id as "driverId", plate, vehicle_type as "vehicleType", body_type as "bodyType", capacity_kg as "capacityKg", free_meters as "freeMeters", status from vehicles where tenant_id = $1 and id = $2`, [tenantId, id]);
       return result.rows[0] ?? null;
+    });
+  }
+
+  async findMatchingCandidates(tenantId: string, vehicleTypes: readonly string[], bodyTypes: readonly string[], minimumCapacityKg: number, minimumFreeMeters?: number): Promise<readonly MatchingCandidateRecord[]> {
+    assertUuid(tenantId, 'tenantId');
+    return withTransaction(this.pool, { tenantId }, async (client) => {
+      const result = await client.query<MatchingCandidateRecord>(
+        `select d.id as "driverId", d.tenant_id as "tenantId", v.vehicle_type as "vehicleType", v.body_type as "bodyType", v.capacity_kg as "capacityKg", v.free_meters as "freeMeters"
+           from drivers d
+           join vehicles v on v.driver_id = d.id and v.tenant_id = d.tenant_id
+          where d.tenant_id = $1
+            and d.status = 'active'
+            and d.antt_status = 'approved'
+            and v.status = 'available'
+            and v.capacity_kg >= $2
+            and (cardinality($3::text[]) = 0 or v.vehicle_type = any($3::text[]))
+            and (cardinality($4::text[]) = 0 or v.body_type = any($4::text[]))
+            and ($5::numeric is null or v.free_meters >= $5::numeric)
+          order by v.capacity_kg asc, d.id`,
+        [tenantId, minimumCapacityKg, vehicleTypes, bodyTypes, minimumFreeMeters ?? null],
+      );
+      return result.rows;
     });
   }
 }
