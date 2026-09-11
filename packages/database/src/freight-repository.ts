@@ -79,25 +79,7 @@ export class PostgresFreightRepository {
           vehicle_types, body_types, minimum_free_meters, minimum_capacity_kg
         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
         returning ${FREIGHT_COLUMNS}`,
-        [
-          input.tenantId,
-          input.freightType,
-          input.originCity,
-          input.originState,
-          input.destinationCity,
-          input.destinationState,
-          input.cargoDescription,
-          input.quantity,
-          input.weightKg,
-          input.volumeM3 ?? null,
-          input.linearMeters ?? null,
-          input.customerPriceCents ?? null,
-          input.driverPriceCents ?? null,
-          input.vehicleTypes ?? [],
-          input.bodyTypes ?? [],
-          input.minimumFreeMeters ?? null,
-          input.minimumCapacityKg ?? null,
-        ],
+        [input.tenantId, input.freightType, input.originCity, input.originState, input.destinationCity, input.destinationState, input.cargoDescription, input.quantity, input.weightKg, input.volumeM3 ?? null, input.linearMeters ?? null, input.customerPriceCents ?? null, input.driverPriceCents ?? null, input.vehicleTypes ?? [], input.bodyTypes ?? [], input.minimumFreeMeters ?? null, input.minimumCapacityKg ?? null],
       );
       const row = result.rows[0];
       if (!row) throw new Error('Freight creation failed');
@@ -109,13 +91,7 @@ export class PostgresFreightRepository {
     assertUuid(tenantId, 'tenantId');
     assertUuid(freightId, 'freightId');
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const result = await client.query<FreightRow>(
-        `select ${FREIGHT_COLUMNS}
-           from freights
-          where id = $1 and tenant_id = $2
-          limit 1`,
-        [freightId, tenantId],
-      );
+      const result = await client.query<FreightRow>(`select ${FREIGHT_COLUMNS} from freights where id = $1 and tenant_id = $2 limit 1`, [freightId, tenantId]);
       return result.rows[0] ?? null;
     });
   }
@@ -123,14 +99,23 @@ export class PostgresFreightRepository {
   async list(tenantId: string): Promise<readonly FreightRow[]> {
     assertUuid(tenantId, 'tenantId');
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const result = await client.query<FreightRow>(
-        `select ${FREIGHT_COLUMNS}
-           from freights
-          where tenant_id = $1
-          order by created_at desc`,
-        [tenantId],
-      );
+      const result = await client.query<FreightRow>(`select ${FREIGHT_COLUMNS} from freights where tenant_id = $1 order by created_at desc`, [tenantId]);
       return result.rows;
+    });
+  }
+
+  async updateStatus(tenantId: string, freightId: string, expectedStatus: string, nextStatus: string): Promise<FreightRow | null> {
+    assertUuid(tenantId, 'tenantId');
+    assertUuid(freightId, 'freightId');
+    return withTransaction(this.pool, { tenantId }, async (client) => {
+      const result = await client.query<FreightRow>(
+        `update freights
+            set status = $3, updated_at = now()
+          where id = $1 and tenant_id = $2 and status = $4
+          returning ${FREIGHT_COLUMNS}`,
+        [freightId, tenantId, nextStatus, expectedStatus],
+      );
+      return result.rows[0] ?? null;
     });
   }
 }
