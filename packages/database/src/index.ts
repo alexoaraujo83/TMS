@@ -26,8 +26,3 @@ export {
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
-export {
-  tenantMatchesSession,
-  userMatchesSession,
-  tenantOrUserMatchesSession,
-} from "./rls.js";
