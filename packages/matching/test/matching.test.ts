@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Freight } from "@tms/freight";
-import { rankCandidates, scoreCandidate, type MatchCandidate } from "../src/index.ts";
+import {
+  rankCandidates,
+  scoreCandidate,
+  type MatchCandidate,
+} from "../src/index.ts";
 
 const freight: Freight = {
   id: "00000000-0000-0000-0000-000000000001",
@@ -21,7 +25,9 @@ const freight: Freight = {
   updatedAt: new Date("2026-09-01T00:00:00Z"),
 };
 
-const candidate = (overrides: Partial<MatchCandidate> = {}): MatchCandidate => ({
+const candidate = (
+  overrides: Partial<MatchCandidate> = {},
+): MatchCandidate => ({
   driverId: "00000000-0000-0000-0000-000000000020",
   tenantId: freight.tenantId,
   vehicleType: "truck",
