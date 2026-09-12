@@ -1,0 +1,31 @@
+name: Temporary Trip Formatting
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prettier --write apps/api/src/modules/operations/operations.controller.ts apps/api/src/modules/operations/operations.service.ts apps/api/src/modules/operations/trip.dto.ts packages/database/src/trip-repository.ts packages/database/test/trip-operations.integration.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add apps/api/src/modules/operations/operations.controller.ts apps/api/src/modules/operations/operations.service.ts apps/api/src/modules/operations/trip.dto.ts packages/database/src/trip-repository.ts packages/database/test/trip-operations.integration.test.ts
+          git diff --cached --quiet || git commit -m "style: apply Prettier to trip operations"
+          git diff --cached --quiet && exit 0 || true
+          git push
