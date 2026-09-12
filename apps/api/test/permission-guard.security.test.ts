@@ -18,6 +18,8 @@ function contextFor(permissions: readonly string[]) {
         },
       }),
     }),
+    getHandler: () => undefined,
+    getClass: () => undefined,
   } as never;
 }
 
@@ -49,6 +51,8 @@ test("PermissionGuard allows an explicit wildcard permission", () => {
 test("PermissionGuard rejects requests without authenticated context", () => {
   const executionContext = {
     switchToHttp: () => ({ getRequest: () => ({}) }),
+    getHandler: () => undefined,
+    getClass: () => undefined,
   } as never;
 
   assert.throws(
