@@ -37,6 +37,11 @@ export {
   type TripRecord,
   type TripStatus,
 } from "./trip-repository.js";
+export {
+  ComplianceRepository,
+  type ComplianceStatus,
+  type GrStatus,
+} from "./compliance-repository.js";
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
