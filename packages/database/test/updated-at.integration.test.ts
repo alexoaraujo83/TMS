@@ -64,10 +64,9 @@ if (!runIntegration) {
       for (const table of ["carriers", "users", "tenants"]) {
         await client.query(`alter table ${table} disable row level security`);
       }
-      await client.query(
-        "delete from carriers where tenant_id = $1",
-        [tenantId],
-      );
+      await client.query("delete from carriers where tenant_id = $1", [
+        tenantId,
+      ]);
       await client.query("delete from users where id = $1", [userId]);
       await client.query("delete from tenants where id = $1", [tenantId]);
       await client.query("commit");
