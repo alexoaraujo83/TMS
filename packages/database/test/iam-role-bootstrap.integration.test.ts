@@ -122,4 +122,46 @@ if (!enabled) {
       client.release();
     }
   });
+
+  it("resolves a new operator membership while tenant RLS is enabled", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
+      await client.query(
+        "delete from tenant_memberships where tenant_id = $1 and user_id = $2",
+        [tenantId, userId],
+      );
+
+      for (const table of [
+        "role_permissions",
+        "roles",
+        "tenant_memberships",
+        "users",
+        "tenants",
+      ]) {
+        await client.query(`alter table ${table} enable row level security`);
+        await client.query(`alter table ${table} force row level security`);
+      }
+
+      const result = await client.query<{ roleId: string | null }>(
+        `insert into tenant_memberships (user_id, tenant_id, role)
+         values ($1, $2, 'operator')
+         returning role_id as "roleId"`,
+        [userId, tenantId],
+      );
+
+      assert.equal(result.rowCount, 1);
+      assert.ok(result.rows[0].roleId);
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
 }
