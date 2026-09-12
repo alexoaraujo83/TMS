@@ -1,6 +1,11 @@
 import { IsIn, IsUUID } from "class-validator";
 
-const tripStatuses = ["planned", "in_transit", "delivered", "cancelled"] as const;
+const tripStatuses = [
+  "planned",
+  "in_transit",
+  "delivered",
+  "cancelled",
+] as const;
 
 export class CreateTripDto {
   @IsUUID()
