@@ -62,6 +62,15 @@ Partial unique indexes enforce at most one active assignment per tenant/freight,
 
 Matching must also treat an active assignment as resource occupancy. Candidate discovery therefore excludes any driver or vehicle already referenced by an `active` freight assignment, even if the vehicle master-data status remains `available`. This prevents the matching list from offering a resource that cannot be assigned atomically.
 
+Freight terminal lifecycle is synchronized with assignment lifecycle in the same database transaction:
+
+- moving a freight to `delivered` requires an active assignment and atomically marks that assignment `completed` with `completed_at`;
+- moving a freight to `cancelled` atomically marks any active assignment `cancelled` with `cancelled_at`;
+- assignment audit events are emitted in the same transaction as the freight status change;
+- if assignment synchronization fails, the entire freight status transaction rolls back.
+
+This prevents delivered/cancelled freights from leaving an active assignment that would permanently block matching for the driver or vehicle.
+
 ## Migration history
 
 1. Foundation: tenants, users, memberships and initial RLS.
