@@ -18,7 +18,7 @@ Uma capacidade só deve ser marcada como concluída quando o comportamento real 
 
 ## 3. Estado conhecido
 
-A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 19. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria, Trip Operations e a fundação de Compliance/GR.
+A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 19. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria, Trip Operations e Compliance/GR.
 
 IAM possui bootstrap de papéis canônicos por tenant (`admin` e `operator`), resolução de `role_id` em memberships e mapeamento inicial de permissões. O operador agora recebe também as permissões de Compliance/GR durante o provisionamento de novos tenants. A criação e resolução devem permanecer dentro de contexto tenant quando a operação exigir RLS.
 
@@ -26,7 +26,7 @@ Assignment possui invariantes de ocupação e ciclo de vida: assignment ativo oc
 
 Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary. A migration 0017 normaliza a correção da restrição aplicada ao banco para permitir cancelamento antes do início da viagem (`planned → cancelled`) sem `started_at`.
 
-Compliance/GR possui agora duas entidades tenant-scoped: `compliance_checks` para verificações de conformidade e risco, e `gr_requests` para o ciclo de Gerenciamento de Risco. Ambas possuem RLS/FORCE RLS, vínculo tenant-safe com freight/assignment, índices operacionais, estados controlados por CHECK constraints e `updated_at` autoritativo no banco. A migration 0018 cria a fundação e a 0019 mantém o bootstrap de IAM coerente para novos tenants.
+Compliance/GR possui duas entidades tenant-scoped: `compliance_checks` para verificações de conformidade e risco, e `gr_requests` para o ciclo de Gerenciamento de Risco. Ambas possuem RLS/FORCE RLS, vínculo tenant-safe com freight/assignment, índices operacionais, estados controlados por CHECK constraints e `updated_at` autoritativo no banco. A migration 0018 cria a fundação e a 0019 mantém o bootstrap de IAM coerente para novos tenants. O application layer agora possui repositório transacional, regras explícitas de transição, auditoria e API NestJS protegida pelas permissões `compliance:read/create/update`.
 
 O Worker permanece bootstrap/placeholder. Não assumir que processamento assíncrono, outbox, retries ou DLQ estejam implementados.
 
@@ -46,7 +46,7 @@ O Worker permanece bootstrap/placeholder. Não assumir que processamento assínc
 2. Fechar fluxos de freight: criação, consulta, matching, assignment e status.
 3. Expandir master data de carrier/driver/vehicle.
 4. Consolidar Trip Operations e seus estados operacionais.
-5. Implementar Compliance/GR no application layer e API, mantendo as invariantes já existentes no banco.
+5. Implementar e validar Compliance/GR ponta a ponta, incluindo testes de aplicação/API.
 6. Implementar estados de loading, vazio, erro, sucesso, proibido e indisponível.
 7. Cobrir API e UI com testes de comportamento.
 
@@ -129,9 +129,11 @@ QA deve receber: arquivos/módulos alterados, endpoints, permissões, migrations
 - impedir vínculos freight/assignment de outro tenant;
 - validar RLS/FORCE RLS;
 - validar permissões `compliance:read/create/update`;
-- registrar auditoria nas transições quando o application layer for implementado.
+- registrar auditoria na criação e nas transições;
+- validar lock transacional e rejeição de `expectedStatus` obsoleto;
+- validar API e mapeamento de erros 404/409.
 
-O teste `packages/database/test/compliance-gr.integration.test.ts` cobre as invariantes de status, timestamps e execução sob contexto tenant. O application layer ainda deve ser implementado antes de marcar Compliance/GR como domínio fechado.
+O teste `packages/database/test/compliance-gr.integration.test.ts` cobre as invariantes de status, timestamps e execução sob contexto tenant. O repositório e a API de Compliance/GR foram implementados; a próxima etapa é ampliar os testes de comportamento do application layer e fechar o gate completo antes de avançar para Matching avançado.
 
 ### Cenários mínimos de IAM
 
@@ -145,7 +147,7 @@ O teste `packages/database/test/compliance-gr.integration.test.ts` cobre as inva
 - resolução de role respeita tenant e RLS;
 - provisionamento não depende de trigger inseguro sobre `tenants`.
 
-O teste `packages/database/test/iam-role-bootstrap.integration.test.ts` valida a resolução de `operator`, o `role_id` e permissões operacionais/trip. Deve ser ampliado para validar explicitamente as novas permissões de Compliance/GR quando o próximo ciclo de CI confirmar a migration 0019.
+O teste `packages/database/test/iam-role-bootstrap.integration.test.ts` valida a resolução de `operator`, o `role_id` e permissões operacionais/trip. As permissões de Compliance/GR também são provisionadas pela migration 0019.
 
 ## 7. Critérios de handoff para Operações
 
