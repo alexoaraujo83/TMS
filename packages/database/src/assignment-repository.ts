@@ -68,10 +68,11 @@ export class AssignmentRepository {
 
       const driverResult = await client.query<{
         id: string;
+        carrierId: string | null;
         status: string;
         anttStatus: string;
       }>(
-        `select id, status, antt_status as "anttStatus" from drivers
+        `select id, carrier_id as "carrierId", status, antt_status as "anttStatus" from drivers
           where tenant_id = $1 and id = $2
           for update`,
         [tenantId, driverId],
@@ -80,6 +81,20 @@ export class AssignmentRepository {
       if (!driver) throw new Error("Driver not found");
       if (driver.status !== "active" || driver.anttStatus !== "approved") {
         throw new Error("Driver is not eligible for assignment");
+      }
+
+      if (driver.carrierId) {
+        const carrierResult = await client.query<{ status: string }>(
+          `select status from carriers
+            where tenant_id = $1 and id = $2
+            for update`,
+          [tenantId, driver.carrierId],
+        );
+        const carrier = carrierResult.rows[0];
+        if (!carrier) throw new Error("Driver carrier not found");
+        if (carrier.status !== "active") {
+          throw new Error("Driver carrier is not active");
+        }
       }
 
       const vehicleResult = await client.query<{
