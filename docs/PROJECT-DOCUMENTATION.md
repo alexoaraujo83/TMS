@@ -51,14 +51,14 @@ The root quality chain is formatting check, lint, typecheck, tests and build. Th
 
 The API has an operational health endpoint and a versioned base path `/api/v1`. The freight controller currently exposes:
 
-| Method | Route | Permission | Purpose |
-|---|---|---|---|
-| POST | `/api/v1/freights` | `freight:create` | Create freight |
-| GET | `/api/v1/freights` | `freight:read` | List freight |
-| GET | `/api/v1/freights/:id` | `freight:read` | Get freight |
-| GET | `/api/v1/freights/:id/matches` | `matching:read` | Rank candidates |
-| POST | `/api/v1/freights/:id/assignment` | `matching:assign` | Assign driver/vehicle |
-| PATCH | `/api/v1/freights/:id/status` | `freight:update` | Change freight status |
+| Method | Route                             | Permission        | Purpose               |
+| ------ | --------------------------------- | ----------------- | --------------------- |
+| POST   | `/api/v1/freights`                | `freight:create`  | Create freight        |
+| GET    | `/api/v1/freights`                | `freight:read`    | List freight          |
+| GET    | `/api/v1/freights/:id`            | `freight:read`    | Get freight           |
+| GET    | `/api/v1/freights/:id/matches`    | `matching:read`   | Rank candidates       |
+| POST   | `/api/v1/freights/:id/assignment` | `matching:assign` | Assign driver/vehicle |
+| PATCH  | `/api/v1/freights/:id/status`     | `freight:update`  | Change freight status |
 
 Every freight endpoint is protected by authentication and permission guards. UUID route parameters are validated by NestJS pipes.
 
@@ -111,23 +111,23 @@ Nexora has a mature engineering baseline including the same Node/pnpm/Turborepo 
 
 ## 11. Target vs implemented matrix
 
-| Capability | Current status |
-|---|---|
-| Monorepo/toolchain | Implemented |
-| Web/API/Worker deployables | Implemented bootstrap |
-| PostgreSQL migrations | Implemented through schema version 11 |
-| Multi-tenancy | Implemented foundation |
-| IAM/permissions | Implemented foundation |
-| Master data | Partially implemented: carrier/driver/vehicle |
-| Freight lifecycle | Implemented foundation |
-| Matching | Implemented foundation/ranking + assignment |
-| Trip execution | Architectural target |
-| Compliance/GR | Architectural target |
-| Finance | Architectural target |
-| Outbox/event processing | Architectural target; worker placeholder |
-| External business integrations | Not established as implemented |
-| Analytics/AI | Architectural target |
-| Production hardening | Roadmap |
+| Capability                     | Current status                                |
+| ------------------------------ | --------------------------------------------- |
+| Monorepo/toolchain             | Implemented                                   |
+| Web/API/Worker deployables     | Implemented bootstrap                         |
+| PostgreSQL migrations          | Implemented through schema version 11         |
+| Multi-tenancy                  | Implemented foundation                        |
+| IAM/permissions                | Implemented foundation                        |
+| Master data                    | Partially implemented: carrier/driver/vehicle |
+| Freight lifecycle              | Implemented foundation                        |
+| Matching                       | Implemented foundation/ranking + assignment   |
+| Trip execution                 | Architectural target                          |
+| Compliance/GR                  | Architectural target                          |
+| Finance                        | Architectural target                          |
+| Outbox/event processing        | Architectural target; worker placeholder      |
+| External business integrations | Not established as implemented                |
+| Analytics/AI                   | Architectural target                          |
+| Production hardening           | Roadmap                                       |
 
 ## 12. Documentation rule
 

@@ -206,14 +206,19 @@ export class PostgresFreightRepository {
         );
 
         if (nextStatus === "delivered" && !assignment.rows[0]) {
-          throw new Error("Freight cannot be delivered without an active assignment");
+          throw new Error(
+            "Freight cannot be delivered without an active assignment",
+          );
         }
 
         const activeAssignment = assignment.rows[0];
         if (activeAssignment) {
-          const assignmentNextStatus = nextStatus === "delivered" ? "completed" : "cancelled";
+          const assignmentNextStatus =
+            nextStatus === "delivered" ? "completed" : "cancelled";
           const timestampColumn =
-            assignmentNextStatus === "completed" ? "completed_at" : "cancelled_at";
+            assignmentNextStatus === "completed"
+              ? "completed_at"
+              : "cancelled_at";
 
           await client.query(
             `update freight_assignments

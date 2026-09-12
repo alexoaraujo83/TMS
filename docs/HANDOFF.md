@@ -83,17 +83,17 @@ QA should receive:
 
 ### Minimum QA matrix
 
-| Area | Verify |
-|---|---|
-| Authentication | unauthenticated request is rejected |
-| Tenant isolation | tenant A cannot read/write tenant B data |
-| Authorization | missing permission is forbidden |
-| Validation | malformed UUID/body/window/value is rejected |
-| Persistence | constraints and transaction behavior hold |
-| Lifecycle | illegal state transitions fail |
-| UI states | all required states render correctly |
-| Errors | stable error semantics and no sensitive leakage |
-| Audit | security/business changes produce required evidence |
+| Area             | Verify                                              |
+| ---------------- | --------------------------------------------------- |
+| Authentication   | unauthenticated request is rejected                 |
+| Tenant isolation | tenant A cannot read/write tenant B data            |
+| Authorization    | missing permission is forbidden                     |
+| Validation       | malformed UUID/body/window/value is rejected        |
+| Persistence      | constraints and transaction behavior hold           |
+| Lifecycle        | illegal state transitions fail                      |
+| UI states        | all required states render correctly                |
+| Errors           | stable error semantics and no sensitive leakage     |
+| Audit            | security/business changes produce required evidence |
 
 ## Development -> Operations handoff
 
