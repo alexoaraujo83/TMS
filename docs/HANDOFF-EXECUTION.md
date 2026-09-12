@@ -18,13 +18,13 @@ Uma capacidade só deve ser marcada como concluída quando o comportamento real 
 
 ## 3. Estado conhecido
 
-A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 16. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria e o núcleo de Trip Operations.
+A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 17. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria e o núcleo de Trip Operations.
 
 IAM possui bootstrap de papéis canônicos por tenant (`admin` e `operator`), resolução de `role_id` em memberships e mapeamento inicial de permissões. A criação e resolução devem permanecer dentro de contexto tenant quando a operação exigir RLS. O fluxo de provisionamento deve ser validado contra o caminho real de criação de membership antes de ser considerado fechado.
 
 Assignment possui invariantes de ocupação e ciclo de vida: assignment ativo ocupa motorista/veículo, delivery completa o assignment, cancelamento cancela o assignment e a transação deve preservar o estado anterior quando a sincronização falhar.
 
-Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary. A migration 0015 alinha a restrição aplicada ao banco para permitir cancelamento antes do início da viagem (`planned → cancelled`) sem `started_at`.
+Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary. A migration 0017 normaliza a correção da restrição aplicada ao banco para permitir cancelamento antes do início da viagem (`planned → cancelled`) sem `started_at`, evitando manter duas migrations com o mesmo prefixo numérico.
 
 O Worker permanece bootstrap/placeholder. Não assumir que processamento assíncrono, outbox, retries ou DLQ estejam implementados.
 
@@ -115,7 +115,7 @@ QA deve receber: arquivos/módulos alterados, endpoints, permissões, migrations
 - preservar atomicidade entre trip, freight e assignment;
 - registrar auditoria para criação e transição.
 
-O teste `packages/database/test/trip-operations.integration.test.ts` cobre o fluxo principal de início/entrega e rejeição de transição obsoleta. A migration 0015 mantém a invariável de cancelamento coerente com o fluxo `planned → cancelled`.
+O teste `packages/database/test/trip-operations.integration.test.ts` cobre o fluxo principal de início/entrega e rejeição de transição obsoleta. A migration 0017 mantém a invariável de cancelamento coerente com o fluxo `planned → cancelled`.
 
 ### Cenários mínimos de IAM
 
