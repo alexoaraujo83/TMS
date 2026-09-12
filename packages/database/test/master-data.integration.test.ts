@@ -52,7 +52,12 @@ if (!runIntegration) {
         `insert into users (id, email, display_name, status)
          values ($1, $3, 'Master User A', 'active'),
                 ($2, $4, 'Master User B', 'active')`,
-        [userA, userB, `master-a-${userA}@test.local`, `master-b-${userB}@test.local`],
+        [
+          userA,
+          userB,
+          `master-a-${userA}@test.local`,
+          `master-b-${userB}@test.local`,
+        ],
       );
       await client.query(
         `insert into tenant_memberships (user_id, tenant_id, role)
@@ -159,7 +164,11 @@ if (!runIntegration) {
         await client.query("rollback");
 
         const row = result.rows[0];
-        if (!row || row.carrierTenant !== tenantA || row.driverTenant !== tenantA) {
+        if (
+          !row ||
+          row.carrierTenant !== tenantA ||
+          row.driverTenant !== tenantA
+        ) {
           throw new Error("same-tenant master data relationship is invalid");
         }
       } finally {
@@ -178,10 +187,17 @@ if (!runIntegration) {
         await client.query(
           `insert into drivers (tenant_id, carrier_id, name, document_number, rntrc)
            values ($1, $2, 'Cross Tenant Driver', $3, $4)`,
-          [tenantB, carrierA, `cross-driver-${tenantB}`, `cross-rntrc-${tenantB}`],
+          [
+            tenantB,
+            carrierA,
+            `cross-driver-${tenantB}`,
+            `cross-rntrc-${tenantB}`,
+          ],
         );
         await client.query("rollback");
-        throw new Error("cross-tenant driver -> carrier relationship was accepted");
+        throw new Error(
+          "cross-tenant driver -> carrier relationship was accepted",
+        );
       } catch (error) {
         await client.query("rollback").catch(() => undefined);
         if (
@@ -208,7 +224,9 @@ if (!runIntegration) {
           [tenantB, driverA],
         );
         await client.query("rollback");
-        throw new Error("cross-tenant vehicle -> driver relationship was accepted");
+        throw new Error(
+          "cross-tenant vehicle -> driver relationship was accepted",
+        );
       } catch (error) {
         await client.query("rollback").catch(() => undefined);
         if (
