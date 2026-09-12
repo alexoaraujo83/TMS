@@ -98,8 +98,9 @@ export class FreightService {
         afterState: { status: dto.status },
       },
     );
-    if (!updated)
+    if (!updated) {
       throw new ConflictException("Freight was changed by another request");
+    }
 
     return updated;
   }
