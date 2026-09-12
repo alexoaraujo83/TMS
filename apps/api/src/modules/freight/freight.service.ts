@@ -81,24 +81,36 @@ export class FreightService {
       );
     }
 
-    const updated = await this.repository.updateStatusWithAudit(
-      context.tenantId,
-      freightId,
-      currentStatus,
-      dto.status,
-      {
-        actorUserId: context.userId,
-        action: "freight.status_changed",
-        entityType: "freight",
-        requestId: context.requestId,
-        beforeState: { status: currentStatus },
-        afterState: { status: dto.status },
-      },
-    );
-    if (!updated) {
-      throw new ConflictException("Freight was changed by another request");
-    }
+    try {
+      const updated = await this.repository.updateStatusWithAudit(
+        context.tenantId,
+        freightId,
+        currentStatus,
+        dto.status,
+        {
+          actorUserId: context.userId,
+          action: "freight.status_changed",
+          entityType: "freight",
+          requestId: context.requestId,
+          beforeState: { status: currentStatus },
+          afterState: { status: dto.status },
+        },
+      );
+      if (!updated) {
+        throw new ConflictException("Freight was changed by another request");
+      }
 
-    return updated;
+      return updated;
+    } catch (error) {
+      if (error instanceof ConflictException) throw error;
+      if (
+        error instanceof Error &&
+        error.message ===
+          "Freight cannot be delivered without an active assignment"
+      ) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
   }
 }
