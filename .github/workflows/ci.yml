@@ -38,9 +38,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.20.0
-      # The repository currently has no pnpm-lock.yaml. Keep CI installable until
-      # the lockfile is generated and committed; then restore --frozen-lockfile.
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tms/database migrate
       - run: pnpm format:check
       - run: pnpm lint
