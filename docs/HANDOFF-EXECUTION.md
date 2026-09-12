@@ -18,11 +18,11 @@ Uma capacidade só deve ser marcada como concluída quando o comportamento real 
 
 ## 3. Estado conhecido
 
-A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 14. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria e o núcleo de Trip Operations.
+A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 15. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria e o núcleo de Trip Operations.
 
 Assignment possui invariantes de ocupação e ciclo de vida: assignment ativo ocupa motorista/veículo, delivery completa o assignment, cancelamento cancela o assignment e a transação deve preservar o estado anterior quando a sincronização falhar.
 
-Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary.
+Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary. A migration 0015 alinha a restrição aplicada ao banco para permitir cancelamento antes do início da viagem (`planned → cancelled`) sem `started_at`.
 
 O Worker permanece bootstrap/placeholder. Não assumir que processamento assíncrono, outbox, retries ou DLQ estejam implementados.
 
@@ -113,7 +113,7 @@ QA deve receber: arquivos/módulos alterados, endpoints, permissões, migrations
 - preservar atomicidade entre trip, freight e assignment;
 - registrar auditoria para criação e transição.
 
-O teste `packages/database/test/trip-operations.integration.test.ts` cobre o fluxo principal de início/entrega e rejeição de transição obsoleta.
+O teste `packages/database/test/trip-operations.integration.test.ts` cobre o fluxo principal de início/entrega e rejeição de transição obsoleta. A migration 0015 mantém a invariável de cancelamento coerente com o fluxo `planned → cancelled`.
 
 ## 7. Critérios de handoff para Operações
 
