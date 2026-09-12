@@ -13,6 +13,23 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: tms_dev
+          POSTGRES_USER: tms
+          POSTGRES_PASSWORD: tms
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U tms -d tms_dev"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://tms:tms@localhost:5432/tms_dev
+      RUN_DB_INTEGRATION: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
