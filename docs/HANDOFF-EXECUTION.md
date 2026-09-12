@@ -1,6 +1,6 @@
 # TMS — Handoff de Execução e Continuidade
 
-**Status:** baseline operacional
+**Status:** baseline operacional em evolução
 **Fonte de verdade:** código e banco do repositório `alexoaraujo83/TMS`
 **Referência:** `alexoaraujo83/nexora-tms`, sem dependência de runtime
 
@@ -18,9 +18,11 @@ Uma capacidade só deve ser marcada como concluída quando o comportamento real 
 
 ## 3. Estado conhecido
 
-A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 11. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment e auditoria.
+A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 14. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria e o núcleo de Trip Operations.
 
 Assignment possui invariantes de ocupação e ciclo de vida: assignment ativo ocupa motorista/veículo, delivery completa o assignment, cancelamento cancela o assignment e a transação deve preservar o estado anterior quando a sincronização falhar.
+
+Trip Operations agora possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary.
 
 O Worker permanece bootstrap/placeholder. Não assumir que processamento assíncrono, outbox, retries ou DLQ estejam implementados.
 
@@ -39,8 +41,9 @@ O Worker permanece bootstrap/placeholder. Não assumir que processamento assínc
 1. Consolidar UX das telas existentes.
 2. Fechar fluxos de freight: criação, consulta, matching, assignment e status.
 3. Expandir master data de carrier/driver/vehicle.
-4. Implementar estados de loading, vazio, erro, sucesso, proibido e indisponível.
-5. Cobrir API e UI com testes de comportamento.
+4. Consolidar Trip Operations e seus estados operacionais.
+5. Implementar estados de loading, vazio, erro, sucesso, proibido e indisponível.
+6. Cobrir API e UI com testes de comportamento.
 
 ### P2 — Operação
 
@@ -51,7 +54,7 @@ O Worker permanece bootstrap/placeholder. Não assumir que processamento assínc
 
 ### P3 — Domínios futuros
 
-Trip Operations, Compliance/GR, Finance, Analytics/AI e integrações externas devem ser adicionados como bounded contexts/adapters, sem misturar responsabilidades no módulo de Freight.
+Compliance/GR, Finance, Analytics/AI e integrações externas devem ser adicionados como bounded contexts/adapters, sem misturar responsabilidades no módulo de Freight ou Trip Operations.
 
 ## 5. Checklist por mudança
 
@@ -97,7 +100,20 @@ QA deve receber: arquivos/módulos alterados, endpoints, permissões, migrations
 - preservar invariantes após falha/transação;
 - validar isolamento tenant no assignment.
 
-O teste de integração `packages/database/test/assignment-lifecycle.integration.test.ts` cobre atualmente sincronização de delivery/cancelamento, rollback de delivery sem assignment, exclusão de recurso ocupado do matching e concorrência de assignment.
+### Cenários mínimos de Trip Operations
+
+- criar trip somente para assignment ativo do mesmo freight;
+- impedir trip duplicada para assignment;
+- `planned → in_transit` mover freight para `in_transit`;
+- `in_transit → delivered` mover freight para `delivered` e completar assignment;
+- `planned/in_transit → cancelled` cancelar freight e assignment;
+- rejeitar transição com `expectedStatus` obsoleto;
+- impedir transições inválidas;
+- validar RLS tenant-scoped;
+- preservar atomicidade entre trip, freight e assignment;
+- registrar auditoria para criação e transição.
+
+O teste `packages/database/test/trip-operations.integration.test.ts` cobre o fluxo principal de início/entrega e rejeição de transição obsoleta.
 
 ## 7. Critérios de handoff para Operações
 
