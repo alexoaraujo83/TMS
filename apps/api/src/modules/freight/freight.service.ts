@@ -1,5 +1,5 @@
 import { Inject, Injectable, ConflictException, NotFoundException } from '@nestjs/common';
-import { AuditRepository, PostgresFreightRepository, type FreightRow } from '@tms/database';
+import { PostgresFreightRepository, type FreightRow } from '@tms/database';
 import type { FreightStatus } from '@tms/freight';
 import type { RequestContext } from '../../common/request-context.js';
 import type { CreateFreightDto, UpdateFreightStatusDto } from './freight.dto.js';
@@ -20,45 +20,40 @@ const transitions: Readonly<Record<FreightStatus, readonly FreightStatus[]>> = {
 @Injectable()
 export class FreightService {
   private readonly repository: PostgresFreightRepository;
-  private readonly audit: AuditRepository;
 
   constructor(@Inject(DATABASE_POOL) pool: Pool) {
     this.repository = new PostgresFreightRepository(pool);
-    this.audit = new AuditRepository(pool);
   }
 
   async create(context: RequestContext, dto: CreateFreightDto): Promise<FreightRow> {
-    const created = await this.repository.create({
-      tenantId: context.tenantId,
-      freightType: dto.freightType,
-      originCity: dto.originCity,
-      originState: dto.originState.toUpperCase(),
-      destinationCity: dto.destinationCity,
-      destinationState: dto.destinationState.toUpperCase(),
-      cargoDescription: dto.cargoDescription,
-      quantity: dto.quantity,
-      weightKg: dto.weightKg,
-      volumeM3: dto.volumeM3,
-      linearMeters: dto.linearMeters,
-      customerPriceCents: dto.customerPriceCents,
-      driverPriceCents: dto.driverPriceCents,
-      vehicleTypes: dto.vehicleTypes,
-      bodyTypes: dto.bodyTypes,
-      minimumFreeMeters: dto.minimumFreeMeters,
-      minimumCapacityKg: dto.minimumCapacityKg,
-    });
-
-    await this.audit.append({
-      tenantId: context.tenantId,
-      actorUserId: context.userId,
-      action: 'freight.created',
-      entityType: 'freight',
-      entityId: created.id,
-      requestId: context.requestId,
-      afterState: { status: created.status, freightType: created.freightType },
-    });
-
-    return created;
+    return this.repository.createWithAudit(
+      {
+        tenantId: context.tenantId,
+        freightType: dto.freightType,
+        originCity: dto.originCity,
+        originState: dto.originState.toUpperCase(),
+        destinationCity: dto.destinationCity,
+        destinationState: dto.destinationState.toUpperCase(),
+        cargoDescription: dto.cargoDescription,
+        quantity: dto.quantity,
+        weightKg: dto.weightKg,
+        volumeM3: dto.volumeM3,
+        linearMeters: dto.linearMeters,
+        customerPriceCents: dto.customerPriceCents,
+        driverPriceCents: dto.driverPriceCents,
+        vehicleTypes: dto.vehicleTypes,
+        bodyTypes: dto.bodyTypes,
+        minimumFreeMeters: dto.minimumFreeMeters,
+        minimumCapacityKg: dto.minimumCapacityKg,
+      },
+      {
+        actorUserId: context.userId,
+        action: 'freight.created',
+        entityType: 'freight',
+        requestId: context.requestId,
+        afterState: { status: 'draft', freightType: dto.freightType },
+      },
+    );
   }
 
   list(context: RequestContext): Promise<readonly FreightRow[]> {
@@ -80,19 +75,21 @@ export class FreightService {
       throw new ConflictException(`Invalid freight status transition: ${currentStatus} -> ${dto.status}`);
     }
 
-    const updated = await this.repository.updateStatus(context.tenantId, freightId, currentStatus, dto.status);
+    const updated = await this.repository.updateStatusWithAudit(
+      context.tenantId,
+      freightId,
+      currentStatus,
+      dto.status,
+      {
+        actorUserId: context.userId,
+        action: 'freight.status_changed',
+        entityType: 'freight',
+        requestId: context.requestId,
+        beforeState: { status: currentStatus },
+        afterState: { status: dto.status },
+      },
+    );
     if (!updated) throw new ConflictException('Freight was changed by another request');
-
-    await this.audit.append({
-      tenantId: context.tenantId,
-      actorUserId: context.userId,
-      action: 'freight.status_changed',
-      entityType: 'freight',
-      entityId: updated.id,
-      requestId: context.requestId,
-      beforeState: { status: currentStatus },
-      afterState: { status: updated.status },
-    });
 
     return updated;
   }
