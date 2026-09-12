@@ -4,6 +4,8 @@ import { IsIn, IsNumber, IsOptional, IsString, IsUUID, IsPositive, Length } from
 const statuses = ['active', 'inactive', 'blocked'] as const;
 const anttStatuses = ['pending', 'approved', 'rejected', 'expired'] as const;
 const vehicleStatuses = ['available', 'unavailable', 'maintenance', 'blocked'] as const;
+const vehicleTypes = ['fiorino', '3_4', 'toco', 'truck', 'bitruck', 'carreta', 'ls', 'vanderleia', 'bitrem', 'rodotrem'] as const;
+const bodyTypes = ['bau', 'sider', 'grade_baixa', 'graneleiro', 'prancha', 'aberto', 'outro'] as const;
 
 export class CreateCarrierDto {
   @IsString() @Length(2, 200) legalName!: string;
@@ -24,8 +26,8 @@ export class CreateDriverDto {
 export class CreateVehicleDto {
   @IsOptional() @IsUUID() driverId?: string;
   @IsString() @Length(7, 10) plate!: string;
-  @IsString() @Length(2, 40) vehicleType!: string;
-  @IsString() @Length(2, 40) bodyType!: string;
+  @IsString() @IsIn(vehicleTypes) vehicleType!: string;
+  @IsString() @IsIn(bodyTypes) bodyType!: string;
   @Type(() => Number) @IsNumber() @IsPositive() capacityKg!: number;
   @Type(() => Number) @IsOptional() @IsNumber() @IsPositive() freeMeters?: number;
   @IsOptional() @IsIn(vehicleStatuses) status?: string;
