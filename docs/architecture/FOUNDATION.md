@@ -30,33 +30,43 @@ Build a new TMS/SaaS from zero, independently from Nexora TMS, using Nexora only
 ## Domain boundaries
 
 ### Platform
+
 Tenants, configuration, feature flags and platform administration.
 
 ### IAM
+
 Users, identities, memberships, roles, permissions and authorization policies.
 
 ### Master Data
+
 Parties, customers, carriers, drivers, vehicles, addresses and reference data.
 
 ### Freight
+
 Transport requests, cargo, stops, quotations, negotiation and contracting.
 
 ### Matching
+
 Capacity, availability, qualification, matching rules, candidates, scoring and assignment.
 
 ### Trip Operations
+
 Trips, stops, execution, occurrences, proof of delivery and operational status.
 
 ### Compliance
+
 Documents, validity, risk controls, GR requirements and operational blocks.
 
 ### Finance
+
 Costs, revenue, payables, receivables, settlements, payments, reconciliation and margin.
 
 ### Reliability
+
 Outbox, jobs, retries, dead-letter handling and webhooks.
 
 ### Audit
+
 Security and business audit trails.
 
 ## Canonical request flow
