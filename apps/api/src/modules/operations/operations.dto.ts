@@ -3,9 +3,9 @@ import {
   IsIn,
   IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   IsUUID,
-  IsPositive,
   Length,
   Matches,
 } from "class-validator";
@@ -42,6 +42,7 @@ const bodyTypes = [
 
 const normalizeText = ({ value }: { value: unknown }): unknown =>
   typeof value === "string" ? value.trim() : value;
+
 const normalizePlate = ({ value }: { value: unknown }): unknown =>
   typeof value === "string" ? value.replace(/[-\s]/g, "").toUpperCase() : value;
 
@@ -63,7 +64,9 @@ export class CreateCarrierDto {
 }
 
 export class CreateDriverDto {
-  @IsOptional() @IsUUID() carrierId?: string;
+  @IsOptional()
+  @IsUUID()
+  carrierId?: string;
 
   @Transform(normalizeText)
   @IsString()
@@ -88,12 +91,19 @@ export class CreateDriverDto {
   @Length(3, 30)
   rntrc?: string;
 
-  @IsOptional() @IsIn(anttStatuses) anttStatus?: string;
-  @IsOptional() @IsIn(statuses) status?: string;
+  @IsOptional()
+  @IsIn(anttStatuses)
+  anttStatus?: string;
+
+  @IsOptional()
+  @IsIn(statuses)
+  status?: string;
 }
 
 export class CreateVehicleDto {
-  @IsOptional() @IsUUID() driverId?: string;
+  @IsOptional()
+  @IsUUID()
+  driverId?: string;
 
   @Transform(normalizePlate)
   @IsString()
@@ -101,8 +111,13 @@ export class CreateVehicleDto {
   @Matches(/^[A-Z0-9]{7}$/)
   plate!: string;
 
-  @IsString() @IsIn(vehicleTypes) vehicleType!: string;
-  @IsString() @IsIn(bodyTypes) bodyType!: string;
+  @IsString()
+  @IsIn(vehicleTypes)
+  vehicleType!: string;
+
+  @IsString()
+  @IsIn(bodyTypes)
+  bodyType!: string;
 
   @Type(() => Number)
   @IsNumber({ allowNaN: false, allowInfinity: false })
@@ -115,5 +130,7 @@ export class CreateVehicleDto {
   @IsPositive()
   freeMeters?: number;
 
-  @IsOptional() @IsIn(vehicleStatuses) status?: string;
+  @IsOptional()
+  @IsIn(vehicleStatuses)
+  status?: string;
 }
