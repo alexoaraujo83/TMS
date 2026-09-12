@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
 import { SignJWT } from 'jose';
-import { verifyAccessToken } from '../src/index.js';
+import { verifyAccessToken } from '../src/index.ts';
 
 const secret = 'test-only-secret-that-is-long-enough';
 const config = { secret, issuer: 'tms-test', audience: 'tms-api-test' };
@@ -40,7 +40,7 @@ test('rejects a token signed with an unexpected algorithm', async () => {
   await assert.rejects(() => verifyAccessToken(bad, config));
 });
 
-test('rejects an invalid issuer', async () => {
+test('rejects a token with an invalid issuer', async () => {
   const bad = await new SignJWT({ tenantId: '11111111-1111-1111-1111-111111111111' })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject('22222222-2222-2222-2222-222222222222')
