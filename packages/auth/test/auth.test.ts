@@ -21,7 +21,15 @@ test("verifyAccessToken accepts a valid RS256 token", async () => {
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
-        keys: [{ ...jwk, kty: "RSA", use: "sig", alg: "RS256", kid: "test-key" }],
+        keys: [
+          {
+            ...jwk,
+            kty: "RSA",
+            use: "sig",
+            alg: "RS256",
+            kid: "test-key",
+          },
+        ],
       }),
       { headers: { "content-type": "application/json" } },
     );
