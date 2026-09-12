@@ -13,6 +13,8 @@ import { CurrentUser } from "../../common/current-user.decorator.js";
 import { PermissionGuard } from "../../common/permission.guard.js";
 import { RequirePermission } from "../../common/permission.decorator.js";
 import type { RequestContext } from "../../common/request-context.js";
+import { AssignFreightDto } from "./assignment.dto.js";
+import { AssignmentService } from "./assignment.service.js";
 import { CreateFreightDto, UpdateFreightStatusDto } from "./freight.dto.js";
 import { FreightService } from "./freight.service.js";
 import { MatchingService } from "./matching.service.js";
@@ -23,6 +25,7 @@ export class FreightController {
   constructor(
     private readonly service: FreightService,
     private readonly matching: MatchingService,
+    private readonly assignments: AssignmentService,
   ) {}
 
   @Post()
@@ -50,12 +53,22 @@ export class FreightController {
   }
 
   @Get(":id/matches")
-  @RequirePermission("freight:read")
+  @RequirePermission("matching:read")
   matches(
     @CurrentUser() context: RequestContext,
     @Param("id", new ParseUUIDPipe()) id: string,
   ) {
     return this.matching.rank(context, id);
+  }
+
+  @Post(":id/assignment")
+  @RequirePermission("matching:assign")
+  assign(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() dto: AssignFreightDto,
+  ) {
+    return this.assignments.assign(context, id, dto.driverId, dto.vehicleId);
   }
 
   @Patch(":id/status")
