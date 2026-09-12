@@ -109,9 +109,10 @@ if (!enabled) {
       await client.query("delete from vehicles where id = $1", [vehicleId]);
       await client.query("delete from drivers where id = $1", [driverId]);
       await client.query("delete from carriers where id = $1", [carrierId]);
-      await client.query("delete from tenant_memberships where tenant_id = $1", [
-        tenantId,
-      ]);
+      await client.query(
+        "delete from tenant_memberships where tenant_id = $1",
+        [tenantId],
+      );
       await client.query("delete from users where id = $1", [userId]);
       await client.query("delete from tenants where id = $1", [tenantId]);
       await client.query("commit");
@@ -123,13 +124,12 @@ if (!enabled) {
 
   describe("carrier status eligibility", () => {
     it("excludes a driver linked to an inactive carrier from matching", async () => {
-      const inactiveCandidates =
-        await vehicleRepository.findMatchingCandidates(
-          tenantId,
-          ["truck"],
-          ["open"],
-          1000,
-        );
+      const inactiveCandidates = await vehicleRepository.findMatchingCandidates(
+        tenantId,
+        ["truck"],
+        ["open"],
+        1000,
+      );
       assert.equal(
         inactiveCandidates.some((candidate) => candidate.driverId === driverId),
         false,
@@ -137,13 +137,12 @@ if (!enabled) {
 
       await tenantUpdateCarrierStatus("active");
 
-      const activeCandidates =
-        await vehicleRepository.findMatchingCandidates(
-          tenantId,
-          ["truck"],
-          ["open"],
-          1000,
-        );
+      const activeCandidates = await vehicleRepository.findMatchingCandidates(
+        tenantId,
+        ["truck"],
+        ["open"],
+        1000,
+      );
       assert.equal(
         activeCandidates.some((candidate) => candidate.driverId === driverId),
         true,
