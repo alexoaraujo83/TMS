@@ -18,4 +18,6 @@ Production promotion is blocked when any P0 or P1 security/control failure remai
 
 ## Current implementation status
 
-The repository is still foundation-stage. Protected operational controllers are intentionally not exposed until the authentication, membership, authorization and audit path is wired end-to-end.
+Protected Freight and Operations controllers are now exposed behind JWT authentication, database-backed tenant membership and permission guards. Freight matching also applies tenant-scoped hard eligibility filters before deterministic ranking.
+
+Production remains blocked until audit logging, end-to-end security tests, CI verification and production hardening are complete.
