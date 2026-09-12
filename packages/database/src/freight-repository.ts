@@ -69,6 +69,8 @@ const FREIGHT_COLUMNS = `id,
   created_at as "createdAt",
   updated_at as "updatedAt"`;
 
+type AuditInput = Omit<AuditEventInput, "tenantId" | "entityId">;
+
 export class PostgresFreightRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -78,7 +80,7 @@ export class PostgresFreightRepository {
 
   async createWithAudit(
     input: CreateFreightInput,
-    audit?: Omit<AuditEventInput, "tenantId" | "entityId">,
+    audit?: AuditInput,
   ): Promise<FreightRow> {
     assertUuid(input.tenantId, "tenantId");
     return withTransaction(
@@ -116,12 +118,13 @@ export class PostgresFreightRepository {
         );
         const row = result.rows[0];
         if (!row) throw new Error("Freight creation failed");
-        if (audit)
+        if (audit) {
           await appendAuditEvent(client, {
             ...audit,
             tenantId: input.tenantId,
             entityId: row.id,
           });
+        }
         return row;
       },
     );
@@ -172,10 +175,11 @@ export class PostgresFreightRepository {
     freightId: string,
     expectedStatus: string,
     nextStatus: string,
-    audit?: Omit<AuditEventInput, "tenantId" | "entityId">,
+    audit?: AuditInput,
   ): Promise<FreightRow | null> {
     assertUuid(tenantId, "tenantId");
     assertUuid(freightId, "freightId");
+
     return withTransaction(this.pool, { tenantId }, async (client) => {
       const result = await client.query<FreightRow>(
         `update freights
@@ -185,13 +189,63 @@ export class PostgresFreightRepository {
         [freightId, tenantId, nextStatus, expectedStatus],
       );
       const row = result.rows[0] ?? null;
-      if (row && audit) {
+      if (!row) return null;
+
+      if (nextStatus === "delivered" || nextStatus === "cancelled") {
+        const assignment = await client.query<{
+          id: string;
+          status: "active";
+        }>(
+          `select id, status
+             from freight_assignments
+            where tenant_id = $1
+              and freight_id = $2
+              and status = 'active'
+            for update`,
+          [tenantId, freightId],
+        );
+
+        if (nextStatus === "delivered" && !assignment.rows[0]) {
+          throw new Error("Freight cannot be delivered without an active assignment");
+        }
+
+        const activeAssignment = assignment.rows[0];
+        if (activeAssignment) {
+          const assignmentNextStatus = nextStatus === "delivered" ? "completed" : "cancelled";
+          const timestampColumn =
+            assignmentNextStatus === "completed" ? "completed_at" : "cancelled_at";
+
+          await client.query(
+            `update freight_assignments
+                set status = $3, ${timestampColumn} = now(), updated_at = now()
+              where tenant_id = $1 and id = $2 and status = 'active'`,
+            [tenantId, activeAssignment.id, assignmentNextStatus],
+          );
+
+          if (audit) {
+            await appendAuditEvent(client, {
+              ...audit,
+              action:
+                assignmentNextStatus === "completed"
+                  ? "freight.assignment_completed"
+                  : "freight.assignment_cancelled",
+              entityType: "freight_assignment",
+              entityId: activeAssignment.id,
+              beforeState: { status: "active", freightId },
+              afterState: { status: assignmentNextStatus, freightId },
+            });
+          }
+        }
+      }
+
+      if (audit) {
         await appendAuditEvent(client, {
           ...audit,
           tenantId,
           entityId: row.id,
         });
       }
+
       return row;
     });
   }
