@@ -51,10 +51,16 @@ if (!runIntegration) {
       userB = randomUUID();
       freightA = randomUUID();
 
-      await client.query(`insert into tenants (id, name, status) values ($1, 'Tenant A', 'active'), ($2, 'Tenant B', 'active')`, [tenantA, tenantB]);
-      await client.query(`insert into users (id, email, status) values ($1, 'a@test.local', 'active'), ($2, 'b@test.local', 'active')`, [userA, userB]);
       await client.query(
-        `insert into tenant_memberships (user_id, tenant_id, role, active) values ($1,$2,'operator',true),($3,$4,'operator',true)`,
+        `insert into tenants (id, name, slug, status) values ($1, 'Tenant A', $3, 'active'), ($2, 'Tenant B', $4, 'active')`,
+        [tenantA, tenantB, `tenant-a-${tenantA}`, `tenant-b-${tenantB}`],
+      );
+      await client.query(
+        `insert into users (id, email, display_name, status) values ($1, 'a@test.local', 'User A', 'active'), ($2, 'b@test.local', 'User B', 'active')`,
+        [userA, userB],
+      );
+      await client.query(
+        `insert into tenant_memberships (user_id, tenant_id, role) values ($1,$2,'operator'),($3,$4,'operator')`,
         [userA, tenantA, userB, tenantB],
       );
       await client.query(
@@ -90,8 +96,6 @@ if (!runIntegration) {
   after(async () => {
     const client = await pool.connect();
     try {
-      // Cleanup is executed with RLS temporarily disabled because the test role
-      // owns the schema in the isolated CI database.
       await client.query('begin');
       for (const table of ['audit_events', 'freights', 'tenant_memberships', 'users', 'tenants']) {
         await client.query(`alter table ${table} disable row level security`);
