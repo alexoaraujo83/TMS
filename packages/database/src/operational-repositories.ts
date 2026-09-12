@@ -473,7 +473,8 @@ export class VehicleRepository {
       const result = await client.query<MatchingCandidateRecord>(
         `select d.id as "driverId", d.tenant_id as "tenantId", v.vehicle_type as "vehicleType", v.body_type as "bodyType", v.capacity_kg as "capacityKg", v.free_meters as "freeMeters"
            from drivers d join vehicles v on v.driver_id = d.id and v.tenant_id = d.tenant_id
-          where d.tenant_id = $1 and d.status = 'active' and d.antt_status = 'approved' and v.status = 'available' and v.capacity_kg >= $2
+           left join carriers c on c.id = d.carrier_id and c.tenant_id = d.tenant_id
+          where d.tenant_id = $1 and d.status = 'active' and d.antt_status = 'approved' and (d.carrier_id is null or c.status = 'active') and v.status = 'available' and v.capacity_kg >= $2
             and (cardinality($3::text[]) = 0 or v.vehicle_type = any($3::text[]))
             and (cardinality($4::text[]) = 0 or v.body_type = any($4::text[]))
             and ($5::numeric is null or v.free_meters >= $5::numeric)
