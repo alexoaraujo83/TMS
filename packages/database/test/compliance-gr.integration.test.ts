@@ -56,11 +56,20 @@ if (!enabled) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      for (const table of ["compliance_checks", "gr_requests", "freights", "tenants"]) {
+      for (const table of [
+        "compliance_checks",
+        "gr_requests",
+        "freights",
+        "tenants",
+      ]) {
         await client.query(`alter table ${table} disable row level security`);
       }
-      await client.query("delete from compliance_checks where tenant_id = $1", [tenantId]);
-      await client.query("delete from gr_requests where tenant_id = $1", [tenantId]);
+      await client.query("delete from compliance_checks where tenant_id = $1", [
+        tenantId,
+      ]);
+      await client.query("delete from gr_requests where tenant_id = $1", [
+        tenantId,
+      ]);
       await client.query("delete from freights where id = $1", [freightId]);
       await client.query("delete from tenants where id = $1", [tenantId]);
       await client.query("commit");
@@ -74,7 +83,10 @@ if (!enabled) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      await client.query("select set_config($1, $2, true)", ["app.tenant_id", tenantId]);
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
       await client.query("alter table compliance_checks enable row level security");
       await client.query("alter table compliance_checks force row level security");
 
@@ -103,7 +115,10 @@ if (!enabled) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      await client.query("select set_config($1, $2, true)", ["app.tenant_id", tenantId]);
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
       const result = await client.query(
         `insert into gr_requests (tenant_id, freight_id, status, submitted_at)
          values ($1, $2, 'submitted', now()) returning status`,
