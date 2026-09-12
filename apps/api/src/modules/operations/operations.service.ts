@@ -9,10 +9,11 @@ import {
   DriverRepository,
   TripRepository,
   VehicleRepository,
+  type TripStatus,
 } from "@tms/database";
-import type { RequestContext } from "../../common/request-context.js";
-import { DATABASE_POOL } from "../../common/database.provider.js";
 import type { Pool } from "pg";
+import { DATABASE_POOL } from "../../common/database.provider.js";
+import type { RequestContext } from "../../common/request-context.js";
 import type {
   CreateCarrierDto,
   CreateDriverDto,
@@ -128,8 +129,12 @@ export class OperationsService {
   }
 
   transitionTrip(context: RequestContext, id: string, dto: TransitionTripDto) {
-    return this.trips.transition(context.tenantId, id, dto.expectedStatus as never, dto.nextStatus as never, {
-      actorUserId: context.userId, action: "trip.transitioned", entityType: "trip", requestId: context.requestId,
-    });
+    return this.trips.transition(
+      context.tenantId,
+      id,
+      dto.expectedStatus as TripStatus,
+      dto.nextStatus as TripStatus,
+      { actorUserId: context.userId, action: "trip.transitioned", entityType: "trip", requestId: context.requestId },
+    );
   }
 }
