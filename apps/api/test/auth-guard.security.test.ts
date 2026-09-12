@@ -10,6 +10,10 @@ const USER_ID = "11111111-1111-4111-8111-111111111111";
 const TENANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
+process.env.JWT_SECRET = SECRET;
+process.env.JWT_ISSUER = ISSUER;
+process.env.JWT_AUDIENCE = AUDIENCE;
+
 function contextFor(request: Record<string, unknown>) {
   return {
     switchToHttp: () => ({ getRequest: () => request }),
@@ -131,7 +135,6 @@ test("AuthGuard rejects a token with an invalid issuer", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
   );
 });
