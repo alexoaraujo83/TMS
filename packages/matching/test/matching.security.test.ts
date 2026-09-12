@@ -42,7 +42,9 @@ test("rejects cross-tenant matching before scoring", () => {
 });
 
 test("rejects freight statuses that are not matching", () => {
-  assert.throws(() => scoreCandidate({ ...baseFreight, status: "open" }, candidate));
+  assert.throws(() =>
+    scoreCandidate({ ...baseFreight, status: "open" }, candidate),
+  );
   assert.throws(() =>
     rankCandidates({ ...baseFreight, status: "negotiating" }, [candidate]),
   );
@@ -56,8 +58,14 @@ test("ranks eligible candidates deterministically", () => {
 });
 
 test("uses driver id as deterministic tie-breaker", () => {
-  const first = { ...candidate, driverId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" };
-  const second = { ...candidate, driverId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" };
+  const first = {
+    ...candidate,
+    driverId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  };
+  const second = {
+    ...candidate,
+    driverId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  };
   const results = rankCandidates(baseFreight, [second, first]);
   assert.deepEqual(
     results.map((result) => result.candidate.driverId),
