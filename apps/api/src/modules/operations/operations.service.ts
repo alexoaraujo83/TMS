@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -25,7 +26,36 @@ import type {
 import type { CreateTripDto, TransitionTripDto } from "./trip.dto.js";
 
 function assertUpdatePayload(dto: object): void {
-  if (Object.keys(dto).length === 0) throw new BadRequestException("At least one field is required");
+  if (Object.keys(dto).length === 0) {
+    throw new BadRequestException("At least one field is required");
+  }
+}
+
+function mapTripError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "Trip operation failed";
+
+  if (message === "Assignment not found" || message === "Freight not found" || message === "Trip not found") {
+    throw new NotFoundException(message);
+  }
+
+  if (
+    message === "Assignment does not belong to the freight" ||
+    message === "Only an active assignment can start a trip" ||
+    message === "Freight must be assigned before trip creation" ||
+    message === "Trip already exists for assignment" ||
+    message === "Trip requires an active assignment" ||
+    message.includes("does not match expected status") ||
+    message.includes("Freight cannot transition") ||
+    message === "Trip transition failed"
+  ) {
+    throw new ConflictException(message);
+  }
+
+  if (message.startsWith("Trip cannot transition")) {
+    throw new BadRequestException(message);
+  }
+
+  throw error;
 }
 
 @Injectable()
@@ -43,13 +73,21 @@ export class OperationsService {
   }
 
   createCarrier(context: RequestContext, dto: CreateCarrierDto) {
-    return this.carriers.create({ tenantId: context.tenantId, ...dto }, {
-      actorUserId: context.userId, action: "carrier.created", entityType: "carrier", requestId: context.requestId,
-      afterState: { legalName: dto.legalName, status: dto.status ?? "active" },
-    });
+    return this.carriers.create(
+      { tenantId: context.tenantId, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "carrier.created",
+        entityType: "carrier",
+        requestId: context.requestId,
+        afterState: { legalName: dto.legalName, status: dto.status ?? "active" },
+      },
+    );
   }
 
-  listCarriers(context: RequestContext) { return this.carriers.list(context.tenantId); }
+  listCarriers(context: RequestContext) {
+    return this.carriers.list(context.tenantId);
+  }
 
   async getCarrier(context: RequestContext, id: string) {
     const item = await this.carriers.findById(context.tenantId, id);
@@ -59,21 +97,40 @@ export class OperationsService {
 
   async updateCarrier(context: RequestContext, id: string, dto: UpdateCarrierDto) {
     assertUpdatePayload(dto);
-    const item = await this.carriers.update({ tenantId: context.tenantId, id, ...dto }, {
-      actorUserId: context.userId, action: "carrier.updated", entityType: "carrier", requestId: context.requestId,
-    });
+    const item = await this.carriers.update(
+      { tenantId: context.tenantId, id, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "carrier.updated",
+        entityType: "carrier",
+        requestId: context.requestId,
+      },
+    );
     if (!item) throw new NotFoundException("Carrier not found");
     return item;
   }
 
   createDriver(context: RequestContext, dto: CreateDriverDto) {
-    return this.drivers.create({ tenantId: context.tenantId, ...dto }, {
-      actorUserId: context.userId, action: "driver.created", entityType: "driver", requestId: context.requestId,
-      afterState: { name: dto.name, carrierId: dto.carrierId ?? null, anttStatus: dto.anttStatus ?? "pending", status: dto.status ?? "active" },
-    });
+    return this.drivers.create(
+      { tenantId: context.tenantId, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "driver.created",
+        entityType: "driver",
+        requestId: context.requestId,
+        afterState: {
+          name: dto.name,
+          carrierId: dto.carrierId ?? null,
+          anttStatus: dto.anttStatus ?? "pending",
+          status: dto.status ?? "active",
+        },
+      },
+    );
   }
 
-  listDrivers(context: RequestContext) { return this.drivers.list(context.tenantId); }
+  listDrivers(context: RequestContext) {
+    return this.drivers.list(context.tenantId);
+  }
 
   async getDriver(context: RequestContext, id: string) {
     const item = await this.drivers.findById(context.tenantId, id);
@@ -83,21 +140,41 @@ export class OperationsService {
 
   async updateDriver(context: RequestContext, id: string, dto: UpdateDriverDto) {
     assertUpdatePayload(dto);
-    const item = await this.drivers.update({ tenantId: context.tenantId, id, ...dto }, {
-      actorUserId: context.userId, action: "driver.updated", entityType: "driver", requestId: context.requestId,
-    });
+    const item = await this.drivers.update(
+      { tenantId: context.tenantId, id, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "driver.updated",
+        entityType: "driver",
+        requestId: context.requestId,
+      },
+    );
     if (!item) throw new NotFoundException("Driver not found");
     return item;
   }
 
   createVehicle(context: RequestContext, dto: CreateVehicleDto) {
-    return this.vehicles.create({ tenantId: context.tenantId, ...dto }, {
-      actorUserId: context.userId, action: "vehicle.created", entityType: "vehicle", requestId: context.requestId,
-      afterState: { plate: dto.plate.toUpperCase(), driverId: dto.driverId ?? null, vehicleType: dto.vehicleType, bodyType: dto.bodyType, status: dto.status ?? "available" },
-    });
+    return this.vehicles.create(
+      { tenantId: context.tenantId, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "vehicle.created",
+        entityType: "vehicle",
+        requestId: context.requestId,
+        afterState: {
+          plate: dto.plate.toUpperCase(),
+          driverId: dto.driverId ?? null,
+          vehicleType: dto.vehicleType,
+          bodyType: dto.bodyType,
+          status: dto.status ?? "available",
+        },
+      },
+    );
   }
 
-  listVehicles(context: RequestContext) { return this.vehicles.list(context.tenantId); }
+  listVehicles(context: RequestContext) {
+    return this.vehicles.list(context.tenantId);
+  }
 
   async getVehicle(context: RequestContext, id: string) {
     const item = await this.vehicles.findById(context.tenantId, id);
@@ -107,20 +184,35 @@ export class OperationsService {
 
   async updateVehicle(context: RequestContext, id: string, dto: UpdateVehicleDto) {
     assertUpdatePayload(dto);
-    const item = await this.vehicles.update({ tenantId: context.tenantId, id, ...dto }, {
-      actorUserId: context.userId, action: "vehicle.updated", entityType: "vehicle", requestId: context.requestId,
-    });
+    const item = await this.vehicles.update(
+      { tenantId: context.tenantId, id, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "vehicle.updated",
+        entityType: "vehicle",
+        requestId: context.requestId,
+      },
+    );
     if (!item) throw new NotFoundException("Vehicle not found");
     return item;
   }
 
-  createTrip(context: RequestContext, dto: CreateTripDto) {
-    return this.trips.create(context.tenantId, dto.freightId, dto.assignmentId, {
-      actorUserId: context.userId, action: "trip.created", entityType: "trip", requestId: context.requestId,
-    });
+  async createTrip(context: RequestContext, dto: CreateTripDto) {
+    try {
+      return await this.trips.create(context.tenantId, dto.freightId, dto.assignmentId, {
+        actorUserId: context.userId,
+        action: "trip.created",
+        entityType: "trip",
+        requestId: context.requestId,
+      });
+    } catch (error) {
+      mapTripError(error);
+    }
   }
 
-  listTrips(context: RequestContext) { return this.trips.list(context.tenantId); }
+  listTrips(context: RequestContext) {
+    return this.trips.list(context.tenantId);
+  }
 
   async getTrip(context: RequestContext, id: string) {
     const item = await this.trips.findById(context.tenantId, id);
@@ -128,13 +220,22 @@ export class OperationsService {
     return item;
   }
 
-  transitionTrip(context: RequestContext, id: string, dto: TransitionTripDto) {
-    return this.trips.transition(
-      context.tenantId,
-      id,
-      dto.expectedStatus as TripStatus,
-      dto.nextStatus as TripStatus,
-      { actorUserId: context.userId, action: "trip.transitioned", entityType: "trip", requestId: context.requestId },
-    );
+  async transitionTrip(context: RequestContext, id: string, dto: TransitionTripDto) {
+    try {
+      return await this.trips.transition(
+        context.tenantId,
+        id,
+        dto.expectedStatus as TripStatus,
+        dto.nextStatus as TripStatus,
+        {
+          actorUserId: context.userId,
+          action: "trip.transitioned",
+          entityType: "trip",
+          requestId: context.requestId,
+        },
+      );
+    } catch (error) {
+      mapTripError(error);
+    }
   }
 }
