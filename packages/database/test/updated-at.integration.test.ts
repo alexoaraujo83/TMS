@@ -97,7 +97,11 @@ if (!runIntegration) {
 
         const beforeAt = before.rows[0]?.updatedAt.getTime();
         const afterAt = after.rows[0]?.updatedAt.getTime();
-        if (beforeAt === undefined || afterAt === undefined || afterAt <= beforeAt) {
+        if (
+          beforeAt === undefined ||
+          afterAt === undefined ||
+          afterAt <= beforeAt
+        ) {
           throw new Error("updated_at trigger did not advance the timestamp");
         }
       } finally {
