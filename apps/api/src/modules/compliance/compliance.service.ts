@@ -110,7 +110,9 @@ export class ComplianceService {
   }
 
   listGr(context: RequestContext, freightId?: string) {
-    return this.repository.listGr(context.tenantId, freightId).catch(mapError);
+    return this.repository
+      .listGr(context.tenantId, freightId)
+      .catch(mapError);
   }
 
   transitionGr(
