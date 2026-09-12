@@ -10,7 +10,10 @@ const enabled =
 
 if (!enabled) {
   describe("Compliance and GR integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it(
+      "is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured",
+      () => {},
+    );
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
