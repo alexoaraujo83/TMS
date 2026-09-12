@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test",
+    "test": "node --import tsx --test",
     "migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
