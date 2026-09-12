@@ -54,7 +54,7 @@ export class MatchingService {
       context.tenantId,
       row.vehicleTypes,
       row.bodyTypes,
-      Number(row.minimumCapacityKg ?? row.weightKg),
+      Math.max(Number(row.minimumCapacityKg ?? 0), Number(row.weightKg)),
       row.minimumFreeMeters === null ? undefined : Number(row.minimumFreeMeters),
     );
 
