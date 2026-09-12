@@ -53,6 +53,9 @@ test('PermissionGuard rejects requests without authenticated context', () => {
   );
 });
 
-test('PermissionGuard does not authorize when no permission metadata is declared', () => {
-  assert.equal(guard(undefined).canActivate(contextFor([])), true);
+test('PermissionGuard fails closed when no permission metadata is declared', () => {
+  assert.throws(
+    () => guard(undefined).canActivate(contextFor([])),
+    (error: unknown) => error instanceof Error && error.message === 'Permission requirement is not configured',
+  );
 });
