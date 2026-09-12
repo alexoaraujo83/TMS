@@ -1,27 +1,38 @@
 # TMS
 
-Novo TMS/SaaS — fundação arquitetural independente, tendo o Nexora TMS como referência técnica e de auditoria.
+Novo TMS/SaaS construído do zero, independente do Nexora TMS e usando-o apenas como referência técnica, arquitetural e de auditoria.
 
-## Princípios
+## Current foundation
 
-- Novo código-base; não é fork do Nexora.
-- Segurança e isolamento multi-tenant desde a fundação.
-- P0/P1 bloqueiam promoção para produção.
-- Ambientes separados: local, development, staging/preview e production.
-- PostgreSQL como banco principal.
-- Web: Next.js + TypeScript.
-- API: NestJS + TypeScript.
-- Worker para processamento assíncrono.
-- Monorepo com pnpm + Turborepo.
+- TypeScript monorepo
+- pnpm + Turborepo
+- Next.js Web
+- NestJS API
+- asynchronous Worker
+- PostgreSQL/Neon
+- multi-tenant by design
+- security gates before production promotion
 
-## Domínios
+## Architecture
 
-Tenancy, IAM/Security, Database, Freight, Matching, Finance, Audit e Operations.
+See:
 
-## Status
+- `docs/architecture/FOUNDATION.md`
+- `docs/architecture/DOMAIN-MAP.md`
+- `docs/architecture/ROADMAP.md`
 
-Foundation initialized. Implementação funcional será feita por etapas, com testes e gates de segurança antes de promoção.
+## Environments
 
-## Referência
+The dedicated Neon project is `tms`, with independent `main`, `development` and `staging` branches. Application deployment configuration is intentionally kept separate from Nexora.
 
-Nexora TMS: https://github.com/alexoaraujo83/nexora-tms
+## Development principle
+
+The implementation follows:
+
+`design -> implement -> test -> verify -> document -> integrate`
+
+No capability is considered complete only because a screen or endpoint exists; tenant isolation, authorization, persistence, tests and operational behavior must also be covered.
+
+## Reference
+
+Nexora TMS is reference material only. The new TMS has its own codebase, database, environments and release lifecycle.
