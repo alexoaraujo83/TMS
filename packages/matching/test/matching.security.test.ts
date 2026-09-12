@@ -6,7 +6,7 @@ import type { Freight } from "@tms/freight";
 const baseFreight: Freight = {
   id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   tenantId: "11111111-1111-1111-1111-111111111111",
-  status: "open",
+  status: "matching",
   type: "dedicated",
   origin: { city: "Betim", state: "MG", country: "BR" },
   destination: { city: "Divinópolis", state: "MG", country: "BR" },
