@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PostgresFreightRepository, type FreightRow } from "@tms/database";
-import type { FreightStatus } from "@tms/freight";
+import {
+  canTransitionFreightStatus,
+  type FreightStatus,
+} from "@tms/freight";
 import type { RequestContext } from "../../common/request-context.js";
 import type {
   CreateFreightDto,
@@ -13,17 +16,6 @@ import type {
 } from "./freight.dto.js";
 import { DATABASE_POOL } from "../../common/database.provider.js";
 import type { Pool } from "pg";
-
-const transitions: Readonly<Record<FreightStatus, readonly FreightStatus[]>> = {
-  draft: ["open", "cancelled"],
-  open: ["matching", "cancelled"],
-  matching: ["negotiating", "open", "cancelled"],
-  negotiating: ["assigned", "matching", "cancelled"],
-  assigned: ["in_transit", "cancelled"],
-  in_transit: ["delivered"],
-  delivered: [],
-  cancelled: [],
-};
 
 @Injectable()
 export class FreightService {
@@ -86,7 +78,7 @@ export class FreightService {
     if (!current) throw new NotFoundException("Freight not found");
 
     const currentStatus = current.status as FreightStatus;
-    if (!transitions[currentStatus]?.includes(dto.status)) {
+    if (!canTransitionFreightStatus(currentStatus, dto.status)) {
       throw new ConflictException(
         `Invalid freight status transition: ${currentStatus} -> ${dto.status}`,
       );
