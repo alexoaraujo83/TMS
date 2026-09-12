@@ -34,7 +34,12 @@ const TRIP_COLUMNS = `id,
 export class TripRepository {
   constructor(private readonly pool: Pool) {}
 
-  async create(tenantId: string, freightId: string, assignmentId: string, audit: AuditInput) {
+  async create(
+    tenantId: string,
+    freightId: string,
+    assignmentId: string,
+    audit: AuditInput,
+  ) {
     assertUuid(tenantId, "tenantId");
     assertUuid(freightId, "freightId");
     assertUuid(assignmentId, "assignmentId");
@@ -73,7 +78,8 @@ export class TripRepository {
         `select id from trips where tenant_id = $1 and assignment_id = $2 limit 1`,
         [tenantId, assignmentId],
       );
-      if (existing.rows[0]) throw new Error("Trip already exists for assignment");
+      if (existing.rows[0])
+        throw new Error("Trip already exists for assignment");
 
       const result = await client.query<TripRecord>(
         `insert into trips (tenant_id, freight_id, assignment_id)
@@ -218,7 +224,10 @@ export class TripRepository {
         ...audit,
         tenantId,
         entityId: tripId,
-        beforeState: { status: expectedStatus, freightStatus: freight.previousStatus },
+        beforeState: {
+          status: expectedStatus,
+          freightStatus: freight.previousStatus,
+        },
         afterState: { status: nextStatus, freightStatus: freight.nextStatus },
       });
       return updated;
@@ -241,7 +250,9 @@ async function transitionFreight(
     [tenantId, freightId, nextStatus, expectedStatus],
   );
   if (!result.rows[0]) {
-    throw new Error(`Freight cannot transition from ${expectedStatus} to ${nextStatus}`);
+    throw new Error(
+      `Freight cannot transition from ${expectedStatus} to ${nextStatus}`,
+    );
   }
   return { previousStatus: expectedStatus, nextStatus };
 }

@@ -32,9 +32,14 @@ function assertUpdatePayload(dto: object): void {
 }
 
 function mapTripError(error: unknown): never {
-  const message = error instanceof Error ? error.message : "Trip operation failed";
+  const message =
+    error instanceof Error ? error.message : "Trip operation failed";
 
-  if (message === "Assignment not found" || message === "Freight not found" || message === "Trip not found") {
+  if (
+    message === "Assignment not found" ||
+    message === "Freight not found" ||
+    message === "Trip not found"
+  ) {
     throw new NotFoundException(message);
   }
 
@@ -80,7 +85,10 @@ export class OperationsService {
         action: "carrier.created",
         entityType: "carrier",
         requestId: context.requestId,
-        afterState: { legalName: dto.legalName, status: dto.status ?? "active" },
+        afterState: {
+          legalName: dto.legalName,
+          status: dto.status ?? "active",
+        },
       },
     );
   }
@@ -95,7 +103,11 @@ export class OperationsService {
     return item;
   }
 
-  async updateCarrier(context: RequestContext, id: string, dto: UpdateCarrierDto) {
+  async updateCarrier(
+    context: RequestContext,
+    id: string,
+    dto: UpdateCarrierDto,
+  ) {
     assertUpdatePayload(dto);
     const item = await this.carriers.update(
       { tenantId: context.tenantId, id, ...dto },
@@ -138,7 +150,11 @@ export class OperationsService {
     return item;
   }
 
-  async updateDriver(context: RequestContext, id: string, dto: UpdateDriverDto) {
+  async updateDriver(
+    context: RequestContext,
+    id: string,
+    dto: UpdateDriverDto,
+  ) {
     assertUpdatePayload(dto);
     const item = await this.drivers.update(
       { tenantId: context.tenantId, id, ...dto },
@@ -182,7 +198,11 @@ export class OperationsService {
     return item;
   }
 
-  async updateVehicle(context: RequestContext, id: string, dto: UpdateVehicleDto) {
+  async updateVehicle(
+    context: RequestContext,
+    id: string,
+    dto: UpdateVehicleDto,
+  ) {
     assertUpdatePayload(dto);
     const item = await this.vehicles.update(
       { tenantId: context.tenantId, id, ...dto },
@@ -199,12 +219,17 @@ export class OperationsService {
 
   async createTrip(context: RequestContext, dto: CreateTripDto) {
     try {
-      return await this.trips.create(context.tenantId, dto.freightId, dto.assignmentId, {
-        actorUserId: context.userId,
-        action: "trip.created",
-        entityType: "trip",
-        requestId: context.requestId,
-      });
+      return await this.trips.create(
+        context.tenantId,
+        dto.freightId,
+        dto.assignmentId,
+        {
+          actorUserId: context.userId,
+          action: "trip.created",
+          entityType: "trip",
+          requestId: context.requestId,
+        },
+      );
     } catch (error) {
       mapTripError(error);
     }
@@ -220,7 +245,11 @@ export class OperationsService {
     return item;
   }
 
-  async transitionTrip(context: RequestContext, id: string, dto: TransitionTripDto) {
+  async transitionTrip(
+    context: RequestContext,
+    id: string,
+    dto: TransitionTripDto,
+  ) {
     try {
       return await this.trips.transition(
         context.tenantId,
