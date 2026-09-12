@@ -1,3 +1,11 @@
+-- Matching assignments must enforce tenant ownership at the FK boundary.
+-- PostgreSQL requires the referenced composite keys to be backed by a
+-- primary key or unique constraint/index. The base tables use id as their
+-- primary key, so add tenant-scoped unique indexes before declaring the FKs.
+create unique index if not exists uq_freights_tenant_id on freights (tenant_id, id);
+create unique index if not exists uq_vehicles_tenant_id on vehicles (tenant_id, id);
+create unique index if not exists uq_drivers_tenant_id on drivers (tenant_id, id);
+
 create table if not exists freight_assignments (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
