@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Freight } from "@tms/freight";
 import {
+  isFreightEligibleForMatching,
   rankCandidates,
   scoreCandidate,
   type MatchCandidate,
@@ -37,6 +38,20 @@ const candidate = (
   distanceKm: 20,
   routeCompatibility: 90,
   ...overrides,
+});
+
+test("recognizes only matching-status freights as eligible", () => {
+  assert.equal(isFreightEligibleForMatching("matching"), true);
+  assert.equal(isFreightEligibleForMatching("open"), false);
+  assert.equal(isFreightEligibleForMatching("negotiating"), false);
+  assert.equal(isFreightEligibleForMatching("assigned"), false);
+});
+
+test("rejects freight that is not in matching status", () => {
+  assert.throws(
+    () => scoreCandidate({ ...freight, status: "open" }, candidate()),
+    /Freight status open is not eligible for matching/,
+  );
 });
 
 test("scores compatible candidates and exposes matching reasons", () => {
