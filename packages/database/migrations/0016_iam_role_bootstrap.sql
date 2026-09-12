@@ -54,26 +54,6 @@ $$;
 revoke all on function public.provision_tenant_iam(uuid) from public;
 grant execute on function public.provision_tenant_iam(uuid) to current_user;
 
-create or replace function public.provision_tenant_iam_on_insert()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  perform public.provision_tenant_iam(new.id);
-  return new;
-end;
-$$;
-
-revoke all on function public.provision_tenant_iam_on_insert() from public;
-grant execute on function public.provision_tenant_iam_on_insert() to current_user;
-
-drop trigger if exists tenants_provision_iam on tenants;
-create trigger tenants_provision_iam
-after insert on tenants
-for each row execute function public.provision_tenant_iam_on_insert();
-
 -- Existing tenants receive the same deterministic role baseline.
 do $$
 declare
@@ -95,6 +75,8 @@ update tenant_memberships tm
    and tm.role_id is null;
 
 -- Future memberships using the legacy role column are resolved automatically.
+-- If the canonical role does not yet exist, create the tenant role baseline inside
+-- the caller's tenant transaction context before resolving the membership.
 create or replace function public.resolve_membership_role()
 returns trigger
 language plpgsql
@@ -109,6 +91,15 @@ begin
       from roles
      where tenant_id = new.tenant_id
        and name = new.role;
+
+    if resolved_role_id is null and new.role in ('admin', 'operator') then
+      perform public.provision_tenant_iam(new.tenant_id);
+      select id into resolved_role_id
+        from roles
+       where tenant_id = new.tenant_id
+         and name = new.role;
+    end if;
+
     new.role_id = resolved_role_id;
   end if;
   return new;
