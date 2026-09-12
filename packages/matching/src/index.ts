@@ -1,4 +1,9 @@
-import type { BodyType, Freight, VehicleType } from "@tms/freight";
+import {
+  type BodyType,
+  type Freight,
+  type FreightStatus,
+  type VehicleType,
+} from "@tms/freight";
 
 export interface MatchCandidate {
   driverId: string;
@@ -29,7 +34,23 @@ export interface MatchResult extends MatchBreakdown {
   reasons: readonly string[];
 }
 
+const MATCHING_ELIGIBLE_STATUSES: ReadonlySet<FreightStatus> = new Set([
+  "matching",
+]);
+
 const clamp = (value: number): number => Math.max(0, Math.min(100, value));
+
+export function isFreightEligibleForMatching(status: FreightStatus): boolean {
+  return MATCHING_ELIGIBLE_STATUSES.has(status);
+}
+
+function assertFreightEligibleForMatching(freight: Freight): void {
+  if (!isFreightEligibleForMatching(freight.status)) {
+    throw new Error(
+      `Freight status ${freight.status} is not eligible for matching`,
+    );
+  }
+}
 
 function vehicleScore(freight: Freight, candidate: MatchCandidate): number {
   const types = freight.vehicleRequirement.types;
@@ -57,6 +78,8 @@ export function scoreCandidate(
   freight: Freight,
   candidate: MatchCandidate,
 ): MatchResult {
+  assertFreightEligibleForMatching(freight);
+
   if (freight.tenantId !== candidate.tenantId) {
     throw new Error("Cross-tenant matching is forbidden");
   }
@@ -120,6 +143,8 @@ export function rankCandidates(
   freight: Freight,
   candidates: readonly MatchCandidate[],
 ): MatchResult[] {
+  assertFreightEligibleForMatching(freight);
+
   return candidates
     .map((candidate) => scoreCandidate(freight, candidate))
     .sort(
