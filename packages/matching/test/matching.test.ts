@@ -50,17 +50,34 @@ test("scores compatible candidates and exposes matching reasons", () => {
 
 test("ranks stronger candidates before weaker candidates", () => {
   const results = rankCandidates(freight, [
-    candidate({ driverId: "00000000-0000-0000-0000-000000000022", distanceKm: 250, routeCompatibility: 40 }),
-    candidate({ driverId: "00000000-0000-0000-0000-000000000021", distanceKm: 10, routeCompatibility: 95 }),
+    candidate({
+      driverId: "00000000-0000-0000-0000-000000000022",
+      distanceKm: 250,
+      routeCompatibility: 40,
+    }),
+    candidate({
+      driverId: "00000000-0000-0000-0000-000000000021",
+      distanceKm: 10,
+      routeCompatibility: 95,
+    }),
   ]);
 
-  assert.equal(results[0]?.candidate.driverId, "00000000-0000-0000-0000-000000000021");
+  assert.equal(
+    results[0]?.candidate.driverId,
+    "00000000-0000-0000-0000-000000000021",
+  );
   assert.ok((results[0]?.total ?? 0) > (results[1]?.total ?? 0));
 });
 
 test("rejects cross-tenant candidates", () => {
   assert.throws(
-    () => scoreCandidate(freight, candidate({ tenantId: "00000000-0000-0000-0000-000000000099" })),
+    () =>
+      scoreCandidate(
+        freight,
+        candidate({
+          tenantId: "00000000-0000-0000-0000-000000000099",
+        }),
+      ),
     /Cross-tenant matching is forbidden/,
   );
 });
