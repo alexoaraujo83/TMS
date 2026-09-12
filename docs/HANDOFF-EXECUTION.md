@@ -20,6 +20,8 @@ Uma capacidade só deve ser marcada como concluída quando o comportamento real 
 
 A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 11. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment e auditoria.
 
+Assignment possui invariantes de ocupação e ciclo de vida: assignment ativo ocupa motorista/veículo, delivery completa o assignment, cancelamento cancela o assignment e a transação deve preservar o estado anterior quando a sincronização falhar.
+
 O Worker permanece bootstrap/placeholder. Não assumir que processamento assíncrono, outbox, retries ou DLQ estejam implementados.
 
 ## 4. Ordem recomendada de trabalho
@@ -80,15 +82,22 @@ QA deve receber: arquivos/módulos alterados, endpoints, permissões, migrations
 - UUID inválido;
 - transição de estado inválida.
 
-### Cenários mínimos de Freight/Matching
+### Cenários mínimos de Freight/Matching/Assignment
 
 - criar freight válido;
 - listar e consultar freight;
 - obter candidatos;
 - assignment válido;
 - impedir assignment duplicado ativo;
-- alterar status;
-- preservar invariantes após falha/transação.
+- impedir assignment concorrente para o mesmo motorista/veículo;
+- excluir recurso ocupado do matching;
+- `assigned → in_transit → delivered` completar assignment;
+- `assigned → cancelled` cancelar assignment;
+- impedir `in_transit → delivered` sem assignment ativo;
+- preservar invariantes após falha/transação;
+- validar isolamento tenant no assignment.
+
+O teste de integração `packages/database/test/assignment-lifecycle.integration.test.ts` cobre atualmente sincronização de delivery/cancelamento, rollback de delivery sem assignment, exclusão de recurso ocupado do matching e concorrência de assignment.
 
 ## 7. Critérios de handoff para Operações
 
