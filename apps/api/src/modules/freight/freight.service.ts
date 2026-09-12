@@ -5,10 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PostgresFreightRepository, type FreightRow } from "@tms/database";
-import {
-  canTransitionFreightStatus,
-  type FreightStatus,
-} from "@tms/freight";
+import { canTransitionFreightStatus, type FreightStatus } from "@tms/freight";
 import type { Pool } from "pg";
 import { DATABASE_POOL } from "../../common/database.provider.js";
 import type { RequestContext } from "../../common/request-context.js";
