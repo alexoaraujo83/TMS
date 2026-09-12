@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { generateKeyPair, SignJWT } from "jose";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { verifyAccessToken } from "../src/index.js";
 
 test("verifyAccessToken accepts a valid RS256 token", async () => {
@@ -15,26 +15,23 @@ test("verifyAccessToken accepts a valid RS256 token", async () => {
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(privateKey);
+  const jwk = await exportJWK(publicKey);
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
-        keys: [
-          {
-            kty: "RSA",
-            use: "sig",
-            alg: "RS256",
-            kid: "test-key",
-            ...(await import("jose")).exportJWK(publicKey).then((jwk) => jwk),
-          },
-        ],
+        keys: [{ ...jwk, kty: "RSA", use: "sig", alg: "RS256", kid: "test-key" }],
       }),
       { headers: { "content-type": "application/json" } },
     );
 
   try {
-    const claims = await verifyAccessToken(token, { issuer, audience, jwksUrl: "https://jwks.example.test/.well-known/jwks.json" });
+    const claims = await verifyAccessToken(token, {
+      issuer,
+      audience,
+      jwksUrl: "https://jwks.example.test/.well-known/jwks.json",
+    });
     assert.equal(claims.sub, "auth0|user-1");
     assert.equal(claims.tenantId, "tenant-a");
   } finally {
