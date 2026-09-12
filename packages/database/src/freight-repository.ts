@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { appendAuditEvent, type AuditEventInput } from './audit-repository.js';
 import { assertUuid } from './query.js';
 import { withTransaction } from './transaction.js';
 
@@ -68,6 +69,10 @@ export class PostgresFreightRepository {
   constructor(private readonly pool: Pool) {}
 
   async create(input: CreateFreightInput): Promise<FreightRow> {
+    return this.createWithAudit(input);
+  }
+
+  async createWithAudit(input: CreateFreightInput, audit?: Omit<AuditEventInput, 'tenantId' | 'entityId'>): Promise<FreightRow> {
     assertUuid(input.tenantId, 'tenantId');
     return withTransaction(this.pool, { tenantId: input.tenantId }, async (client) => {
       const result = await client.query<FreightRow>(
@@ -83,6 +88,7 @@ export class PostgresFreightRepository {
       );
       const row = result.rows[0];
       if (!row) throw new Error('Freight creation failed');
+      if (audit) await appendAuditEvent(client, { ...audit, tenantId: input.tenantId, entityId: row.id });
       return row;
     });
   }
@@ -105,6 +111,16 @@ export class PostgresFreightRepository {
   }
 
   async updateStatus(tenantId: string, freightId: string, expectedStatus: string, nextStatus: string): Promise<FreightRow | null> {
+    return this.updateStatusWithAudit(tenantId, freightId, expectedStatus, nextStatus);
+  }
+
+  async updateStatusWithAudit(
+    tenantId: string,
+    freightId: string,
+    expectedStatus: string,
+    nextStatus: string,
+    audit?: Omit<AuditEventInput, 'tenantId' | 'entityId'>,
+  ): Promise<FreightRow | null> {
     assertUuid(tenantId, 'tenantId');
     assertUuid(freightId, 'freightId');
     return withTransaction(this.pool, { tenantId }, async (client) => {
@@ -115,7 +131,15 @@ export class PostgresFreightRepository {
           returning ${FREIGHT_COLUMNS}`,
         [freightId, tenantId, nextStatus, expectedStatus],
       );
-      return result.rows[0] ?? null;
+      const row = result.rows[0] ?? null;
+      if (row && audit) {
+        await appendAuditEvent(client, {
+          ...audit,
+          tenantId,
+          entityId: row.id,
+        });
+      }
+      return row;
     });
   }
 }
