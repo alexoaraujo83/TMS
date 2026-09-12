@@ -29,13 +29,19 @@ export class ComplianceController {
 
   @Post("checks")
   @RequirePermission("compliance:create")
-  createCheck(@CurrentUser() context: RequestContext, @Body() dto: CreateComplianceCheckDto) {
+  createCheck(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: CreateComplianceCheckDto,
+  ) {
     return this.service.createCheck(context, dto);
   }
 
   @Get("checks")
   @RequirePermission("compliance:read")
-  listChecks(@CurrentUser() context: RequestContext, @Query("freightId") freightId?: string) {
+  listChecks(
+    @CurrentUser() context: RequestContext,
+    @Query("freightId") freightId?: string,
+  ) {
     return this.service.listChecks(context, freightId);
   }
 
@@ -51,13 +57,19 @@ export class ComplianceController {
 
   @Post("gr")
   @RequirePermission("compliance:create")
-  createGr(@CurrentUser() context: RequestContext, @Body() dto: CreateGrRequestDto) {
+  createGr(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: CreateGrRequestDto,
+  ) {
     return this.service.createGr(context, dto);
   }
 
   @Get("gr")
   @RequirePermission("compliance:read")
-  listGr(@CurrentUser() context: RequestContext, @Query("freightId") freightId?: string) {
+  listGr(
+    @CurrentUser() context: RequestContext,
+    @Query("freightId") freightId?: string,
+  ) {
     return this.service.listGr(context, freightId);
   }
 
