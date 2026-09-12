@@ -3,7 +3,11 @@ import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
 import { assertUuid } from "./query.js";
 import { withTransaction } from "./transaction.js";
 
-export type ComplianceStatus = "pending" | "approved" | "rejected" | "expired";
+export type ComplianceStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "expired";
 export type GrStatus =
   | "pending"
   | "submitted"
@@ -309,7 +313,8 @@ function isAllowedComplianceTransition(
   to: ComplianceStatus,
 ) {
   return (
-    (from === "pending" && ["approved", "rejected", "expired"].includes(to)) ||
+    (from === "pending" &&
+      ["approved", "rejected", "expired"].includes(to)) ||
     (from === "approved" && to === "expired")
   );
 }
