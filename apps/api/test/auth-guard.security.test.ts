@@ -127,21 +127,24 @@ test("AuthGuard rejects missing authentication", async () => {
   );
 });
 
-test("AuthGuard rejects a token with an invalid issuer", async () => {
-  const invalid = await new SignJWT({ tenantId: TENANT_A })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(USER_ID)
-    .setIssuer("attacker")
-    .setAudience(AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(SECRET));
+test(
+  "AuthGuard rejects a token with an invalid issuer",
+  async () => {
+    const invalid = await new SignJWT({ tenantId: TENANT_A })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject(USER_ID)
+      .setIssuer("attacker")
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(new TextEncoder().encode(SECRET));
 
-  const request = { headers: { authorization: `Bearer ${invalid}` } };
+    const request = { headers: { authorization: `Bearer ${invalid}` } };
 
-  await assert.rejects(
-    () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
-  );
-});
+    await assert.rejects(
+      () => guard([]).canActivate(contextFor(request)),
+      (error: unknown) =>
+        error instanceof Error && error.message === "Invalid access token",
+    );
+  },
+);
