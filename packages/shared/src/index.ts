@@ -1,3 +1,3 @@
-export type Environment = 'local' | 'development' | 'staging' | 'production';
+export type Environment = "local" | "development" | "staging" | "production";
 
-export const APP_NAME = 'tms';
+export const APP_NAME = "tms";

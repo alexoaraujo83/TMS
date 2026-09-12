@@ -11,6 +11,6 @@ export class ApiError extends Error {
     public readonly statusCode: number,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }

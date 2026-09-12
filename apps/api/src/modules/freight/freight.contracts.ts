@@ -1,4 +1,4 @@
-import type { Freight } from '@tms/freight';
+import type { Freight } from "@tms/freight";
 
 export interface FreightRepository {
   create(freight: Freight): Promise<Freight>;

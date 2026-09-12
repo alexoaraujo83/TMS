@@ -1,35 +1,35 @@
 export type FreightStatus =
-  | 'draft'
-  | 'open'
-  | 'matching'
-  | 'negotiating'
-  | 'assigned'
-  | 'in_transit'
-  | 'delivered'
-  | 'cancelled';
+  | "draft"
+  | "open"
+  | "matching"
+  | "negotiating"
+  | "assigned"
+  | "in_transit"
+  | "delivered"
+  | "cancelled";
 
-export type FreightType = 'dedicated' | 'shared' | 'complement' | 'urgent';
+export type FreightType = "dedicated" | "shared" | "complement" | "urgent";
 
 export type VehicleType =
-  | 'fiorino'
-  | '3_4'
-  | 'toco'
-  | 'truck'
-  | 'bitruck'
-  | 'carreta'
-  | 'ls'
-  | 'vanderleia'
-  | 'bitrem'
-  | 'rodotrem';
+  | "fiorino"
+  | "3_4"
+  | "toco"
+  | "truck"
+  | "bitruck"
+  | "carreta"
+  | "ls"
+  | "vanderleia"
+  | "bitrem"
+  | "rodotrem";
 
 export type BodyType =
-  | 'bau'
-  | 'sider'
-  | 'grade_baixa'
-  | 'graneleiro'
-  | 'prancha'
-  | 'aberto'
-  | 'outro';
+  | "bau"
+  | "sider"
+  | "grade_baixa"
+  | "graneleiro"
+  | "prancha"
+  | "aberto"
+  | "outro";
 
 export interface Location {
   city: string;
@@ -57,7 +57,7 @@ export interface VehicleRequirement {
 
 export interface Money {
   amountCents: bigint;
-  currency: 'BRL';
+  currency: "BRL";
 }
 
 export interface Freight {
@@ -80,15 +80,17 @@ export interface Freight {
 }
 
 export function assertFreightCapacity(freight: Freight): void {
-  if (freight.cargo.weightKg <= 0) throw new Error('Cargo weight must be positive');
-  if (freight.cargo.quantity <= 0) throw new Error('Cargo quantity must be positive');
+  if (freight.cargo.weightKg <= 0)
+    throw new Error("Cargo weight must be positive");
+  if (freight.cargo.quantity <= 0)
+    throw new Error("Cargo quantity must be positive");
   if (freight.cargo.volumeM3 !== undefined && freight.cargo.volumeM3 < 0) {
-    throw new Error('Cargo volume cannot be negative');
+    throw new Error("Cargo volume cannot be negative");
   }
   if (
     freight.vehicleRequirement.minimumCapacityKg !== undefined &&
     freight.vehicleRequirement.minimumCapacityKg < freight.cargo.weightKg
   ) {
-    throw new Error('Vehicle capacity is insufficient for cargo weight');
+    throw new Error("Vehicle capacity is insufficient for cargo weight");
   }
 }

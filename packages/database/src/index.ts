@@ -7,17 +7,21 @@ export interface TenantScopedRecord {
   updatedAt: Date;
 }
 
-export const RLS_CONTEXT_KEY = 'app.tenant_id';
+export const RLS_CONTEXT_KEY = "app.tenant_id";
 
 export function tenantSessionSql(tenantId: string): string {
   const escaped = tenantId.replaceAll("'", "''");
   return `select set_config('${RLS_CONTEXT_KEY}', '${escaped}', true)`;
 }
 
-export { createDatabasePool } from './pool.js';
-export { withTransaction } from './transaction.js';
-export { PostgresFreightRepository } from './freight-repository.js';
-export { CarrierRepository, DriverRepository, VehicleRepository } from './operational-repositories.js';
-export { verifyTenantMembership } from './membership-bootstrap.js';
-export { AuditRepository } from './audit-repository.js';
-export { queryOne, assertUuid } from './query.js';
+export { createDatabasePool } from "./pool.js";
+export { withTransaction } from "./transaction.js";
+export { PostgresFreightRepository } from "./freight-repository.js";
+export {
+  CarrierRepository,
+  DriverRepository,
+  VehicleRepository,
+} from "./operational-repositories.js";
+export { verifyTenantMembership } from "./membership-bootstrap.js";
+export { AuditRepository } from "./audit-repository.js";
+export { queryOne, assertUuid } from "./query.js";

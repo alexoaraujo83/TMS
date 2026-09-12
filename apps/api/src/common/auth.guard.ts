@@ -1,9 +1,16 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { verifyAccessToken } from '@tms/auth';
-import { verifyTenantMembership } from '@tms/database';
-import type { Pool } from 'pg';
-import type { RequestContext } from './request-context.js';
-import { DATABASE_POOL } from './database.provider.js';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { verifyAccessToken } from "@tms/auth";
+import { verifyTenantMembership } from "@tms/database";
+import type { Pool } from "pg";
+import type { RequestContext } from "./request-context.js";
+import { DATABASE_POOL } from "./database.provider.js";
 
 interface RequestLike {
   headers: Record<string, string | string[] | undefined>;
@@ -12,7 +19,7 @@ interface RequestLike {
 
 function headerValue(request: RequestLike, name: string): string | undefined {
   const value = request.headers[name];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 @Injectable()
@@ -21,36 +28,50 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(executionContext: ExecutionContext): Promise<boolean> {
     const request = executionContext.switchToHttp().getRequest<RequestLike>();
-    const authorization = headerValue(request, 'authorization');
+    const authorization = headerValue(request, "authorization");
 
-    if (!authorization?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Authentication required');
+    if (!authorization?.startsWith("Bearer ")) {
+      throw new UnauthorizedException("Authentication required");
     }
 
-    const token = authorization.slice('Bearer '.length).trim();
+    const token = authorization.slice("Bearer ".length).trim();
     const secret = process.env.JWT_SECRET;
     const issuer = process.env.JWT_ISSUER;
     const audience = process.env.JWT_AUDIENCE;
 
-    if (!secret || secret === 'replace-with-a-local-only-secret' || !issuer || !audience) {
-      throw new UnauthorizedException('JWT verification is not configured');
+    if (
+      !secret ||
+      secret === "replace-with-a-local-only-secret" ||
+      !issuer ||
+      !audience
+    ) {
+      throw new UnauthorizedException("JWT verification is not configured");
     }
 
     try {
-      const claims = await verifyAccessToken(token, { secret, issuer, audience });
-      const selectedTenantId = headerValue(request, 'x-tenant-id') ?? claims.tenantId;
+      const claims = await verifyAccessToken(token, {
+        secret,
+        issuer,
+        audience,
+      });
+      const selectedTenantId =
+        headerValue(request, "x-tenant-id") ?? claims.tenantId;
 
       if (!selectedTenantId) {
-        throw new UnauthorizedException('Tenant selection is required');
+        throw new UnauthorizedException("Tenant selection is required");
       }
 
-      const membership = await verifyTenantMembership(this.pool, claims.sub, selectedTenantId);
+      const membership = await verifyTenantMembership(
+        this.pool,
+        claims.sub,
+        selectedTenantId,
+      );
       if (!membership?.active) {
-        throw new ForbiddenException('Active tenant membership required');
+        throw new ForbiddenException("Active tenant membership required");
       }
 
       request.context = {
-        requestId: headerValue(request, 'x-request-id') ?? '',
+        requestId: headerValue(request, "x-request-id") ?? "",
         userId: claims.sub,
         tenantId: membership.tenantId,
         roles: [membership.role],
@@ -58,8 +79,12 @@ export class AuthGuard implements CanActivate {
       };
       return true;
     } catch (error) {
-      if (error instanceof UnauthorizedException || error instanceof ForbiddenException) throw error;
-      throw new UnauthorizedException('Invalid access token');
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      )
+        throw error;
+      throw new UnauthorizedException("Invalid access token");
     }
   }
 }

@@ -1,4 +1,4 @@
-import type { BodyType, Freight, VehicleType } from '@tms/freight';
+import type { BodyType, Freight, VehicleType } from "@tms/freight";
 
 export interface MatchCandidate {
   driverId: string;
@@ -52,9 +52,12 @@ function distanceScore(distanceKm: number): number {
   return clamp(100 - distanceKm / 2);
 }
 
-export function scoreCandidate(freight: Freight, candidate: MatchCandidate): MatchResult {
+export function scoreCandidate(
+  freight: Freight,
+  candidate: MatchCandidate,
+): MatchResult {
   if (freight.tenantId !== candidate.tenantId) {
-    throw new Error('Cross-tenant matching is forbidden');
+    throw new Error("Cross-tenant matching is forbidden");
   }
 
   const distance = distanceScore(candidate.distanceKm);
@@ -64,25 +67,35 @@ export function scoreCandidate(freight: Freight, candidate: MatchCandidate): Mat
   const route = clamp(candidate.routeCompatibility);
   const reliability = clamp(candidate.historicalReliability ?? 50);
 
-  const price = candidate.offeredPriceCents === undefined || freight.driverPrice === undefined
-    ? 50
-    : clamp(100 - Math.abs(Number(candidate.offeredPriceCents - freight.driverPrice.amountCents)) / 10000);
+  const price =
+    candidate.offeredPriceCents === undefined ||
+    freight.driverPrice === undefined
+      ? 50
+      : clamp(
+          100 -
+            Math.abs(
+              Number(
+                candidate.offeredPriceCents - freight.driverPrice.amountCents,
+              ),
+            ) /
+              10000,
+        );
 
   const total =
-    distance * 0.20 +
-    vehicleCompatibility * 0.20 +
+    distance * 0.2 +
+    vehicleCompatibility * 0.2 +
     capacity * 0.15 +
     availability * 0.15 +
     route * 0.15 +
-    price * 0.10 +
+    price * 0.1 +
     reliability * 0.05;
 
   const reasons: string[] = [];
-  if (vehicleCompatibility === 100) reasons.push('vehicle-compatible');
-  if (capacity === 100) reasons.push('capacity-suitable');
-  if (availability === 100) reasons.push('available');
-  if (route >= 80) reasons.push('route-compatible');
-  if (reliability >= 80) reasons.push('high-reliability');
+  if (vehicleCompatibility === 100) reasons.push("vehicle-compatible");
+  if (capacity === 100) reasons.push("capacity-suitable");
+  if (availability === 100) reasons.push("available");
+  if (route >= 80) reasons.push("route-compatible");
+  if (reliability >= 80) reasons.push("high-reliability");
 
   return {
     candidate,
@@ -98,7 +111,10 @@ export function scoreCandidate(freight: Freight, candidate: MatchCandidate): Mat
   };
 }
 
-export function rankCandidates(freight: Freight, candidates: readonly MatchCandidate[]): MatchResult[] {
+export function rankCandidates(
+  freight: Freight,
+  candidates: readonly MatchCandidate[],
+): MatchResult[] {
   return candidates
     .map((candidate) => scoreCandidate(freight, candidate))
     .sort((a, b) => b.total - a.total);

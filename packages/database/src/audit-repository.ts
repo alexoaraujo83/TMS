@@ -1,6 +1,6 @@
-import type { Pool, PoolClient } from 'pg';
-import { assertUuid } from './query.js';
-import { withTransaction } from './transaction.js';
+import type { Pool, PoolClient } from "pg";
+import { assertUuid } from "./query.js";
+import { withTransaction } from "./transaction.js";
 
 export interface AuditEventInput {
   tenantId: string;
@@ -14,10 +14,13 @@ export interface AuditEventInput {
   metadata?: Record<string, unknown>;
 }
 
-export async function appendAuditEvent(client: PoolClient, input: AuditEventInput): Promise<void> {
-  assertUuid(input.tenantId, 'tenantId');
-  if (input.actorUserId) assertUuid(input.actorUserId, 'actorUserId');
-  if (input.entityId) assertUuid(input.entityId, 'entityId');
+export async function appendAuditEvent(
+  client: PoolClient,
+  input: AuditEventInput,
+): Promise<void> {
+  assertUuid(input.tenantId, "tenantId");
+  if (input.actorUserId) assertUuid(input.actorUserId, "actorUserId");
+  if (input.entityId) assertUuid(input.entityId, "entityId");
 
   await client.query(
     `insert into audit_events (
@@ -42,8 +45,12 @@ export class AuditRepository {
   constructor(private readonly pool: Pool) {}
 
   async append(input: AuditEventInput): Promise<void> {
-    await withTransaction(this.pool, { tenantId: input.tenantId }, async (client) => {
-      await appendAuditEvent(client, input);
-    });
+    await withTransaction(
+      this.pool,
+      { tenantId: input.tenantId },
+      async (client) => {
+        await appendAuditEvent(client, input);
+      },
+    );
   }
 }

@@ -6,4 +6,4 @@ export interface RequestContext {
   permissions: readonly string[];
 }
 
-export const REQUEST_CONTEXT = Symbol('REQUEST_CONTEXT');
+export const REQUEST_CONTEXT = Symbol("REQUEST_CONTEXT");

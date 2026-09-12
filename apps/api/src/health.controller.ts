@@ -1,14 +1,14 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get } from "@nestjs/common";
 
 @Controller()
 export class HealthController {
-  @Get('/health')
+  @Get("/health")
   health() {
-    return { status: 'ok', service: 'tms-api' };
+    return { status: "ok", service: "tms-api" };
   }
 
-  @Get('/ready')
+  @Get("/ready")
   ready() {
-    return { status: 'ready', service: 'tms-api' };
+    return { status: "ready", service: "tms-api" };
   }
 }

@@ -1,11 +1,43 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsNumber, IsOptional, IsString, IsUUID, IsPositive, Length } from 'class-validator';
+import { Type } from "class-transformer";
+import {
+  IsIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsPositive,
+  Length,
+} from "class-validator";
 
-const statuses = ['active', 'inactive', 'blocked'] as const;
-const anttStatuses = ['pending', 'approved', 'rejected', 'expired'] as const;
-const vehicleStatuses = ['available', 'unavailable', 'maintenance', 'blocked'] as const;
-const vehicleTypes = ['fiorino', '3_4', 'toco', 'truck', 'bitruck', 'carreta', 'ls', 'vanderleia', 'bitrem', 'rodotrem'] as const;
-const bodyTypes = ['bau', 'sider', 'grade_baixa', 'graneleiro', 'prancha', 'aberto', 'outro'] as const;
+const statuses = ["active", "inactive", "blocked"] as const;
+const anttStatuses = ["pending", "approved", "rejected", "expired"] as const;
+const vehicleStatuses = [
+  "available",
+  "unavailable",
+  "maintenance",
+  "blocked",
+] as const;
+const vehicleTypes = [
+  "fiorino",
+  "3_4",
+  "toco",
+  "truck",
+  "bitruck",
+  "carreta",
+  "ls",
+  "vanderleia",
+  "bitrem",
+  "rodotrem",
+] as const;
+const bodyTypes = [
+  "bau",
+  "sider",
+  "grade_baixa",
+  "graneleiro",
+  "prancha",
+  "aberto",
+  "outro",
+] as const;
 
 export class CreateCarrierDto {
   @IsString() @Length(2, 200) legalName!: string;
@@ -29,6 +61,10 @@ export class CreateVehicleDto {
   @IsString() @IsIn(vehicleTypes) vehicleType!: string;
   @IsString() @IsIn(bodyTypes) bodyType!: string;
   @Type(() => Number) @IsNumber() @IsPositive() capacityKg!: number;
-  @Type(() => Number) @IsOptional() @IsNumber() @IsPositive() freeMeters?: number;
+  @Type(() => Number)
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  freeMeters?: number;
   @IsOptional() @IsIn(vehicleStatuses) status?: string;
 }

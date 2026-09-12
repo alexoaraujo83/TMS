@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool } from "pg";
 
 export interface MembershipBootstrapRecord {
   userId: string;

@@ -1,7 +1,7 @@
-import type { Pool } from 'pg';
-import { appendAuditEvent, type AuditEventInput } from './audit-repository.js';
-import { assertUuid } from './query.js';
-import { withTransaction } from './transaction.js';
+import type { Pool } from "pg";
+import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
+import { assertUuid } from "./query.js";
+import { withTransaction } from "./transaction.js";
 
 export interface CreateFreightInput {
   tenantId: string;
@@ -72,11 +72,17 @@ export class PostgresFreightRepository {
     return this.createWithAudit(input);
   }
 
-  async createWithAudit(input: CreateFreightInput, audit?: Omit<AuditEventInput, 'tenantId' | 'entityId'>): Promise<FreightRow> {
-    assertUuid(input.tenantId, 'tenantId');
-    return withTransaction(this.pool, { tenantId: input.tenantId }, async (client) => {
-      const result = await client.query<FreightRow>(
-        `insert into freights (
+  async createWithAudit(
+    input: CreateFreightInput,
+    audit?: Omit<AuditEventInput, "tenantId" | "entityId">,
+  ): Promise<FreightRow> {
+    assertUuid(input.tenantId, "tenantId");
+    return withTransaction(
+      this.pool,
+      { tenantId: input.tenantId },
+      async (client) => {
+        const result = await client.query<FreightRow>(
+          `insert into freights (
           tenant_id, freight_type, origin_city, origin_state,
           destination_city, destination_state, cargo_description,
           quantity, weight_kg, volume_m3, linear_meters,
@@ -84,34 +90,77 @@ export class PostgresFreightRepository {
           vehicle_types, body_types, minimum_free_meters, minimum_capacity_kg
         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
         returning ${FREIGHT_COLUMNS}`,
-        [input.tenantId, input.freightType, input.originCity, input.originState, input.destinationCity, input.destinationState, input.cargoDescription, input.quantity, input.weightKg, input.volumeM3 ?? null, input.linearMeters ?? null, input.customerPriceCents ?? null, input.driverPriceCents ?? null, input.vehicleTypes ?? [], input.bodyTypes ?? [], input.minimumFreeMeters ?? null, input.minimumCapacityKg ?? null],
-      );
-      const row = result.rows[0];
-      if (!row) throw new Error('Freight creation failed');
-      if (audit) await appendAuditEvent(client, { ...audit, tenantId: input.tenantId, entityId: row.id });
-      return row;
-    });
+          [
+            input.tenantId,
+            input.freightType,
+            input.originCity,
+            input.originState,
+            input.destinationCity,
+            input.destinationState,
+            input.cargoDescription,
+            input.quantity,
+            input.weightKg,
+            input.volumeM3 ?? null,
+            input.linearMeters ?? null,
+            input.customerPriceCents ?? null,
+            input.driverPriceCents ?? null,
+            input.vehicleTypes ?? [],
+            input.bodyTypes ?? [],
+            input.minimumFreeMeters ?? null,
+            input.minimumCapacityKg ?? null,
+          ],
+        );
+        const row = result.rows[0];
+        if (!row) throw new Error("Freight creation failed");
+        if (audit)
+          await appendAuditEvent(client, {
+            ...audit,
+            tenantId: input.tenantId,
+            entityId: row.id,
+          });
+        return row;
+      },
+    );
   }
 
-  async findById(tenantId: string, freightId: string): Promise<FreightRow | null> {
-    assertUuid(tenantId, 'tenantId');
-    assertUuid(freightId, 'freightId');
+  async findById(
+    tenantId: string,
+    freightId: string,
+  ): Promise<FreightRow | null> {
+    assertUuid(tenantId, "tenantId");
+    assertUuid(freightId, "freightId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const result = await client.query<FreightRow>(`select ${FREIGHT_COLUMNS} from freights where id = $1 and tenant_id = $2 limit 1`, [freightId, tenantId]);
+      const result = await client.query<FreightRow>(
+        `select ${FREIGHT_COLUMNS} from freights where id = $1 and tenant_id = $2 limit 1`,
+        [freightId, tenantId],
+      );
       return result.rows[0] ?? null;
     });
   }
 
   async list(tenantId: string): Promise<readonly FreightRow[]> {
-    assertUuid(tenantId, 'tenantId');
+    assertUuid(tenantId, "tenantId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const result = await client.query<FreightRow>(`select ${FREIGHT_COLUMNS} from freights where tenant_id = $1 order by created_at desc`, [tenantId]);
+      const result = await client.query<FreightRow>(
+        `select ${FREIGHT_COLUMNS} from freights where tenant_id = $1 order by created_at desc`,
+        [tenantId],
+      );
       return result.rows;
     });
   }
 
-  async updateStatus(tenantId: string, freightId: string, expectedStatus: string, nextStatus: string): Promise<FreightRow | null> {
-    return this.updateStatusWithAudit(tenantId, freightId, expectedStatus, nextStatus);
+  async updateStatus(
+    tenantId: string,
+    freightId: string,
+    expectedStatus: string,
+    nextStatus: string,
+  ): Promise<FreightRow | null> {
+    return this.updateStatusWithAudit(
+      tenantId,
+      freightId,
+      expectedStatus,
+      nextStatus,
+    );
   }
 
   async updateStatusWithAudit(
@@ -119,10 +168,10 @@ export class PostgresFreightRepository {
     freightId: string,
     expectedStatus: string,
     nextStatus: string,
-    audit?: Omit<AuditEventInput, 'tenantId' | 'entityId'>,
+    audit?: Omit<AuditEventInput, "tenantId" | "entityId">,
   ): Promise<FreightRow | null> {
-    assertUuid(tenantId, 'tenantId');
-    assertUuid(freightId, 'freightId');
+    assertUuid(tenantId, "tenantId");
+    assertUuid(freightId, "freightId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
       const result = await client.query<FreightRow>(
         `update freights

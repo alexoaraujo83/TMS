@@ -1,6 +1,7 @@
 # ADR 0001 — New codebase using Nexora as reference
 
 ## Status
+
 Accepted
 
 ## Decision
