@@ -60,7 +60,7 @@ export class AssignmentRepository {
       );
       const freight = freightResult.rows[0];
       if (!freight) throw new Error("Freight not found");
-      if (freight.status !== "matching") {
+      if (freight.status !== "matching" && freight.status !== "negotiating") {
         throw new Error(
           `Freight status ${freight.status} is not eligible for assignment`,
         );
@@ -128,7 +128,7 @@ export class AssignmentRepository {
       const freightUpdate = await client.query<{ status: string }>(
         `update freights
             set status = 'assigned', updated_at = now()
-          where tenant_id = $1 and id = $2 and status = 'matching'
+          where tenant_id = $1 and id = $2 and status in ('matching', 'negotiating')
           returning status`,
         [tenantId, freightId],
       );
@@ -145,6 +145,7 @@ export class AssignmentRepository {
           driverId,
           vehicleId,
           status: "active",
+          freightStatus: freightUpdate.rows[0].status,
         },
       });
 
