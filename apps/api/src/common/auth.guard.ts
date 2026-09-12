@@ -35,24 +35,19 @@ export class AuthGuard implements CanActivate {
     }
 
     const token = authorization.slice("Bearer ".length).trim();
-    const secret = process.env.JWT_SECRET;
-    const issuer = process.env.JWT_ISSUER;
-    const audience = process.env.JWT_AUDIENCE;
+    const issuer = process.env.AUTH0_ISSUER_BASE_URL;
+    const audience = process.env.AUTH0_AUDIENCE;
+    const jwksUrl = process.env.AUTH0_JWKS_URL;
 
-    if (
-      !secret ||
-      secret === "replace-with-a-local-only-secret" ||
-      !issuer ||
-      !audience
-    ) {
-      throw new UnauthorizedException("JWT verification is not configured");
+    if (!issuer || !audience) {
+      throw new UnauthorizedException("OIDC verification is not configured");
     }
 
     try {
       const claims = await verifyAccessToken(token, {
-        secret,
         issuer,
         audience,
+        jwksUrl,
       });
       const selectedTenantId =
         headerValue(request, "x-tenant-id") ?? claims.tenantId;
@@ -82,8 +77,9 @@ export class AuthGuard implements CanActivate {
       if (
         error instanceof UnauthorizedException ||
         error instanceof ForbiddenException
-      )
+      ) {
         throw error;
+      }
       throw new UnauthorizedException("Invalid access token");
     }
   }
