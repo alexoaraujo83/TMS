@@ -39,10 +39,6 @@ jobs:
         with:
           node-version: 24.20.0
       - run: pnpm install --no-frozen-lockfile --lockfile=false
-      - name: Capture Prettier repair diff
-        run: |
-          pnpm exec prettier --write packages/database/src/operational-repositories.ts
-          git diff --no-color -- packages/database/src/operational-repositories.ts
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck

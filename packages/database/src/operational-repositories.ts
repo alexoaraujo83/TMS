@@ -152,7 +152,13 @@ export class CarrierRepository {
         if (!before) return null;
         const result = await client.query<CarrierRecord>(
           `update carriers set legal_name = coalesce($3, legal_name), document_number = coalesce($4, document_number), status = coalesce($5, status) where tenant_id = $1 and id = $2 returning id, tenant_id as "tenantId", legal_name as "legalName", document_number as "documentNumber", status`,
-          [input.tenantId, input.id, input.legalName, input.documentNumber, input.status],
+          [
+            input.tenantId,
+            input.id,
+            input.legalName,
+            input.documentNumber,
+            input.status,
+          ],
         );
         const after = result.rows[0];
         if (!after) throw new Error("Carrier update failed");
