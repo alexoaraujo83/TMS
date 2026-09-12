@@ -3,11 +3,7 @@ import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
 import { assertUuid } from "./query.js";
 import { withTransaction } from "./transaction.js";
 
-export type ComplianceStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "expired";
+export type ComplianceStatus = "pending" | "approved" | "rejected" | "expired";
 export type GrStatus =
   | "pending"
   | "submitted"
