@@ -43,6 +43,8 @@ export interface FreightRow {
   bodyTypes: readonly string[];
   minimumFreeMeters: string | null;
   minimumCapacityKg: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const FREIGHT_COLUMNS = `id,
@@ -63,7 +65,9 @@ const FREIGHT_COLUMNS = `id,
   vehicle_types as "vehicleTypes",
   body_types as "bodyTypes",
   minimum_free_meters as "minimumFreeMeters",
-  minimum_capacity_kg as "minimumCapacityKg"`;
+  minimum_capacity_kg as "minimumCapacityKg",
+  created_at as "createdAt",
+  updated_at as "updatedAt"`;
 
 export class PostgresFreightRepository {
   constructor(private readonly pool: Pool) {}

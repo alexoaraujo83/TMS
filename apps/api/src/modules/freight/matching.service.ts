@@ -54,8 +54,8 @@ function toFreight(row: FreightRow): Freight {
       row.customerPriceCents === null
         ? undefined
         : { amountCents: BigInt(row.customerPriceCents), currency: "BRL" },
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -94,9 +94,6 @@ export class MatchingService {
       bodyType: record.bodyType as BodyType,
       capacityKg: Number(record.capacityKg),
       available: true,
-      // Route distance is intentionally neutral until a routing/geocoding provider is integrated.
-      distanceKm: 100,
-      routeCompatibility: 50,
     }));
 
     return rankCandidates(freight, candidates);

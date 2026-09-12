@@ -7,8 +7,8 @@ export interface MatchCandidate {
   bodyType: BodyType;
   capacityKg: number;
   available: boolean;
-  distanceKm: number;
-  routeCompatibility: number;
+  distanceKm?: number;
+  routeCompatibility?: number;
   historicalReliability?: number;
   offeredPriceCents?: bigint;
 }
@@ -48,7 +48,8 @@ function capacityScore(freight: Freight, candidate: MatchCandidate): number {
   return clamp(100 - (excess / Math.max(required, 1)) * 25);
 }
 
-function distanceScore(distanceKm: number): number {
+function distanceScore(distanceKm?: number): number {
+  if (distanceKm === undefined) return 50;
   return clamp(100 - distanceKm / 2);
 }
 
@@ -64,7 +65,10 @@ export function scoreCandidate(
   const vehicleCompatibility = vehicleScore(freight, candidate);
   const capacity = capacityScore(freight, candidate);
   const availability = candidate.available ? 100 : 0;
-  const route = clamp(candidate.routeCompatibility);
+  const route =
+    candidate.routeCompatibility === undefined
+      ? 50
+      : clamp(candidate.routeCompatibility);
   const reliability = clamp(candidate.historicalReliability ?? 50);
 
   const price =
@@ -94,7 +98,8 @@ export function scoreCandidate(
   if (vehicleCompatibility === 100) reasons.push("vehicle-compatible");
   if (capacity === 100) reasons.push("capacity-suitable");
   if (availability === 100) reasons.push("available");
-  if (route >= 80) reasons.push("route-compatible");
+  if (route >= 80 && candidate.routeCompatibility !== undefined)
+    reasons.push("route-compatible");
   if (reliability >= 80) reasons.push("high-reliability");
 
   return {
@@ -117,5 +122,9 @@ export function rankCandidates(
 ): MatchResult[] {
   return candidates
     .map((candidate) => scoreCandidate(freight, candidate))
-    .sort((a, b) => b.total - a.total);
+    .sort(
+      (a, b) =>
+        b.total - a.total ||
+        a.candidate.driverId.localeCompare(b.candidate.driverId),
+    );
 }
