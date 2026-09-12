@@ -26,6 +26,7 @@ jobs:
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add apps/api/src/modules/operations/operations.controller.ts apps/api/src/modules/operations/operations.service.ts apps/api/src/modules/operations/trip.dto.ts packages/database/src/trip-repository.ts packages/database/test/trip-operations.integration.test.ts
-          git diff --cached --quiet || git commit -m "style: apply Prettier to trip operations"
-          git diff --cached --quiet && exit 0 || true
-          git push
+          if ! git diff --cached --quiet; then
+            git commit -m "style: apply Prettier to trip operations"
+            git push
+          fi
