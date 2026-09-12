@@ -1,38 +1,47 @@
-import { jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { TenantContext } from "@tms/tenancy";
 
 export interface AuthClaims {
   sub: string;
   tenantId?: string;
   issuer: string;
-  audience: string;
+  audience: string | string[];
 }
 
 export interface AuthenticatedRequestContext extends TenantContext {
   permissions: readonly string[];
 }
 
-export interface JwtVerifierConfig {
-  secret: string;
+export interface OidcVerifierConfig {
   issuer: string;
   audience: string;
+  jwksUrl?: string;
+}
+
+function normalizeIssuer(issuer: string): string {
+  return issuer.replace(/\/+$/, "");
 }
 
 export async function verifyAccessToken(
   token: string,
-  config: JwtVerifierConfig,
+  config: OidcVerifierConfig,
 ): Promise<AuthClaims> {
   if (!token || token.length > 8192) throw new Error("Invalid access token");
 
-  const { payload } = await jwtVerify(
-    token,
-    new TextEncoder().encode(config.secret),
-    {
-      algorithms: ["HS256"],
-      issuer: config.issuer,
-      audience: config.audience,
-    },
+  const issuer = normalizeIssuer(config.issuer);
+  if (!issuer || !config.audience) {
+    throw new Error("OIDC verification is not configured");
+  }
+
+  const jwks = createRemoteJWKSet(
+    new URL(config.jwksUrl ?? `${issuer}/.well-known/jwks.json`),
   );
+
+  const { payload } = await jwtVerify(token, jwks, {
+    algorithms: ["RS256"],
+    issuer,
+    audience: config.audience,
+  });
 
   if (typeof payload.sub !== "string" || payload.sub.length === 0) {
     throw new Error("Invalid authentication claims");
@@ -42,7 +51,7 @@ export async function verifyAccessToken(
     sub: payload.sub,
     tenantId:
       typeof payload.tenantId === "string" ? payload.tenantId : undefined,
-    issuer: config.issuer,
-    audience: config.audience,
+    issuer,
+    audience: payload.aud ?? config.audience,
   };
 }
