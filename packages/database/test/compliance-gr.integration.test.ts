@@ -71,9 +71,10 @@ if (!enabled) {
         "delete from compliance_checks where tenant_id = $1",
         [tenantId],
       );
-      await client.query("delete from gr_requests where tenant_id = $1", [
-        tenantId,
-      ]);
+      await client.query(
+        "delete from gr_requests where tenant_id = $1",
+        [tenantId],
+      );
       await client.query("delete from freights where id = $1", [freightId]);
       await client.query("delete from tenants where id = $1", [tenantId]);
       await client.query("commit");
