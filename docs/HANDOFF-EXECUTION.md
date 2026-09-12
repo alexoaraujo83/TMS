@@ -18,13 +18,15 @@ Uma capacidade só deve ser marcada como concluída quando o comportamento real 
 
 ## 3. Estado conhecido
 
-A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 17. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria e o núcleo de Trip Operations.
+A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 19. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria, Trip Operations e a fundação de Compliance/GR.
 
-IAM possui bootstrap de papéis canônicos por tenant (`admin` e `operator`), resolução de `role_id` em memberships e mapeamento inicial de permissões. A criação e resolução devem permanecer dentro de contexto tenant quando a operação exigir RLS. O fluxo de provisionamento deve ser validado contra o caminho real de criação de membership antes de ser considerado fechado.
+IAM possui bootstrap de papéis canônicos por tenant (`admin` e `operator`), resolução de `role_id` em memberships e mapeamento inicial de permissões. O operador agora recebe também as permissões de Compliance/GR durante o provisionamento de novos tenants. A criação e resolução devem permanecer dentro de contexto tenant quando a operação exigir RLS.
 
 Assignment possui invariantes de ocupação e ciclo de vida: assignment ativo ocupa motorista/veículo, delivery completa o assignment, cancelamento cancela o assignment e a transação deve preservar o estado anterior quando a sincronização falhar.
 
-Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary. A migration 0017 normaliza a correção da restrição aplicada ao banco para permitir cancelamento antes do início da viagem (`planned → cancelled`) sem `started_at`, evitando manter duas migrations com o mesmo prefixo numérico.
+Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary. A migration 0017 normaliza a correção da restrição aplicada ao banco para permitir cancelamento antes do início da viagem (`planned → cancelled`) sem `started_at`.
+
+Compliance/GR possui agora duas entidades tenant-scoped: `compliance_checks` para verificações de conformidade e risco, e `gr_requests` para o ciclo de Gerenciamento de Risco. Ambas possuem RLS/FORCE RLS, vínculo tenant-safe com freight/assignment, índices operacionais, estados controlados por CHECK constraints e `updated_at` autoritativo no banco. A migration 0018 cria a fundação e a 0019 mantém o bootstrap de IAM coerente para novos tenants.
 
 O Worker permanece bootstrap/placeholder. Não assumir que processamento assíncrono, outbox, retries ou DLQ estejam implementados.
 
@@ -44,8 +46,9 @@ O Worker permanece bootstrap/placeholder. Não assumir que processamento assínc
 2. Fechar fluxos de freight: criação, consulta, matching, assignment e status.
 3. Expandir master data de carrier/driver/vehicle.
 4. Consolidar Trip Operations e seus estados operacionais.
-5. Implementar estados de loading, vazio, erro, sucesso, proibido e indisponível.
-6. Cobrir API e UI com testes de comportamento.
+5. Implementar Compliance/GR no application layer e API, mantendo as invariantes já existentes no banco.
+6. Implementar estados de loading, vazio, erro, sucesso, proibido e indisponível.
+7. Cobrir API e UI com testes de comportamento.
 
 ### P2 — Operação
 
@@ -56,7 +59,7 @@ O Worker permanece bootstrap/placeholder. Não assumir que processamento assínc
 
 ### P3 — Domínios futuros
 
-Compliance/GR, Finance, Analytics/AI e integrações externas devem ser adicionados como bounded contexts/adapters, sem misturar responsabilidades no módulo de Freight ou Trip Operations.
+Matching avançado, Finance, Analytics/AI e integrações externas devem ser adicionados como bounded contexts/adapters, sem misturar responsabilidades no módulo de Freight ou Trip Operations.
 
 ## 5. Checklist por mudança
 
@@ -115,20 +118,34 @@ QA deve receber: arquivos/módulos alterados, endpoints, permissões, migrations
 - preservar atomicidade entre trip, freight e assignment;
 - registrar auditoria para criação e transição.
 
-O teste `packages/database/test/trip-operations.integration.test.ts` cobre o fluxo principal de início/entrega e rejeição de transição obsoleta. A migration 0017 mantém a invariável de cancelamento coerente com o fluxo `planned → cancelled`.
+### Cenários mínimos de Compliance/GR
+
+- criar verificação `pending` para freight do mesmo tenant;
+- impedir `approved/rejected/expired` sem `checked_at`;
+- criar solicitação GR `pending`;
+- permitir `pending → submitted` somente com `submitted_at`;
+- permitir `submitted → approved` somente com `approved_at`;
+- permitir `submitted → rejected` somente com `rejected_at`;
+- impedir vínculos freight/assignment de outro tenant;
+- validar RLS/FORCE RLS;
+- validar permissões `compliance:read/create/update`;
+- registrar auditoria nas transições quando o application layer for implementado.
+
+O teste `packages/database/test/compliance-gr.integration.test.ts` cobre as invariantes de status, timestamps e execução sob contexto tenant. O application layer ainda deve ser implementado antes de marcar Compliance/GR como domínio fechado.
 
 ### Cenários mínimos de IAM
 
 - membership `admin` resolve para role canônica `admin`;
 - membership `operator` resolve para role canônica `operator`;
 - `operator` recebe somente as permissões operacionais previstas;
+- `operator` recebe as permissões de Compliance/GR previstas;
 - `operator` não recebe `iam:manage`;
 - role canônica possui `role_id` persistido na membership;
 - novo permission code é propagado aos admins;
 - resolução de role respeita tenant e RLS;
 - provisionamento não depende de trigger inseguro sobre `tenants`.
 
-O teste `packages/database/test/iam-role-bootstrap.integration.test.ts` valida a resolução de `operator`, o `role_id` e permissões operacionais/trip.
+O teste `packages/database/test/iam-role-bootstrap.integration.test.ts` valida a resolução de `operator`, o `role_id` e permissões operacionais/trip. Deve ser ampliado para validar explicitamente as novas permissões de Compliance/GR quando o próximo ciclo de CI confirmar a migration 0019.
 
 ## 7. Critérios de handoff para Operações
 
