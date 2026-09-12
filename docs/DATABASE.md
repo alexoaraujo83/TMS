@@ -4,7 +4,7 @@
 
 PostgreSQL is the transactional source of truth. The project uses `pg`, a dedicated database package, versioned SQL migrations and tenant-aware transactions. The database package exports pool/transaction helpers, tenant context support and repositories for freight, carriers, drivers, vehicles, assignments and audit.
 
-Current schema version: **11**.
+Current schema version: **12**.
 
 ## Entity catalogue
 
@@ -73,6 +73,10 @@ Freight terminal lifecycle is synchronized with assignment lifecycle in the same
 
 This prevents delivered/cancelled freights from leaving an active assignment that would permanently block matching for the driver or vehicle.
 
+## Timestamp integrity
+
+All mutable tables with an `updated_at` column are protected by the database trigger `public.set_updated_at()`. Migration 0012 installs triggers on `tenants`, `users`, `carriers`, `drivers`, `vehicles`, `freights` and `freight_assignments`, so `updated_at` advances on every row update regardless of which repository or SQL path performed the mutation. This makes the timestamp authoritative at the database boundary instead of depending on individual application code paths.
+
 ## Migration history
 
 1. Foundation: tenants, users, memberships and initial RLS.
@@ -86,6 +90,7 @@ This prevents delivered/cancelled freights from leaving an active assignment tha
 9. Runtime bootstrap grant for membership verification.
 10. Same-tenant master-data relationship hardening.
 11. Freight assignments and matching permissions.
+12. Database-authoritative `updated_at` triggers.
 
 Migrations are forward-only by default. Production schema changes should use expand/contract when old and new application versions need compatibility.
 
