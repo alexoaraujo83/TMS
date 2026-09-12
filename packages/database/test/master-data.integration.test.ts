@@ -17,9 +17,9 @@ if (!runIntegration) {
   const tenantB = randomUUID();
   const userA = randomUUID();
   const userB = randomUUID();
-  let carrierA: string;
-  let driverA: string;
-  let vehicleA: string;
+  let carrierA = "";
+  let driverA = "";
+  let vehicleA = "";
 
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
@@ -144,6 +144,9 @@ if (!runIntegration) {
       const client = await pool.connect();
       try {
         await client.query("begin");
+        for (const table of ["vehicles", "drivers", "carriers"]) {
+          await client.query(`alter table ${table} disable row level security`);
+        }
         const result = await client.query(
           `select c.tenant_id as "carrierTenant", d.tenant_id as "driverTenant",
                   d.carrier_id as "carrierId", v.driver_id as "driverId"
@@ -170,6 +173,8 @@ if (!runIntegration) {
       const client = await pool.connect();
       try {
         await client.query("begin");
+        await client.query("alter table drivers disable row level security");
+        await client.query("alter table carriers disable row level security");
         await client.query(
           `insert into drivers (tenant_id, carrier_id, name, document_number, rntrc)
            values ($1, $2, 'Cross Tenant Driver', $3, $4)`,
@@ -179,7 +184,10 @@ if (!runIntegration) {
         throw new Error("cross-tenant driver -> carrier relationship was accepted");
       } catch (error) {
         await client.query("rollback").catch(() => undefined);
-        if (!(error instanceof Error) || !error.message.includes("violates foreign key constraint")) {
+        if (
+          !(error instanceof Error) ||
+          !error.message.includes("violates foreign key constraint")
+        ) {
           throw error;
         }
       } finally {
@@ -191,6 +199,8 @@ if (!runIntegration) {
       const client = await pool.connect();
       try {
         await client.query("begin");
+        await client.query("alter table vehicles disable row level security");
+        await client.query("alter table drivers disable row level security");
         await client.query(
           `insert into vehicles
              (tenant_id, driver_id, plate, vehicle_type, body_type, capacity_kg)
@@ -201,7 +211,10 @@ if (!runIntegration) {
         throw new Error("cross-tenant vehicle -> driver relationship was accepted");
       } catch (error) {
         await client.query("rollback").catch(() => undefined);
-        if (!(error instanceof Error) || !error.message.includes("violates foreign key constraint")) {
+        if (
+          !(error instanceof Error) ||
+          !error.message.includes("violates foreign key constraint")
+        ) {
           throw error;
         }
       } finally {
