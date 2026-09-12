@@ -8,6 +8,10 @@ export class RequestContextMiddleware implements NestMiddleware {
     const requestId =
       incoming && incoming.length <= 128 ? incoming : randomUUID();
 
+    // Keep the canonical value available to downstream guards/services so
+    // audit records and logs correlate with the response header.
+    req.headers["x-request-id"] = requestId;
+
     res.setHeader("X-Request-Id", requestId);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "DENY");
