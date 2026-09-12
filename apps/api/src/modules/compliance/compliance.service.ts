@@ -20,16 +20,29 @@ import type {
 } from "./compliance.dto.js";
 
 function mapError(error: unknown): never {
-  const message = error instanceof Error ? error.message : "Compliance operation failed";
-  if (message === "Freight not found" || message === "Assignment not found" || message === "Compliance check not found" || message === "GR request not found") {
+  const message =
+    error instanceof Error ? error.message : "Compliance operation failed";
+
+  if (
+    message === "Freight not found" ||
+    message === "Assignment not found" ||
+    message === "Compliance check not found" ||
+    message === "GR request not found"
+  ) {
     throw new NotFoundException(message);
   }
-  if (message.includes("does not match expected status") || message.includes("transition failed")) {
+
+  if (
+    message.includes("does not match expected status") ||
+    message.includes("transition failed")
+  ) {
     throw new ConflictException(message);
   }
+
   if (message.includes("cannot transition")) {
     throw new ConflictException(message);
   }
+
   throw error;
 }
 
@@ -56,10 +69,16 @@ export class ComplianceService {
   }
 
   listChecks(context: RequestContext, freightId?: string) {
-    return this.repository.listChecks(context.tenantId, freightId).catch(mapError);
+    return this.repository
+      .listChecks(context.tenantId, freightId)
+      .catch(mapError);
   }
 
-  transitionCheck(context: RequestContext, id: string, dto: TransitionComplianceDto) {
+  transitionCheck(
+    context: RequestContext,
+    id: string,
+    dto: TransitionComplianceDto,
+  ) {
     return this.repository
       .transitionCheck(
         context.tenantId,
@@ -94,7 +113,11 @@ export class ComplianceService {
     return this.repository.listGr(context.tenantId, freightId).catch(mapError);
   }
 
-  transitionGr(context: RequestContext, id: string, dto: TransitionGrDto) {
+  transitionGr(
+    context: RequestContext,
+    id: string,
+    dto: TransitionGrDto,
+  ) {
     return this.repository
       .transitionGr(
         context.tenantId,
