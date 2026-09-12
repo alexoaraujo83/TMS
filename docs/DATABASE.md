@@ -60,6 +60,8 @@ An assignment is:
 
 Partial unique indexes enforce at most one active assignment per tenant/freight, tenant/driver and tenant/vehicle.
 
+Matching must also treat an active assignment as resource occupancy. Candidate discovery therefore excludes any driver or vehicle already referenced by an `active` freight assignment, even if the vehicle master-data status remains `available`. This prevents the matching list from offering a resource that cannot be assigned atomically.
+
 ## Migration history
 
 1. Foundation: tenants, users, memberships and initial RLS.
