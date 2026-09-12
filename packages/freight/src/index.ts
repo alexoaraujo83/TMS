@@ -79,6 +79,26 @@ export interface Freight {
   updatedAt: Date;
 }
 
+export const FREIGHT_STATUS_TRANSITIONS: Readonly<
+  Record<FreightStatus, readonly FreightStatus[]>
+> = {
+  draft: ["open", "cancelled"],
+  open: ["matching", "cancelled"],
+  matching: ["negotiating", "open", "cancelled"],
+  negotiating: ["assigned", "matching", "cancelled"],
+  assigned: ["in_transit", "cancelled"],
+  in_transit: ["delivered"],
+  delivered: [],
+  cancelled: [],
+};
+
+export function canTransitionFreightStatus(
+  current: FreightStatus,
+  next: FreightStatus,
+): boolean {
+  return FREIGHT_STATUS_TRANSITIONS[current].includes(next);
+}
+
 export function assertFreightCapacity(freight: Freight): void {
   if (freight.cargo.weightKg <= 0)
     throw new Error("Cargo weight must be positive");
