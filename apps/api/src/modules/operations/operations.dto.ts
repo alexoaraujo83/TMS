@@ -63,6 +63,24 @@ export class CreateCarrierDto {
   status?: string;
 }
 
+export class UpdateCarrierDto {
+  @Transform(normalizeText)
+  @IsOptional()
+  @IsString()
+  @Length(2, 200)
+  legalName?: string;
+
+  @Transform(normalizeText)
+  @IsOptional()
+  @IsString()
+  @Length(5, 30)
+  documentNumber?: string;
+
+  @IsOptional()
+  @IsIn(statuses)
+  status?: string;
+}
+
 export class CreateDriverDto {
   @IsOptional()
   @IsUUID()
@@ -72,6 +90,44 @@ export class CreateDriverDto {
   @IsString()
   @Length(2, 160)
   name!: string;
+
+  @Transform(normalizeText)
+  @IsOptional()
+  @IsString()
+  @Length(5, 30)
+  documentNumber?: string;
+
+  @Transform(normalizeText)
+  @IsOptional()
+  @IsString()
+  @Length(8, 30)
+  phone?: string;
+
+  @Transform(normalizeText)
+  @IsOptional()
+  @IsString()
+  @Length(3, 30)
+  rntrc?: string;
+
+  @IsOptional()
+  @IsIn(anttStatuses)
+  anttStatus?: string;
+
+  @IsOptional()
+  @IsIn(statuses)
+  status?: string;
+}
+
+export class UpdateDriverDto {
+  @IsOptional()
+  @IsUUID()
+  carrierId?: string;
+
+  @Transform(normalizeText)
+  @IsOptional()
+  @IsString()
+  @Length(2, 160)
+  name?: string;
 
   @Transform(normalizeText)
   @IsOptional()
@@ -123,6 +179,45 @@ export class CreateVehicleDto {
   @IsNumber({ allowNaN: false, allowInfinity: false })
   @IsPositive()
   capacityKg!: number;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @IsPositive()
+  freeMeters?: number;
+
+  @IsOptional()
+  @IsIn(vehicleStatuses)
+  status?: string;
+}
+
+export class UpdateVehicleDto {
+  @IsOptional()
+  @IsUUID()
+  driverId?: string;
+
+  @Transform(normalizePlate)
+  @IsOptional()
+  @IsString()
+  @Length(7, 7)
+  @Matches(/^[A-Z0-9]{7}$/)
+  plate?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(vehicleTypes)
+  vehicleType?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(bodyTypes)
+  bodyType?: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @IsPositive()
+  capacityKg?: number;
 
   @Type(() => Number)
   @IsOptional()

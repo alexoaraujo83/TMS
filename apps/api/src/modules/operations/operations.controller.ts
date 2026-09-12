@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   UseGuards,
 } from "@nestjs/common";
@@ -16,6 +17,9 @@ import {
   CreateCarrierDto,
   CreateDriverDto,
   CreateVehicleDto,
+  UpdateCarrierDto,
+  UpdateDriverDto,
+  UpdateVehicleDto,
 } from "./operations.dto.js";
 import { OperationsService } from "./operations.service.js";
 
@@ -32,11 +36,13 @@ export class OperationsController {
   ) {
     return this.service.createCarrier(context, dto);
   }
+
   @Get("carriers")
   @RequirePermission("carrier:read")
   listCarriers(@CurrentUser() context: RequestContext) {
     return this.service.listCarriers(context);
   }
+
   @Get("carriers/:id")
   @RequirePermission("carrier:read")
   getCarrier(
@@ -44,6 +50,16 @@ export class OperationsController {
     @Param("id", new ParseUUIDPipe()) id: string,
   ) {
     return this.service.getCarrier(context, id);
+  }
+
+  @Patch("carriers/:id")
+  @RequirePermission("carrier:update")
+  updateCarrier(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateCarrierDto,
+  ) {
+    return this.service.updateCarrier(context, id, dto);
   }
 
   @Post("drivers")
@@ -54,11 +70,13 @@ export class OperationsController {
   ) {
     return this.service.createDriver(context, dto);
   }
+
   @Get("drivers")
   @RequirePermission("driver:read")
   listDrivers(@CurrentUser() context: RequestContext) {
     return this.service.listDrivers(context);
   }
+
   @Get("drivers/:id")
   @RequirePermission("driver:read")
   getDriver(
@@ -66,6 +84,16 @@ export class OperationsController {
     @Param("id", new ParseUUIDPipe()) id: string,
   ) {
     return this.service.getDriver(context, id);
+  }
+
+  @Patch("drivers/:id")
+  @RequirePermission("driver:update")
+  updateDriver(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateDriverDto,
+  ) {
+    return this.service.updateDriver(context, id, dto);
   }
 
   @Post("vehicles")
@@ -76,11 +104,13 @@ export class OperationsController {
   ) {
     return this.service.createVehicle(context, dto);
   }
+
   @Get("vehicles")
   @RequirePermission("vehicle:read")
   listVehicles(@CurrentUser() context: RequestContext) {
     return this.service.listVehicles(context);
   }
+
   @Get("vehicles/:id")
   @RequirePermission("vehicle:read")
   getVehicle(
@@ -88,5 +118,15 @@ export class OperationsController {
     @Param("id", new ParseUUIDPipe()) id: string,
   ) {
     return this.service.getVehicle(context, id);
+  }
+
+  @Patch("vehicles/:id")
+  @RequirePermission("vehicle:update")
+  updateVehicle(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateVehicleDto,
+  ) {
+    return this.service.updateVehicle(context, id, dto);
   }
 }

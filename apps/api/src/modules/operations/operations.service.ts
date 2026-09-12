@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   CarrierRepository,
   DriverRepository,
@@ -11,7 +16,16 @@ import type {
   CreateCarrierDto,
   CreateDriverDto,
   CreateVehicleDto,
+  UpdateCarrierDto,
+  UpdateDriverDto,
+  UpdateVehicleDto,
 } from "./operations.dto.js";
+
+function assertUpdatePayload(dto: object): void {
+  if (Object.keys(dto).length === 0) {
+    throw new BadRequestException("At least one field is required");
+  }
+}
 
 @Injectable()
 export class OperationsService {
@@ -40,11 +54,32 @@ export class OperationsService {
       },
     );
   }
+
   listCarriers(context: RequestContext) {
     return this.carriers.list(context.tenantId);
   }
+
   async getCarrier(context: RequestContext, id: string) {
     const item = await this.carriers.findById(context.tenantId, id);
+    if (!item) throw new NotFoundException("Carrier not found");
+    return item;
+  }
+
+  async updateCarrier(
+    context: RequestContext,
+    id: string,
+    dto: UpdateCarrierDto,
+  ) {
+    assertUpdatePayload(dto);
+    const item = await this.carriers.update(
+      { tenantId: context.tenantId, id, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "carrier.updated",
+        entityType: "carrier",
+        requestId: context.requestId,
+      },
+    );
     if (!item) throw new NotFoundException("Carrier not found");
     return item;
   }
@@ -66,11 +101,32 @@ export class OperationsService {
       },
     );
   }
+
   listDrivers(context: RequestContext) {
     return this.drivers.list(context.tenantId);
   }
+
   async getDriver(context: RequestContext, id: string) {
     const item = await this.drivers.findById(context.tenantId, id);
+    if (!item) throw new NotFoundException("Driver not found");
+    return item;
+  }
+
+  async updateDriver(
+    context: RequestContext,
+    id: string,
+    dto: UpdateDriverDto,
+  ) {
+    assertUpdatePayload(dto);
+    const item = await this.drivers.update(
+      { tenantId: context.tenantId, id, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "driver.updated",
+        entityType: "driver",
+        requestId: context.requestId,
+      },
+    );
     if (!item) throw new NotFoundException("Driver not found");
     return item;
   }
@@ -93,11 +149,32 @@ export class OperationsService {
       },
     );
   }
+
   listVehicles(context: RequestContext) {
     return this.vehicles.list(context.tenantId);
   }
+
   async getVehicle(context: RequestContext, id: string) {
     const item = await this.vehicles.findById(context.tenantId, id);
+    if (!item) throw new NotFoundException("Vehicle not found");
+    return item;
+  }
+
+  async updateVehicle(
+    context: RequestContext,
+    id: string,
+    dto: UpdateVehicleDto,
+  ) {
+    assertUpdatePayload(dto);
+    const item = await this.vehicles.update(
+      { tenantId: context.tenantId, id, ...dto },
+      {
+        actorUserId: context.userId,
+        action: "vehicle.updated",
+        entityType: "vehicle",
+        requestId: context.requestId,
+      },
+    );
     if (!item) throw new NotFoundException("Vehicle not found");
     return item;
   }
