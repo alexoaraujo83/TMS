@@ -12,9 +12,9 @@
   "dependencies": {
     "@tms/tenancy": "workspace:*",
     "@tms/security": "workspace:*",
-    "jose": "^6.1.0"
+    "jose": "6.2.10"
   },
   "devDependencies": {
-    "typescript": "^5.9.0"
+    "typescript": "6.0.3"
   }
 }
