@@ -62,6 +62,8 @@ Partial unique indexes enforce at most one active assignment per tenant/freight,
 
 Matching must also treat an active assignment as resource occupancy. Candidate discovery therefore excludes any driver or vehicle already referenced by an `active` freight assignment, even if the vehicle master-data status remains `available`. This prevents the matching list from offering a resource that cannot be assigned atomically.
 
+Assignment is valid from both `matching` and `negotiating` freight states because the domain lifecycle explicitly permits `negotiating -> assigned`. The assignment transaction locks the freight, driver and vehicle rows, rejects active occupancy, creates the assignment and moves the freight to `assigned` atomically.
+
 Freight terminal lifecycle is synchronized with assignment lifecycle in the same database transaction:
 
 - moving a freight to `delivered` requires an active assignment and atomically marks that assignment `completed` with `completed_at`;
