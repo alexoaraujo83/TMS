@@ -1,0 +1,113 @@
+# TMS Implementation Roadmap
+
+## Stage 0 — Foundation
+
+- repository and monorepo conventions
+- CI gates
+- environment contract
+- configuration validation
+- API/Web/Worker bootstraps
+- database package and migration pipeline
+- logging/correlation primitives
+
+## Stage 1 — Security and tenancy
+
+- tenant model
+- users and identities
+- memberships
+- roles and permissions
+- immutable TenantContext
+- authorization guards/policies
+- PostgreSQL RLS
+- negative cross-tenant tests
+- audit foundation
+
+## Stage 2 — Master data
+
+- parties
+- customers
+- carriers
+- drivers
+- vehicles
+- addresses
+- documents/reference data
+
+## Stage 3 — Freight lifecycle
+
+- transport request
+- cargo and dimensions
+- stops and route
+- quotation
+- negotiation
+- contracting
+- lifecycle invariants
+
+## Stage 4 — Matching and capacity
+
+- availability
+- capacity
+- qualification
+- matching rules
+- candidate generation
+- scoring
+- ranking
+- assignment
+
+## Stage 5 — Trip execution
+
+- trip creation
+- pickup
+- transit
+- occurrences
+- delivery
+- proof of delivery
+- operational timeline
+
+## Stage 6 — Compliance
+
+- document validity
+- GR/risk controls
+- blocks and releases
+- compliance audit
+
+## Stage 7 — Finance
+
+- cost
+- revenue
+- payable/receivable
+- settlement
+- payment
+- reconciliation
+- margin
+- idempotency
+
+## Stage 8 — Reliability and integrations
+
+- outbox
+- worker
+- retries
+- dead-letter
+- webhooks
+- notifications
+- external integrations
+
+## Stage 9 — Analytics and AI
+
+- operational read models
+- KPIs
+- dashboards
+- anomaly detection
+- matching optimization
+- forecasting
+
+## Stage 10 — Production hardening
+
+- load tests
+- security assessment
+- backup/restore drill
+- observability
+- disaster recovery
+- cost/performance tuning
+- production readiness review
+
+No stage is considered production-ready merely because its UI exists. Completion requires end-to-end traceability and passing quality/security gates.
