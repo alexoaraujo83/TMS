@@ -41,11 +41,39 @@ test("rejects cross-tenant matching before scoring", () => {
   );
 });
 
+test("rejects freight statuses that are not matching", () => {
+  assert.throws(() => scoreCandidate({ ...baseFreight, status: "open" }, candidate));
+  assert.throws(() =>
+    rankCandidates({ ...baseFreight, status: "negotiating" }, [candidate]),
+  );
+});
+
 test("ranks eligible candidates deterministically", () => {
   const results = rankCandidates(baseFreight, [candidate]);
   assert.equal(results.length, 1);
   assert.equal(results[0]?.candidate.driverId, candidate.driverId);
   assert.ok(results[0]?.total > 0);
+});
+
+test("uses driver id as deterministic tie-breaker", () => {
+  const first = { ...candidate, driverId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" };
+  const second = { ...candidate, driverId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" };
+  const results = rankCandidates(baseFreight, [second, first]);
+  assert.deepEqual(
+    results.map((result) => result.candidate.driverId),
+    [first.driverId, second.driverId],
+  );
+});
+
+test("does not invent routing confidence when routing data is unavailable", () => {
+  const result = scoreCandidate(baseFreight, {
+    ...candidate,
+    distanceKm: undefined,
+    routeCompatibility: undefined,
+  });
+  assert.equal(result.distance, 50);
+  assert.equal(result.route, 50);
+  assert.equal(result.reasons.includes("route-compatible"), false);
 });
 
 test("hard capacity mismatch scores zero", () => {
