@@ -1,0 +1,176 @@
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { Pool } from 'pg';
+import { describe, it, before, after } from 'node:test';
+
+const databaseUrl = process.env.DATABASE_URL;
+const runIntegration = process.env.RUN_DB_INTEGRATION === 'true' && Boolean(databaseUrl);
+
+if (!runIntegration) {
+  describe('database security integration', () => {
+    it('is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured', () => {});
+  });
+} else {
+  const pool = new Pool({ connectionString: databaseUrl });
+  let tenantA: string;
+  let tenantB: string;
+  let userA: string;
+  let userB: string;
+  let freightA: string;
+
+  before(async () => {
+    execFileSync('pnpm', ['migrate'], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: 'inherit',
+    });
+
+    // Test data is provisioned before re-enabling RLS so the test can use the
+    // same non-superuser application role for the actual isolation assertions.
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      for (const table of [
+        'audit_events',
+        'freights',
+        'vehicles',
+        'drivers',
+        'carriers',
+        'role_permissions',
+        'roles',
+        'tenant_memberships',
+        'users',
+        'tenants',
+      ]) {
+        await client.query(`alter table ${table} disable row level security`);
+      }
+
+      tenantA = randomUUID();
+      tenantB = randomUUID();
+      userA = randomUUID();
+      userB = randomUUID();
+      freightA = randomUUID();
+
+      await client.query(`insert into tenants (id, name, status) values ($1, 'Tenant A', 'active'), ($2, 'Tenant B', 'active')`, [tenantA, tenantB]);
+      await client.query(`insert into users (id, email, status) values ($1, 'a@test.local', 'active'), ($2, 'b@test.local', 'active')`, [userA, userB]);
+      await client.query(
+        `insert into tenant_memberships (user_id, tenant_id, role, active) values ($1,$2,'operator',true),($3,$4,'operator',true)`,
+        [userA, tenantA, userB, tenantB],
+      );
+      await client.query(
+        `insert into freights (id, tenant_id, status, freight_type, origin_city, origin_state, destination_city, destination_state, cargo_description, quantity, weight_kg)
+         values ($1,$2,'open','dedicated','Santos','SP','São Paulo','SP','test cargo',1,100)`,
+        [freightA, tenantA],
+      );
+
+      for (const table of [
+        'audit_events',
+        'freights',
+        'vehicles',
+        'drivers',
+        'carriers',
+        'role_permissions',
+        'roles',
+        'tenant_memberships',
+        'users',
+        'tenants',
+      ]) {
+        await client.query(`alter table ${table} enable row level security`);
+        await client.query(`alter table ${table} force row level security`);
+      }
+      await client.query('commit');
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  after(async () => {
+    const client = await pool.connect();
+    try {
+      // Cleanup is executed with RLS temporarily disabled because the test role
+      // owns the schema in the isolated CI database.
+      await client.query('begin');
+      for (const table of ['audit_events', 'freights', 'tenant_memberships', 'users', 'tenants']) {
+        await client.query(`alter table ${table} disable row level security`);
+      }
+      await client.query('delete from audit_events');
+      await client.query('delete from freights');
+      await client.query('delete from tenant_memberships');
+      await client.query('delete from users');
+      await client.query('delete from tenants');
+      await client.query('commit');
+    } finally {
+      client.release();
+      await pool.end();
+    }
+  });
+
+  describe('tenant isolation and membership bootstrap', () => {
+    it('isolates tenant-owned resources through RLS', async () => {
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantB]);
+        const result = await client.query('select id from freights where id = $1', [freightA]);
+        await client.query('rollback');
+        if (result.rowCount !== 0) throw new Error('cross-tenant freight became visible');
+      } finally {
+        client.release();
+      }
+    });
+
+    it('does not allow a forged tenant context to reveal another tenant resource', async () => {
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantB]);
+        const result = await client.query('select id from freights where tenant_id = $1', [tenantA]);
+        await client.query('rollback');
+        if (result.rowCount !== 0) throw new Error('forged tenant context bypassed RLS');
+      } finally {
+        client.release();
+      }
+    });
+
+    it('keeps the membership bootstrap function non-public and callable by the runtime role', async () => {
+      const client = await pool.connect();
+      try {
+        const privileges = await client.query(
+          `select has_function_privilege(current_user, 'public.check_tenant_membership(uuid, uuid)', 'execute') as executable,
+                  has_function_privilege('public', 'public.check_tenant_membership(uuid, uuid)', 'execute') as public_executable`,
+        );
+        if (!privileges.rows[0].executable) throw new Error('runtime role cannot execute membership bootstrap');
+        if (privileges.rows[0].public_executable) throw new Error('membership bootstrap is executable by PUBLIC');
+
+        const result = await client.query(
+          `select user_id as "userId", tenant_id as "tenantId", role, permissions, active
+             from public.check_tenant_membership($1, $2)`,
+          [userA, tenantA],
+        );
+        if (result.rowCount !== 1 || result.rows[0].userId !== userA || result.rows[0].tenantId !== tenantA || !result.rows[0].active) {
+          throw new Error('membership bootstrap returned an invalid authoritative result');
+        }
+      } finally {
+        client.release();
+      }
+    });
+
+    it('keeps tenant context transaction-scoped', async () => {
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        await client.query('select set_config($1, $2, true)', ['app.tenant_id', tenantA]);
+        const inside = await client.query<{ value: string }>("select current_setting('app.tenant_id', true) as value");
+        await client.query('commit');
+        const outside = await client.query<{ value: string | null }>("select nullif(current_setting('app.tenant_id', true), '') as value");
+        if (inside.rows[0]?.value !== tenantA) throw new Error('tenant context was not installed inside transaction');
+        if (outside.rows[0]?.value !== null) throw new Error('tenant context leaked outside transaction');
+      } finally {
+        client.release();
+      }
+    });
+  });
+}
