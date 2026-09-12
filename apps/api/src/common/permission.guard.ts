@@ -17,7 +17,13 @@ export class PermissionGuard implements CanActivate {
       executionContext.getHandler(),
       executionContext.getClass(),
     ]);
-    if (!permission) return true;
+
+    // Fail closed: a route protected by PermissionGuard must explicitly declare
+    // the permission it requires. This prevents accidental authorization when a
+    // developer adds a new protected endpoint but forgets @RequirePermission.
+    if (!permission) {
+      throw new ForbiddenException('Permission requirement is not configured');
+    }
 
     const request = executionContext.switchToHttp().getRequest<RequestLike>();
     const context = request.context;
