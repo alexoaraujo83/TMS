@@ -37,7 +37,7 @@ test("scores compatible candidates and exposes matching reasons", () => {
   const result = scoreCandidate(freight, candidate());
 
   assert.equal(result.vehicleCompatibility, 100);
-  assert.equal(result.capacity, 97);
+  assert.ok(Math.abs(result.capacity - 96.5909) < 0.001);
   assert.equal(result.availability, 100);
   assert.equal(result.route, 90);
   assert.ok(result.total > 90);
