@@ -110,7 +110,9 @@ export class AssignmentRepository {
         [tenantId, freightId, driverId, vehicleId],
       );
       if (existing.rows[0]) {
-        throw new Error("Freight, driver, or vehicle already has an active assignment");
+        throw new Error(
+          "Freight, driver, or vehicle already has an active assignment",
+        );
       }
 
       const assignmentResult = await client.query<FreightAssignmentRecord>(
