@@ -2,8 +2,5 @@ packages:
   - apps/*
   - packages/*
 
-dependencyRules:
-  - pattern: "**"
-
 onlyBuiltDependencies:
   - esbuild
