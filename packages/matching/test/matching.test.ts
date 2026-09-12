@@ -54,6 +54,17 @@ test("scores compatible candidates and exposes matching reasons", () => {
   ]);
 });
 
+test("uses neutral scores when routing data is unavailable", () => {
+  const result = scoreCandidate(
+    freight,
+    candidate({ distanceKm: undefined, routeCompatibility: undefined }),
+  );
+
+  assert.equal(result.distance, 50);
+  assert.equal(result.route, 50);
+  assert.ok(!result.reasons.includes("route-compatible"));
+});
+
 test("ranks stronger candidates before weaker candidates", () => {
   const results = rankCandidates(freight, [
     candidate({
@@ -73,6 +84,25 @@ test("ranks stronger candidates before weaker candidates", () => {
     "00000000-0000-0000-0000-000000000021",
   );
   assert.ok((results[0]?.total ?? 0) > (results[1]?.total ?? 0));
+});
+
+test("uses driver id as a deterministic tie-breaker", () => {
+  const results = rankCandidates(freight, [
+    candidate({
+      driverId: "00000000-0000-0000-0000-000000000022",
+    }),
+    candidate({
+      driverId: "00000000-0000-0000-0000-000000000021",
+    }),
+  ]);
+
+  assert.deepEqual(
+    results.map((result) => result.candidate.driverId),
+    [
+      "00000000-0000-0000-0000-000000000021",
+      "00000000-0000-0000-0000-000000000022",
+    ],
+  );
 });
 
 test("rejects cross-tenant candidates", () => {
