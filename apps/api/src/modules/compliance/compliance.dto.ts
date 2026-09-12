@@ -1,6 +1,11 @@
 import { IsIn, IsOptional, IsString, IsUUID } from "class-validator";
 
-const complianceStatuses = ["pending", "approved", "rejected", "expired"] as const;
+const complianceStatuses = [
+  "pending",
+  "approved",
+  "rejected",
+  "expired",
+] as const;
 const grStatuses = [
   "pending",
   "submitted",
