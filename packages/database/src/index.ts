@@ -17,7 +17,11 @@ export function tenantSessionSql(tenantId: string): string {
 export { createDatabasePool } from "./pool.js";
 export { withTransaction } from "./transaction.js";
 export { withTenantContext } from "./tenant-transaction.js";
-export { PostgresFreightRepository } from "./freight-repository.js";
+export {
+  PostgresFreightRepository,
+  type CreateFreightInput,
+  type FreightRow,
+} from "./freight-repository.js";
 export {
   CarrierRepository,
   DriverRepository,
