@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 10;
+export const DATABASE_SCHEMA_VERSION = 11;
 
 export interface TenantScopedRecord {
   id: string;
@@ -27,6 +27,11 @@ export {
   DriverRepository,
   VehicleRepository,
 } from "./operational-repositories.js";
+export {
+  AssignmentRepository,
+  type AssignmentResult,
+  type FreightAssignmentRecord,
+} from "./assignment-repository.js";
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
