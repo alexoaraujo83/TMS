@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
 
@@ -64,9 +64,10 @@ if (!enabled) {
       ]) {
         await client.query(`alter table ${table} disable row level security`);
       }
-      await client.query("delete from compliance_checks where tenant_id = $1", [
-        tenantId,
-      ]);
+      await client.query(
+        "delete from compliance_checks where tenant_id = $1",
+        [tenantId],
+      );
       await client.query("delete from gr_requests where tenant_id = $1", [
         tenantId,
       ]);
@@ -87,8 +88,12 @@ if (!enabled) {
         "app.tenant_id",
         tenantId,
       ]);
-      await client.query("alter table compliance_checks enable row level security");
-      await client.query("alter table compliance_checks force row level security");
+      await client.query(
+        "alter table compliance_checks enable row level security",
+      );
+      await client.query(
+        "alter table compliance_checks force row level security",
+      );
 
       const pending = await client.query(
         `insert into compliance_checks (tenant_id, freight_id, check_type)
