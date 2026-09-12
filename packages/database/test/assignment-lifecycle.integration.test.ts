@@ -33,27 +33,32 @@ if (!enabled) {
     requestId: randomUUID(),
   };
 
-  async function insertFreight(status = "matching"): Promise<string> {
+  async function tenantQuery<T>(text: string, values: readonly unknown[] = []) {
     const client = await pool.connect();
     try {
       await client.query("begin");
       await client.query("select set_config($1, $2, true)", ["app.tenant_id", tenantId]);
-      const result = await client.query<{ id: string }>(
-        `insert into freights
-          (tenant_id, status, freight_type, origin_city, origin_state,
-           destination_city, destination_state, cargo_description, quantity, weight_kg)
-         values ($1, $2, 'dedicated', 'Betim', 'MG', 'Divinopolis', 'MG', 'Test cargo', 1, 1000)
-         returning id`,
-        [tenantId, status],
-      );
+      const result = await client.query<T>(text, values);
       await client.query("commit");
-      return result.rows[0].id;
+      return result;
     } catch (error) {
       await client.query("rollback");
       throw error;
     } finally {
       client.release();
     }
+  }
+
+  async function insertFreight(status = "matching"): Promise<string> {
+    const result = await tenantQuery<{ id: string }>(
+      `insert into freights
+        (tenant_id, status, freight_type, origin_city, origin_state,
+         destination_city, destination_state, cargo_description, quantity, weight_kg)
+       values ($1, $2, 'dedicated', 'Betim', 'MG', 'Divinopolis', 'MG', 'Test cargo', 1, 1000)
+       returning id`,
+      [tenantId, status],
+    );
+    return result.rows[0].id;
   }
 
   before(async () => {
@@ -135,7 +140,7 @@ if (!enabled) {
       const delivered = await freightRepository.updateStatusWithAudit(tenantId, deliveredFreightId, "in_transit", "delivered", audit);
       assert.equal(delivered?.status, "delivered");
 
-      const result = await pool.query<{ status: string; completedAt: Date | null; cancelledAt: Date | null }>(
+      const result = await tenantQuery<{ status: string; completedAt: Date | null; cancelledAt: Date | null }>(
         `select status, completed_at as "completedAt", cancelled_at as "cancelledAt"
            from freight_assignments where tenant_id = $1 and freight_id = $2`,
         [tenantId, deliveredFreightId],
@@ -162,7 +167,7 @@ if (!enabled) {
       const cancelled = await freightRepository.updateStatusWithAudit(tenantId, cancelledFreightId, "assigned", "cancelled", audit);
       assert.equal(cancelled?.status, "cancelled");
 
-      const result = await pool.query<{ status: string; cancelledAt: Date | null; completedAt: Date | null }>(
+      const result = await tenantQuery<{ status: string; cancelledAt: Date | null; completedAt: Date | null }>(
         `select status, cancelled_at as "cancelledAt", completed_at as "completedAt"
            from freight_assignments where tenant_id = $1 and freight_id = $2`,
         [tenantId, cancelledFreightId],
@@ -194,7 +199,7 @@ if (!enabled) {
       assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
       assert.equal(results.filter((result) => result.status === "rejected").length, 1);
 
-      const active = await pool.query<{ freightId: string }>(
+      const active = await tenantQuery<{ freightId: string }>(
         `select freight_id as "freightId" from freight_assignments
           where tenant_id = $1 and status = 'active' and driver_id = $2`,
         [tenantId, driverId],
