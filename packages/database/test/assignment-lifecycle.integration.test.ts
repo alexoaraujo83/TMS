@@ -1,9 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { Pool } from "pg";
+import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { Pool } from "pg";
 import { AssignmentRepository } from "../src/assignment-repository.js";
 import { PostgresFreightRepository } from "../src/freight-repository.js";
+import { VehicleRepository } from "../src/operational-repositories.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const enabled = process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
@@ -16,6 +18,7 @@ if (!enabled) {
   const pool = new Pool({ connectionString: databaseUrl });
   const freightRepository = new PostgresFreightRepository(pool);
   const assignmentRepository = new AssignmentRepository(pool);
+  const vehicleRepository = new VehicleRepository(pool);
   const tenantId = randomUUID();
   const userId = randomUUID();
   let driverId = "";
@@ -30,18 +33,24 @@ if (!enabled) {
     requestId: randomUUID(),
   };
 
-  async function insertFreight(): Promise<string> {
+  async function insertFreight(status = "matching"): Promise<string> {
     const client = await pool.connect();
     try {
+      await client.query("begin");
+      await client.query("select set_config($1, $2, true)", ["app.tenant_id", tenantId]);
       const result = await client.query<{ id: string }>(
         `insert into freights
           (tenant_id, status, freight_type, origin_city, origin_state,
            destination_city, destination_state, cargo_description, quantity, weight_kg)
-         values ($1, 'matching', 'dedicated', 'Betim', 'MG', 'Divinopolis', 'MG', 'Test cargo', 1, 1000)
+         values ($1, $2, 'dedicated', 'Betim', 'MG', 'Divinopolis', 'MG', 'Test cargo', 1, 1000)
          returning id`,
-        [tenantId],
+        [tenantId, status],
       );
+      await client.query("commit");
       return result.rows[0].id;
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
     } finally {
       client.release();
     }
@@ -79,6 +88,19 @@ if (!enabled) {
     } finally {
       client.release();
     }
+
+    const enableClient = await pool.connect();
+    try {
+      await enableClient.query("begin");
+      for (const table of ["freight_assignments", "vehicles", "drivers", "carriers", "audit_events", "tenant_memberships", "users", "freights", "tenants"]) {
+        await enableClient.query(`alter table ${table} enable row level security`);
+        await enableClient.query(`alter table ${table} force row level security`);
+      }
+      await enableClient.query("commit");
+    } finally {
+      enableClient.release();
+    }
+
     deliveredFreightId = await insertFreight();
     await assignmentRepository.assign(tenantId, deliveredFreightId, driverId, vehicleId, audit);
     cancelledFreightId = await insertFreight();
@@ -111,7 +133,7 @@ if (!enabled) {
     it("completes the assignment when freight is delivered", async () => {
       await freightRepository.updateStatusWithAudit(tenantId, deliveredFreightId, "assigned", "in_transit", audit);
       const delivered = await freightRepository.updateStatusWithAudit(tenantId, deliveredFreightId, "in_transit", "delivered", audit);
-      if (delivered?.status !== "delivered") throw new Error("freight did not reach delivered");
+      assert.equal(delivered?.status, "delivered");
 
       const result = await pool.query<{ status: string; completedAt: Date | null; cancelledAt: Date | null }>(
         `select status, completed_at as "completedAt", cancelled_at as "cancelledAt"
@@ -119,27 +141,26 @@ if (!enabled) {
         [tenantId, deliveredFreightId],
       );
       const assignment = result.rows[0];
-      if (!assignment || assignment.status !== "completed" || !assignment.completedAt || assignment.cancelledAt) {
-        throw new Error("assignment was not completed with freight delivery");
-      }
+      assert.equal(assignment?.status, "completed");
+      assert.ok(assignment?.completedAt);
+      assert.equal(assignment?.cancelledAt, null);
     });
 
     it("rejects delivery without an assignment and rolls back the freight update", async () => {
-      const freightId = await insertFreight();
-      await pool.query(`update freights set status = 'in_transit', updated_at = now() where tenant_id = $1 and id = $2`, [tenantId, freightId]);
+      const freightId = await insertFreight("in_transit");
 
-      await assertRejects(
+      await assert.rejects(
         freightRepository.updateStatusWithAudit(tenantId, freightId, "in_transit", "delivered", audit),
-        "Freight cannot be delivered without an active assignment",
+        /Freight cannot be delivered without an active assignment/,
       );
       const freight = await freightRepository.findById(tenantId, freightId);
-      if (freight?.status !== "in_transit") throw new Error("delivery failure did not roll back freight state");
+      assert.equal(freight?.status, "in_transit");
     });
 
     it("cancels the assignment when freight is cancelled", async () => {
       await assignmentRepository.assign(tenantId, cancelledFreightId, driverId, vehicleId, audit);
       const cancelled = await freightRepository.updateStatusWithAudit(tenantId, cancelledFreightId, "assigned", "cancelled", audit);
-      if (cancelled?.status !== "cancelled") throw new Error("freight did not reach cancelled");
+      assert.equal(cancelled?.status, "cancelled");
 
       const result = await pool.query<{ status: string; cancelledAt: Date | null; completedAt: Date | null }>(
         `select status, cancelled_at as "cancelledAt", completed_at as "completedAt"
@@ -147,19 +168,38 @@ if (!enabled) {
         [tenantId, cancelledFreightId],
       );
       const assignment = result.rows[0];
-      if (!assignment || assignment.status !== "cancelled" || !assignment.cancelledAt || assignment.completedAt) {
-        throw new Error("assignment was not cancelled with freight cancellation");
-      }
+      assert.equal(assignment?.status, "cancelled");
+      assert.ok(assignment?.cancelledAt);
+      assert.equal(assignment?.completedAt, null);
+    });
+
+    it("excludes an actively assigned driver from matching", async () => {
+      const freightId = await insertFreight();
+      const candidatesBefore = await vehicleRepository.findMatchingCandidates(tenantId, ["truck"], ["open"], 1000);
+      assert.equal(candidatesBefore.some((candidate) => candidate.driverId === driverId), true);
+
+      await assignmentRepository.assign(tenantId, freightId, driverId, vehicleId, audit);
+      const candidatesAfter = await vehicleRepository.findMatchingCandidates(tenantId, ["truck"], ["open"], 1000);
+      assert.equal(candidatesAfter.some((candidate) => candidate.driverId === driverId), false);
+    });
+
+    it("allows only one of two concurrent assignments for the same driver and vehicle", async () => {
+      const freightA = await insertFreight();
+      const freightB = await insertFreight();
+      const results = await Promise.allSettled([
+        assignmentRepository.assign(tenantId, freightA, driverId, vehicleId, audit),
+        assignmentRepository.assign(tenantId, freightB, driverId, vehicleId, audit),
+      ]);
+
+      assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+      assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+
+      const active = await pool.query<{ freightId: string }>(
+        `select freight_id as "freightId" from freight_assignments
+          where tenant_id = $1 and status = 'active' and driver_id = $2`,
+        [tenantId, driverId],
+      );
+      assert.equal(active.rows.length, 1);
     });
   });
-}
-
-async function assertRejects(promise: Promise<unknown>, expectedMessage: string): Promise<void> {
-  try {
-    await promise;
-  } catch (error) {
-    if (error instanceof Error && error.message === expectedMessage) return;
-    throw error;
-  }
-  throw new Error(`Expected rejection: ${expectedMessage}`);
 }
