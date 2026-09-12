@@ -3,8 +3,8 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
-  Reflector,
 } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 import { hasPermission } from "@tms/security";
 import type { RequestContext } from "./request-context.js";
 
