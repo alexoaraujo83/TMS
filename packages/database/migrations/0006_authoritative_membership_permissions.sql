@@ -34,6 +34,7 @@ as $$
 $$;
 
 revoke all on function public.check_tenant_membership(uuid, uuid) from public;
+grant execute on function public.check_tenant_membership(uuid, uuid) to current_user;
 
 comment on function public.check_tenant_membership(uuid, uuid) is
 'Bootstrap-only authoritative tenant membership and effective permission lookup. SECURITY DEFINER uses a fixed search_path and accepts identity and selected tenant explicitly.';
