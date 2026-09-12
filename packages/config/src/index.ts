@@ -14,13 +14,15 @@ export interface AppConfig {
   logLevel: string;
 }
 
-function required(env: NodeJS.ProcessEnv, key: string): string {
+type Environment = Record<string, string | undefined>;
+
+function required(env: Environment, key: string): string {
   const value = env[key];
   if (!value) throw new Error(`Missing required environment variable: ${key}`);
   return value;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+export function loadConfig(env: Environment = {}): AppConfig {
   const appEnv = required(env, "APP_ENV") as AppEnvironment;
   if (!["local", "development", "staging", "production"].includes(appEnv)) {
     throw new Error(`Invalid APP_ENV: ${appEnv}`);
