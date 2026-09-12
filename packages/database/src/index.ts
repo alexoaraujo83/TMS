@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 8;
+export const DATABASE_SCHEMA_VERSION = 9;
 
 export interface TenantScopedRecord {
   id: string;
@@ -16,6 +16,7 @@ export function tenantSessionSql(tenantId: string): string {
 
 export { createDatabasePool } from "./pool.js";
 export { withTransaction } from "./transaction.js";
+export { withTenantContext } from "./tenant-transaction.js";
 export { PostgresFreightRepository } from "./freight-repository.js";
 export {
   CarrierRepository,
@@ -25,3 +26,8 @@ export {
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
+export {
+  tenantMatchesSession,
+  userMatchesSession,
+  tenantOrUserMatchesSession,
+} from "./rls.js";
