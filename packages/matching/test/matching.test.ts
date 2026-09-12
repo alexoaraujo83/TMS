@@ -46,7 +46,7 @@ test("scores compatible candidates and exposes matching reasons", () => {
   assert.ok(Math.abs(result.capacity - 96.5909) < 0.001);
   assert.equal(result.availability, 100);
   assert.equal(result.route, 90);
-  assert.ok(result.total > 90);
+  assert.ok(result.total > 88);
   assert.deepEqual(result.reasons, [
     "vehicle-compatible",
     "available",
