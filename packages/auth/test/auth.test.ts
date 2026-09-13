@@ -146,7 +146,9 @@ test("verifyAccessToken rejects an invalid audience", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
 
   await withJwks(publicKey, async () => {
-    const token = await signedToken(privateKey, { audience: "wrong-audience" });
+    const token = await signedToken(privateKey, {
+      audience: "wrong-audience",
+    });
     await assert.rejects(
       verifyAccessToken(token, {
         issuer: ISSUER,
@@ -228,9 +230,12 @@ test("verifyAccessToken rejects an unknown signing key", async () => {
 });
 
 test("verifyAccessToken rejects HS256 tokens", async () => {
-  const token = await signedToken(new TextEncoder().encode("test-only-secret"), {
-    algorithm: "HS256",
-  });
+  const token = await signedToken(
+    new TextEncoder().encode("test-only-secret"),
+    {
+      algorithm: "HS256",
+    },
+  );
 
   await assert.rejects(
     verifyAccessToken(token, {
