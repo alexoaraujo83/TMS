@@ -1,0 +1,53 @@
+name: Database Migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/database/migrations/**"
+      - "packages/database/scripts/migrate.ts"
+      - "packages/database/package.json"
+      - "pnpm-lock.yaml"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-migrations-main
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.24.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify migration secret is configured
+        shell: bash
+        run: |
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "NEON_DATABASE_URL is not configured for the production environment."
+            exit 1
+          fi
+
+      - name: Apply database migrations
+        run: pnpm --filter @tms/database migrate
