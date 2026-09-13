@@ -12,10 +12,8 @@ const enabled =
 
 if (!enabled) {
   describe("assignment matching eligibility integration", () => {
-    it(
-      "is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured",
-      () => undefined,
-    );
+    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () =>
+      undefined);
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
@@ -220,26 +218,26 @@ if (!enabled) {
         "delete from audit_events where tenant_id in ($1, $2)",
         [tenantId, otherTenantId],
       );
-      await client.query(
-        "delete from vehicles where tenant_id in ($1, $2)",
-        [tenantId, otherTenantId],
-      );
-      await client.query(
-        "delete from drivers where tenant_id in ($1, $2)",
-        [tenantId, otherTenantId],
-      );
-      await client.query(
-        "delete from carriers where tenant_id in ($1, $2)",
-        [tenantId, otherTenantId],
-      );
+      await client.query("delete from vehicles where tenant_id in ($1, $2)", [
+        tenantId,
+        otherTenantId,
+      ]);
+      await client.query("delete from drivers where tenant_id in ($1, $2)", [
+        tenantId,
+        otherTenantId,
+      ]);
+      await client.query("delete from carriers where tenant_id in ($1, $2)", [
+        tenantId,
+        otherTenantId,
+      ]);
       await client.query(
         "delete from tenant_memberships where tenant_id in ($1, $2)",
         [tenantId, otherTenantId],
       );
-      await client.query(
-        "delete from freights where tenant_id in ($1, $2)",
-        [tenantId, otherTenantId],
-      );
+      await client.query("delete from freights where tenant_id in ($1, $2)", [
+        tenantId,
+        otherTenantId,
+      ]);
       await client.query("delete from users where id in ($1, $2)", [
         userId,
         otherUserId,
@@ -277,12 +275,10 @@ if (!enabled) {
     assert.equal(result.freightStatus, "assigned");
   });
 
-  it(
-    "rejects a different vehicle for the same driver when it violates freight requirements",
-    async () => {
-      const freshFreightId = randomUUID();
-      await query(
-        `insert into freights (
+  it("rejects a different vehicle for the same driver when it violates freight requirements", async () => {
+    const freshFreightId = randomUUID();
+    await query(
+      `insert into freights (
            id, tenant_id, status, freight_type, origin_city, origin_state,
            destination_city, destination_state, cargo_description, quantity,
            weight_kg, vehicle_types, body_types, minimum_free_meters,
@@ -292,33 +288,32 @@ if (!enabled) {
            'MG', 'Wrong vehicle cargo', 1, 5000,
            ARRAY['truck'], ARRAY['open'], 5, 5000
          )`,
-        [freshFreightId, tenantId],
-      );
+      [freshFreightId, tenantId],
+    );
 
-      await assert.rejects(
-        assignments.assign(
-          tenantId,
-          freshFreightId,
-          driverId,
-          wrongVehicleId,
-          audit,
-        ),
-        /Vehicle does not satisfy freight matching requirements/,
-      );
+    await assert.rejects(
+      assignments.assign(
+        tenantId,
+        freshFreightId,
+        driverId,
+        wrongVehicleId,
+        audit,
+      ),
+      /Vehicle does not satisfy freight matching requirements/,
+    );
 
-      const state = await query<{ status: string; assignments: string }>(
-        `select f.status, count(fa.id)::text as assignments
+    const state = await query<{ status: string; assignments: string }>(
+      `select f.status, count(fa.id)::text as assignments
            from freights f
            left join freight_assignments fa
              on fa.freight_id = f.id and fa.status = 'active'
           where f.tenant_id = $1 and f.id = $2
           group by f.status`,
-        [tenantId, freshFreightId],
-      );
-      assert.equal(state.rows[0]?.status, "matching");
-      assert.equal(state.rows[0]?.assignments, "0");
-    },
-  );
+      [tenantId, freshFreightId],
+    );
+    assert.equal(state.rows[0]?.status, "matching");
+    assert.equal(state.rows[0]?.assignments, "0");
+  });
 
   it("rejects a vehicle from another tenant", async () => {
     const freshFreightId = randomUUID();
@@ -357,12 +352,10 @@ if (!enabled) {
     assert.equal(state.rows[0]?.assignments, "0");
   });
 
-  it(
-    "rejects an unavailable vehicle before creating an assignment",
-    async () => {
-      const freshFreightId = randomUUID();
-      await query(
-        `insert into freights (
+  it("rejects an unavailable vehicle before creating an assignment", async () => {
+    const freshFreightId = randomUUID();
+    await query(
+      `insert into freights (
            id, tenant_id, status, freight_type, origin_city, origin_state,
            destination_city, destination_state, cargo_description, quantity,
            weight_kg
@@ -370,30 +363,29 @@ if (!enabled) {
            $1, $2, 'matching', 'dedicated', 'Betim', 'MG', 'Divinopolis',
            'MG', 'Unavailable cargo', 1, 1000
          )`,
-        [freshFreightId, tenantId],
-      );
-      await assert.rejects(
-        assignments.assign(
-          tenantId,
-          freshFreightId,
-          driverId,
-          unavailableVehicleId,
-          audit,
-        ),
-        /Vehicle is not available for assignment/,
-      );
+      [freshFreightId, tenantId],
+    );
+    await assert.rejects(
+      assignments.assign(
+        tenantId,
+        freshFreightId,
+        driverId,
+        unavailableVehicleId,
+        audit,
+      ),
+      /Vehicle is not available for assignment/,
+    );
 
-      const state = await query<{ status: string; assignments: string }>(
-        `select f.status, count(fa.id)::text as assignments
+    const state = await query<{ status: string; assignments: string }>(
+      `select f.status, count(fa.id)::text as assignments
            from freights f
            left join freight_assignments fa
              on fa.freight_id = f.id and fa.status = 'active'
           where f.tenant_id = $1 and f.id = $2
           group by f.status`,
-        [tenantId, freshFreightId],
-      );
-      assert.equal(state.rows[0]?.status, "matching");
-      assert.equal(state.rows[0]?.assignments, "0");
-    },
-  );
+      [tenantId, freshFreightId],
+    );
+    assert.equal(state.rows[0]?.status, "matching");
+    assert.equal(state.rows[0]?.assignments, "0");
+  });
 }
