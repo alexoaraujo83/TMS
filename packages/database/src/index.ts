@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 20;
+export const DATABASE_SCHEMA_VERSION = 21;
 
 export interface TenantScopedRecord {
   id: string;
@@ -41,6 +41,17 @@ export {
   type TripRecord,
   type TripStatus,
 } from "./trip-repository.js";
+export {
+  TripExecutionRepository,
+  occurrenceTypes,
+  occurrenceSeverities,
+  type TripOccurrenceType,
+  type TripOccurrenceSeverity,
+  type TripOccurrenceRecord,
+  type TripPodRecord,
+  type CreateOccurrenceInput,
+  type CreatePodInput,
+} from "./trip-execution-repository.js";
 export {
   ComplianceRepository,
   type ComplianceStatus,
