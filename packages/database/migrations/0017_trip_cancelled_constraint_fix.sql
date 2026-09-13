@@ -1,20 +1,12 @@
-do $$
-declare
-  constraint_name text;
-begin
-  select c.conname
-    into constraint_name
-    from pg_constraint c
-   where c.conrelid = 'trips'::regclass
-     and c.contype = 'c'
-     and pg_get_constraintdef(c.oid) like '%status = ''planned''%'
-     and pg_get_constraintdef(c.oid) like '%cancelled_at%'
-   limit 1;
+-- Keep the trip lifecycle constraint executor-compatible and idempotent.
+-- 0015 introduced the canonical lifecycle invariant; this migration replaces
+-- any legacy equivalent before installing the canonical constraint.
 
-  if constraint_name is not null then
-    execute format('alter table trips drop constraint %I', constraint_name);
-  end if;
-end $$;
+alter table trips
+  drop constraint if exists trips_check;
+
+alter table trips
+  drop constraint if exists trips_status_timestamps_check;
 
 alter table trips
   add constraint trips_status_timestamps_check
