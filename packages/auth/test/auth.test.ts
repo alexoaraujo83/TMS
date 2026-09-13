@@ -100,35 +100,43 @@ test(
   },
 );
 
-test("verifyAccessToken accepts the canonical TMS namespaced tenant claim", async () => {
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
+test(
+  "verifyAccessToken accepts the canonical TMS namespaced tenant claim",
+  async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
 
-  await withJwks(publicKey, async () => {
-    const token = await signedToken(privateKey, { tenantId: "tenant-a" });
-    const claims = await verifyAccessToken(token, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      jwksUrl: JWKS_URL,
+    await withJwks(publicKey, async () => {
+      const token = await signedToken(privateKey, { tenantId: "tenant-a" });
+      const claims = await verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      });
+
+      assert.equal(claims.tenantId, "tenant-a");
     });
+  },
+);
 
-    assert.equal(claims.tenantId, "tenant-a");
-  });
-});
+test(
+  "verifyAccessToken accepts the legacy Nexora tenant claim during migration",
+  async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
 
-test("verifyAccessToken accepts the legacy Nexora tenant claim during migration", async () => {
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
+    await withJwks(publicKey, async () => {
+      const token = await signedToken(privateKey, {
+        legacyTenantId: "tenant-legacy",
+      });
+      const claims = await verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      });
 
-  await withJwks(publicKey, async () => {
-    const token = await signedToken(privateKey, { legacyTenantId: "tenant-legacy" });
-    const claims = await verifyAccessToken(token, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      jwksUrl: JWKS_URL,
+      assert.equal(claims.tenantId, "tenant-legacy");
     });
-
-    assert.equal(claims.tenantId, "tenant-legacy");
-  });
-});
+  },
+);
 
 test(
   "verifyAccessToken prefers the canonical TMS tenant claim over the legacy claim",
