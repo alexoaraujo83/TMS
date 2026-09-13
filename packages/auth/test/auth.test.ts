@@ -1,13 +1,13 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { verifyAccessToken } from "../src/index.ts";
+import { NEXORA_TENANT_ID_CLAIM, verifyAccessToken } from "../src/index.ts";
 
-test("verifyAccessToken accepts a valid RS256 token", async () => {
+test("verifyAccessToken accepts a valid RS256 token with the Auth0 namespaced tenant claim", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
   const issuer = "https://tenant.example.auth0.com/";
   const audience = "urn:nexora:tms:api:development";
-  const token = await new SignJWT({ tenantId: "tenant-a" })
+  const token = await new SignJWT({ [NEXORA_TENANT_ID_CLAIM]: "tenant-a" })
     .setProtectedHeader({ alg: "RS256", kid: "test-key" })
     .setSubject("auth0|user-1")
     .setIssuer(issuer)
@@ -47,8 +47,38 @@ test("verifyAccessToken accepts a valid RS256 token", async () => {
   }
 });
 
+test("verifyAccessToken ignores an untrusted root tenantId claim", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+  const issuer = "https://tenant.example.auth0.com/";
+  const audience = "urn:nexora:tms:api:development";
+  const token = await new SignJWT({
+    tenantId: "attacker-controlled",
+    [NEXORA_TENANT_ID_CLAIM]: "tenant-a",
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
+    .setSubject("auth0|user-1")
+    .setIssuer(issuer)
+    .setAudience(audience)
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
+  const jwk = await exportJWK(publicKey);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ keys: [{ ...jwk, kty: "RSA", use: "sig", alg: "RS256", kid: "test-key" }] }), {
+      headers: { "content-type": "application/json" },
+    });
+
+  try {
+    const claims = await verifyAccessToken(token, { issuer, audience, jwksUrl: "https://jwks.example.test/.well-known/jwks.json" });
+    assert.equal(claims.tenantId, "tenant-a");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("verifyAccessToken rejects HS256 tokens", async () => {
-  const token = await new SignJWT({ tenantId: "tenant-a" })
+  const token = await new SignJWT({ [NEXORA_TENANT_ID_CLAIM]: "tenant-a" })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject("auth0|user-1")
     .setIssuer("https://tenant.example.auth0.com/")
