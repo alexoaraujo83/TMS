@@ -83,14 +83,17 @@ const requiredColumns: Record<string, string[]> = {
 const client = new Client({ connectionString: databaseUrl });
 
 async function validateExistingSchema(): Promise<void> {
-  const tables = await client.query<{ table_name: string }>(`
+  const tables = await client.query<{ table_name: string }>(
+    `
     select table_name
     from information_schema.tables
     where table_schema = 'public'
       and table_type = 'BASE TABLE'
       and table_name = any($1::text[])
     order by table_name
-  `, [expectedTables]);
+  `,
+    [expectedTables],
+  );
 
   const foundTables = new Set(tables.rows.map((row) => row.table_name));
   const missingTables = expectedTables.filter((table) => !foundTables.has(table));
@@ -98,12 +101,15 @@ async function validateExistingSchema(): Promise<void> {
     throw new Error(`Existing schema baseline rejected: missing tables: ${missingTables.join(", ")}`);
   }
 
-  const columns = await client.query<{ table_name: string; column_name: string }>(`
+  const columns = await client.query<{ table_name: string; column_name: string }>(
+    `
     select table_name, column_name
     from information_schema.columns
     where table_schema = 'public'
       and table_name = any($1::text[])
-  `, [Object.keys(requiredColumns)]);
+  `,
+    [Object.keys(requiredColumns)],
+  );
 
   const foundColumns = new Set(columns.rows.map((row) => `${row.table_name}.${row.column_name}`));
   const missingColumns = Object.entries(requiredColumns).flatMap(([table, names]) =>
@@ -113,13 +119,20 @@ async function validateExistingSchema(): Promise<void> {
     throw new Error(`Existing schema baseline rejected: missing columns: ${missingColumns.join(", ")}`);
   }
 
-  const rls = await client.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(`
+  const rls = await client.query<{
+    relname: string;
+    relrowsecurity: boolean;
+    relforcerowsecurity: boolean;
+  }>(
+    `
     select c.relname, c.relrowsecurity, c.relforcerowsecurity
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public'
       and c.relname = any($1::text[])
-  `, [rlsTables]);
+  `,
+    [rlsTables],
+  );
 
   const badRls = rls.rows.filter((row) => !row.relrowsecurity || !row.relforcerowsecurity);
   if (badRls.length > 0) {
@@ -130,69 +143,99 @@ async function validateExistingSchema(): Promise<void> {
     );
   }
 
-  const policies = await client.query<{ tablename: string; policy_count: string }>(`
+  const policies = await client.query<{ tablename: string; policy_count: string }>(
+    `
     select tablename, count(*)::text as policy_count
     from pg_policies
     where schemaname = 'public'
       and tablename = any($1::text[])
     group by tablename
-  `, [rlsTables]);
+  `,
+    [rlsTables],
+  );
   const policyCounts = new Map(policies.rows.map((row) => [row.tablename, Number(row.policy_count)]));
-  const missingPolicies = rlsTables.filter((table) => !policyCounts.has(table) || policyCounts.get(table) === 0);
+  const missingPolicies = rlsTables.filter(
+    (table) => !policyCounts.has(table) || policyCounts.get(table) === 0,
+  );
   if (missingPolicies.length > 0) {
     throw new Error(`Existing schema baseline rejected: missing RLS policies: ${missingPolicies.join(", ")}`);
   }
 
-  const primaryKeys = await client.query<{ table_name: string; primary_key_count: string }>(`
+  const primaryKeys = await client.query<{ table_name: string; primary_key_count: string }>(
+    `
     select tc.table_name, count(*)::text as primary_key_count
     from information_schema.table_constraints tc
     where tc.table_schema = 'public'
       and tc.constraint_type = 'PRIMARY KEY'
       and tc.table_name = any($1::text[])
     group by tc.table_name
-  `, [expectedTables]);
-  const primaryKeyCounts = new Map(primaryKeys.rows.map((row) => [row.table_name, Number(row.primary_key_count)]));
+  `,
+    [expectedTables],
+  );
+  const primaryKeyCounts = new Map(
+    primaryKeys.rows.map((row) => [row.table_name, Number(row.primary_key_count)]),
+  );
   const missingPrimaryKeys = expectedTables.filter((table) => !primaryKeyCounts.has(table));
   if (missingPrimaryKeys.length > 0) {
-    throw new Error(`Existing schema baseline rejected: missing primary keys: ${missingPrimaryKeys.join(", ")}`);
+    throw new Error(
+      `Existing schema baseline rejected: missing primary keys: ${missingPrimaryKeys.join(", ")}`,
+    );
   }
 
-  const auth0Resolver = await client.query<{ proname: string; prosecdef: boolean; proconfig: string[] | null }>(`
+  const auth0Resolver = await client.query<{
+    proname: string;
+    prosecdef: boolean;
+    proconfig: string[] | null;
+  }>(
+    `
     select p.proname, p.prosecdef, p.proconfig
     from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public'
-      and p.proname = 'check_tenant_membership'
-      and pg_get_function_identity_arguments(p.oid) = 'text, uuid'
-  `);
+    join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public'
+      and p.proname='check_tenant_membership'
+      and pg_get_function_identity_arguments(p.oid)='text, uuid'
+  `,
+  );
   const resolver = auth0Resolver.rows[0];
-  if (!resolver || !resolver.prosecdef || !resolver.proconfig?.includes("search_path=public, pg_catalog")) {
-    throw new Error("Existing schema baseline rejected: canonical Auth0 membership resolver is missing or insecure");
+  if (
+    !resolver ||
+    !resolver.prosecdef ||
+    !resolver.proconfig?.includes("search_path=public, pg_catalog")
+  ) {
+    throw new Error(
+      "Existing schema baseline rejected: canonical Auth0 membership resolver is missing or insecure",
+    );
   }
 
-  const auth0Index = await client.query<{ indexname: string }>(`
+  const auth0Index = await client.query<{ indexname: string }>(
+    `
     select indexname
     from pg_indexes
-    where schemaname = 'public'
-      and tablename = 'users'
-      and indexname = 'users_auth0_subject_uidx'
-  `);
+    where schemaname='public'
+      and tablename='users'
+      and indexname='users_auth0_subject_uidx'
+  `,
+  );
   if (auth0Index.rows.length !== 1) {
     throw new Error("Existing schema baseline rejected: users_auth0_subject_uidx is missing");
   }
 
-  const tenantScopedFks = await client.query<{ constraint_name: string }>(`
+  const tenantScopedFks = await client.query<{ constraint_name: string }>(
+    `
     select constraint_name
     from information_schema.table_constraints
-    where constraint_schema = 'public'
-      and constraint_type = 'FOREIGN KEY'
+    where constraint_schema='public'
+      and constraint_type='FOREIGN KEY'
       and constraint_name in (
         'drivers_carrier_same_tenant_fkey',
         'vehicles_driver_same_tenant_fkey'
       )
-  `);
+  `,
+  );
   if (tenantScopedFks.rows.length !== 2) {
-    throw new Error("Existing schema baseline rejected: canonical tenant-scoped driver/vehicle foreign keys are incomplete");
+    throw new Error(
+      "Existing schema baseline rejected: canonical tenant-scoped driver/vehicle foreign keys are incomplete",
+    );
   }
 
   console.log("existing schema baseline validation passed");
