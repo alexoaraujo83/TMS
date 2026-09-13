@@ -48,16 +48,16 @@ const requiredColumns: Record<string, string[]> = {
     "updated_at",
   ],
   tenants: ["id", "name", "status", "created_at", "updated_at"],
-  tenant_memberships: ["tenant_id", "user_id", "role_id", "status"],
+  tenant_memberships: ["tenant_id", "user_id", "role_id"],
   roles: ["id", "name", "description"],
-  permissions: ["id", "resource", "action"],
+  permissions: ["id", "code"],
   role_permissions: ["role_id", "permission_id"],
   carriers: ["id", "tenant_id"],
   drivers: ["id", "tenant_id", "carrier_id"],
   vehicles: ["id", "tenant_id", "driver_id"],
   freights: ["id", "tenant_id"],
   freight_assignments: ["id", "tenant_id", "freight_id"],
-  trips: ["id", "tenant_id", "freight_assignment_id", "status"],
+  trips: ["id", "tenant_id", "freight_id", "assignment_id", "status"],
   compliance_checks: [
     "id",
     "tenant_id",
@@ -90,7 +90,7 @@ const requiredColumns: Record<string, string[]> = {
     "id",
     "tenant_id",
     "actor_user_id",
-    "event_type",
+    "action",
     "created_at",
   ],
 };
@@ -313,6 +313,11 @@ try {
       );
 
       if (Number(result.rows[0]?.count ?? 0) === 0) {
+        const reconciliation = await readFile(
+          join(migrationsDir, "0021_canonical_schema_reconciliation.sql"),
+          "utf8",
+        );
+        await client.query(reconciliation);
         await validateExistingSchema();
         for (const [file, checksum] of migrationChecksums) {
           await client.query(
