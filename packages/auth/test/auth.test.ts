@@ -159,25 +159,22 @@ test(
   },
 );
 
-test(
-  "verifyAccessToken ignores a root tenantId claim",
-  async () => {
-    const { privateKey, publicKey } = await generateKeyPair("RS256");
+test("verifyAccessToken ignores a root tenantId claim", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
 
-    await withJwks(publicKey, async () => {
-      const token = await signedToken(privateKey, {
-        rootTenantId: "ignored-root-claim",
-      });
-      const claims = await verifyAccessToken(token, {
-        issuer: ISSUER,
-        audience: AUDIENCE,
-        jwksUrl: JWKS_URL,
-      });
-
-      assert.equal(claims.tenantId, undefined);
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, {
+      rootTenantId: "ignored-root-claim",
     });
-  },
-);
+    const claims = await verifyAccessToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwksUrl: JWKS_URL,
+    });
+
+    assert.equal(claims.tenantId, undefined);
+  });
+});
 
 test(
   "verifyAccessToken leaves tenant selection undefined when the token has no tenant claim",
@@ -197,115 +194,13 @@ test(
   },
 );
 
-test(
-  "verifyAccessToken rejects an invalid audience",
-  async () => {
-    const { privateKey, publicKey } = await generateKeyPair("RS256");
+test("verifyAccessToken rejects an invalid audience", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
 
-    await withJwks(publicKey, async () => {
-      const token = await signedToken(privateKey, {
-        audience: "wrong-audience",
-      });
-      await assert.rejects(
-        verifyAccessToken(token, {
-          issuer: ISSUER,
-          audience: AUDIENCE,
-          jwksUrl: JWKS_URL,
-        }),
-      );
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, {
+      audience: "wrong-audience",
     });
-  },
-);
-
-test(
-  "verifyAccessToken rejects an invalid issuer",
-  async () => {
-    const { privateKey, publicKey } = await generateKeyPair("RS256");
-
-    await withJwks(publicKey, async () => {
-      const token = await signedToken(privateKey, {
-        issuer: "https://attacker.example.com",
-      });
-      await assert.rejects(
-        verifyAccessToken(token, {
-          issuer: ISSUER,
-          audience: AUDIENCE,
-          jwksUrl: JWKS_URL,
-        }),
-      );
-    });
-  },
-);
-
-test(
-  "verifyAccessToken rejects expired tokens",
-  async () => {
-    const { privateKey, publicKey } = await generateKeyPair("RS256");
-
-    await withJwks(publicKey, async () => {
-      const token = await signedToken(privateKey, {
-        expiresAt: Math.floor(Date.now() / 1000) - 60,
-      });
-      await assert.rejects(
-        verifyAccessToken(token, {
-          issuer: ISSUER,
-          audience: AUDIENCE,
-          jwksUrl: JWKS_URL,
-        }),
-      );
-    });
-  },
-);
-
-test(
-  "verifyAccessToken rejects an unknown signing key",
-  async () => {
-    const { privateKey } = await generateKeyPair("RS256");
-    const { publicKey: otherPublicKey } = await generateKeyPair("RS256");
-
-    const jwk = await exportJWK(otherPublicKey);
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async () =>
-      new Response(
-        JSON.stringify({
-          keys: [
-            {
-              ...jwk,
-              kty: "RSA",
-              use: "sig",
-              alg: "RS256",
-              kid: "other-key",
-            },
-          ],
-        }),
-        { headers: { "content-type": "application/json" } },
-      );
-
-    try {
-      const token = await signedToken(privateKey);
-      await assert.rejects(
-        verifyAccessToken(token, {
-          issuer: ISSUER,
-          audience: AUDIENCE,
-          jwksUrl: JWKS_URL,
-        }),
-      );
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  },
-);
-
-test(
-  "verifyAccessToken rejects HS256 tokens",
-  async () => {
-    const token = await signedToken(
-      new TextEncoder().encode("test-only-secret"),
-      {
-        algorithm: "HS256",
-      },
-    );
-
     await assert.rejects(
       verifyAccessToken(token, {
         issuer: ISSUER,
@@ -313,5 +208,92 @@ test(
         jwksUrl: JWKS_URL,
       }),
     );
-  },
-);
+  });
+});
+
+test("verifyAccessToken rejects an invalid issuer", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, {
+      issuer: "https://attacker.example.com",
+    });
+    await assert.rejects(
+      verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      }),
+    );
+  });
+});
+
+test("verifyAccessToken rejects expired tokens", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, {
+      expiresAt: Math.floor(Date.now() / 1000) - 60,
+    });
+    await assert.rejects(
+      verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      }),
+    );
+  });
+});
+
+test("verifyAccessToken rejects an unknown signing key", async () => {
+  const { privateKey } = await generateKeyPair("RS256");
+  const { publicKey: otherPublicKey } = await generateKeyPair("RS256");
+
+  const jwk = await exportJWK(otherPublicKey);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        keys: [
+          {
+            ...jwk,
+            kty: "RSA",
+            use: "sig",
+            alg: "RS256",
+            kid: "other-key",
+          },
+        ],
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+
+  try {
+    const token = await signedToken(privateKey);
+    await assert.rejects(
+      verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      }),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("verifyAccessToken rejects HS256 tokens", async () => {
+  const token = await signedToken(
+    new TextEncoder().encode("test-only-secret"),
+    {
+      algorithm: "HS256",
+    },
+  );
+
+  await assert.rejects(
+    verifyAccessToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwksUrl: JWKS_URL,
+    }),
+  );
+});
