@@ -205,7 +205,9 @@ if (!runIntegration) {
           [auth0SubjectA, tenantB],
         );
         if (result.rowCount !== 0)
-          throw new Error("cross-tenant Auth0 subject resolved as a membership");
+          throw new Error(
+            "cross-tenant Auth0 subject resolved as a membership",
+          );
       } finally {
         client.release();
       }
