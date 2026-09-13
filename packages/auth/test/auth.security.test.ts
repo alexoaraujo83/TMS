@@ -1,31 +1,65 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { SignJWT } from "jose";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { verifyAccessToken } from "../src/index.ts";
 
-const secret = "test-only-secret-that-is-long-enough";
-const config = { secret, issuer: "tms-test", audience: "tms-api-test" };
+const issuer = "https://tenant.example.auth0.com/";
+const audience = "urn:nexora:tms:api:development";
+const jwksUrl = "https://jwks.example.test/.well-known/jwks.json";
 
-async function token(overrides: Record<string, unknown> = {}) {
-  return new SignJWT({
-    tenantId: "11111111-1111-1111-1111-111111111111",
-    roles: ["operator"],
-    permissions: ["freight:read"],
-    ...overrides,
-  })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setSubject("22222222-2222-2222-2222-222222222222")
-    .setIssuer(config.issuer)
-    .setAudience(config.audience)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(secret));
+async function setup() {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+  const jwk = await exportJWK(publicKey);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        keys: [
+          {
+            ...jwk,
+            kty: "RSA",
+            use: "sig",
+            alg: "RS256",
+            kid: "test-key",
+          },
+        ],
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+
+  return { privateKey, originalFetch };
 }
 
-test("accepts a valid HS256 access token", async () => {
-  const result = await verifyAccessToken(await token(), config);
-  assert.equal(result.sub, "22222222-2222-2222-2222-222222222222");
-  assert.equal(result.tenantId, "11111111-1111-1111-1111-111111111111");
+async function token(
+  privateKey: CryptoKey,
+  overrides: Record<string, unknown> = {},
+) {
+  return new SignJWT({
+    tenantId: "11111111-1111-1111-1111-111111111111",
+    ...overrides,
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
+    .setSubject("auth0|user-1")
+    .setIssuer(issuer)
+    .setAudience(audience)
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
+}
+
+test("accepts a valid RS256 access token", async () => {
+  const { privateKey, originalFetch } = await setup();
+  try {
+    const result = await verifyAccessToken(await token(privateKey), {
+      issuer,
+      audience,
+      jwksUrl,
+    });
+    assert.equal(result.sub, "auth0|user-1");
+    assert.equal(result.tenantId, "11111111-1111-1111-1111-111111111111");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("rejects a token signed with an unexpected algorithm", async () => {
@@ -33,40 +67,58 @@ test("rejects a token signed with an unexpected algorithm", async () => {
     tenantId: "11111111-1111-1111-1111-111111111111",
   })
     .setProtectedHeader({ alg: "HS384", typ: "JWT" })
-    .setSubject("22222222-2222-2222-2222-222222222222")
-    .setIssuer(config.issuer)
-    .setAudience(config.audience)
+    .setSubject("auth0|user-1")
+    .setIssuer(issuer)
+    .setAudience(audience)
     .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(secret));
+    .sign(new TextEncoder().encode("test-only-secret"));
 
-  await assert.rejects(() => verifyAccessToken(bad, config));
+  await assert.rejects(() =>
+    verifyAccessToken(bad, { issuer, audience, jwksUrl }),
+  );
 });
 
 test("rejects a token with an invalid issuer", async () => {
-  const bad = await new SignJWT({
-    tenantId: "11111111-1111-1111-1111-111111111111",
-  })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setSubject("22222222-2222-2222-2222-222222222222")
-    .setIssuer("attacker")
-    .setAudience(config.audience)
-    .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(secret));
+  const { privateKey, originalFetch } = await setup();
+  try {
+    const bad = await new SignJWT({
+      tenantId: "11111111-1111-1111-1111-111111111111",
+    })
+      .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
+      .setSubject("auth0|user-1")
+      .setIssuer("https://attacker.example/")
+      .setAudience(audience)
+      .setExpirationTime("5m")
+      .sign(privateKey);
 
-  await assert.rejects(() => verifyAccessToken(bad, config));
+    await assert.rejects(() =>
+      verifyAccessToken(bad, { issuer, audience, jwksUrl }),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
-test("rejects a token without a subject or tenant claim", async () => {
-  const bad = await new SignJWT({})
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setIssuer(config.issuer)
-    .setAudience(config.audience)
-    .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(secret));
+test("rejects a token without a subject", async () => {
+  const { privateKey, originalFetch } = await setup();
+  try {
+    const bad = await new SignJWT({})
+      .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
+      .setIssuer(issuer)
+      .setAudience(audience)
+      .setExpirationTime("5m")
+      .sign(privateKey);
 
-  await assert.rejects(() => verifyAccessToken(bad, config));
+    await assert.rejects(() =>
+      verifyAccessToken(bad, { issuer, audience, jwksUrl }),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("rejects oversized bearer material before JWT verification", async () => {
-  await assert.rejects(() => verifyAccessToken("x".repeat(8193), config));
+  await assert.rejects(() =>
+    verifyAccessToken("x".repeat(8193), { issuer, audience, jwksUrl }),
+  );
 });
