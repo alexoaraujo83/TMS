@@ -144,25 +144,28 @@ if (!runIntegration) {
       }
     });
 
-    it("does not allow a forged tenant context to reveal another tenant resource", async () => {
-      const client = await pool.connect();
-      try {
-        await client.query("begin");
-        await client.query("select set_config($1, $2, true)", [
-          "app.tenant_id",
-          tenantB,
-        ]);
-        const result = await client.query(
-          "select id from freights where tenant_id = $1",
-          [tenantA],
-        );
-        await client.query("rollback");
-        if (result.rowCount !== 0)
-          throw new Error("forged tenant context bypassed RLS");
-      } finally {
-        client.release();
-      }
-    });
+    it(
+      "does not allow a forged tenant context to reveal another tenant resource",
+      async () => {
+        const client = await pool.connect();
+        try {
+          await client.query("begin");
+          await client.query("select set_config($1, $2, true)", [
+            "app.tenant_id",
+            tenantB,
+          ]);
+          const result = await client.query(
+            "select id from freights where tenant_id = $1",
+            [tenantA],
+          );
+          await client.query("rollback");
+          if (result.rowCount !== 0)
+            throw new Error("forged tenant context bypassed RLS");
+        } finally {
+          client.release();
+        }
+      },
+    );
 
     it("rejects cross-tenant inserts through WITH CHECK", async () => {
       const client = await pool.connect();
@@ -215,9 +218,10 @@ if (!runIntegration) {
           "app.tenant_id",
           tenantB,
         ]);
-        const result = await client.query("delete from freights where id = $1", [
-          freightA,
-        ]);
+        const result = await client.query(
+          "delete from freights where id = $1",
+          [freightA],
+        );
         await client.query("rollback");
         if (result.rowCount !== 0)
           throw new Error("cross-tenant freight delete was accepted");
@@ -275,37 +279,40 @@ if (!runIntegration) {
       }
     });
 
-    it("keeps the membership bootstrap function non-public and callable by the runtime role", async () => {
-      const client = await pool.connect();
-      try {
-        const privileges = await client.query(
-          `select has_function_privilege(current_user, 'public.check_tenant_membership(text, uuid)', 'execute') as executable,
+    it(
+      "keeps the membership bootstrap function non-public and callable by the runtime role",
+      async () => {
+        const client = await pool.connect();
+        try {
+          const privileges = await client.query(
+            `select has_function_privilege(current_user, 'public.check_tenant_membership(text, uuid)', 'execute') as executable,
                   has_function_privilege('public', 'public.check_tenant_membership(text, uuid)', 'execute') as public_executable`,
-        );
-        if (!privileges.rows[0].executable)
-          throw new Error("runtime role cannot execute membership bootstrap");
-        if (privileges.rows[0].public_executable)
-          throw new Error("membership bootstrap is executable by PUBLIC");
-
-        const result = await client.query(
-          `select user_id as "userId", tenant_id as "tenantId", role, permissions, active
-             from public.check_tenant_membership($1, $2)`,
-          [auth0SubjectA, tenantA],
-        );
-        if (
-          result.rowCount !== 1 ||
-          result.rows[0].userId !== userA ||
-          result.rows[0].tenantId !== tenantA ||
-          !result.rows[0].active
-        ) {
-          throw new Error(
-            "membership bootstrap returned an invalid authoritative result",
           );
+          if (!privileges.rows[0].executable)
+            throw new Error("runtime role cannot execute membership bootstrap");
+          if (privileges.rows[0].public_executable)
+            throw new Error("membership bootstrap is executable by PUBLIC");
+
+          const result = await client.query(
+            `select user_id as "userId", tenant_id as "tenantId", role, permissions, active
+             from public.check_tenant_membership($1, $2)`,
+            [auth0SubjectA, tenantA],
+          );
+          if (
+            result.rowCount !== 1 ||
+            result.rows[0].userId !== userA ||
+            result.rows[0].tenantId !== tenantA ||
+            !result.rows[0].active
+          ) {
+            throw new Error(
+              "membership bootstrap returned an invalid authoritative result",
+            );
+          }
+        } finally {
+          client.release();
         }
-      } finally {
-        client.release();
-      }
-    });
+      },
+    );
 
     it("does not resolve an Auth0 subject from another tenant", async () => {
       const client = await pool.connect();
