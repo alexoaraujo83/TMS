@@ -42,7 +42,7 @@ export async function verifyAccessToken(
 
   const { payload } = await jwtVerify(token, jwks, {
     algorithms: ["RS256"],
-    issuer,
+    issuer: [issuer, `${issuer}/`],
     audience: config.audience,
   });
 
@@ -56,7 +56,7 @@ export async function verifyAccessToken(
       typeof payload[NEXORA_TENANT_ID_CLAIM] === "string"
         ? payload[NEXORA_TENANT_ID_CLAIM]
         : undefined,
-    issuer,
+    issuer: typeof payload.iss === "string" ? payload.iss : issuer,
     audience: payload.aud ?? config.audience,
   };
 }
