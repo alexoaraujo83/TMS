@@ -111,7 +111,9 @@ async function validateExistingSchema(): Promise<void> {
   );
 
   const foundTables = new Set(tables.rows.map((row) => row.table_name));
-  const missingTables = expectedTables.filter((table) => !foundTables.has(table));
+  const missingTables = expectedTables.filter(
+    (table) => !foundTables.has(table),
+  );
   if (missingTables.length > 0) {
     throw new Error(
       `Existing schema baseline rejected: missing tables: ${missingTables.join(", ")}`,
@@ -212,7 +214,10 @@ async function validateExistingSchema(): Promise<void> {
     [expectedTables],
   );
   const primaryKeyCounts = new Map(
-    primaryKeys.rows.map((row) => [row.table_name, Number(row.primary_key_count)]),
+    primaryKeys.rows.map((row) => [
+      row.table_name,
+      Number(row.primary_key_count),
+    ]),
   );
   const missingPrimaryKeys = expectedTables.filter(
     (table) => !primaryKeyCounts.has(table),
@@ -301,18 +306,26 @@ try {
 
   for (const file of files) {
     const sql = await readFile(join(migrationsDir, file), "utf8");
-    migrationChecksums.set(file, createHash("sha256").update(sql).digest("hex"));
+    migrationChecksums.set(
+      file,
+      createHash("sha256").update(sql).digest("hex"),
+    );
   }
 
   if (allowExistingSchemaBaseline) {
     await client.query("begin");
     try {
-      await client.query("select pg_advisory_xact_lock(hashtext('tms:schema-migrations'))");
+      await client.query(
+        "select pg_advisory_xact_lock(hashtext('tms:schema-migrations'))",
+      );
       const result = await client.query<{ count: string }>(
         "select count(*)::text as count from public.schema_migrations",
       );
 
       if (Number(result.rows[0]?.count ?? 0) === 0) {
+        await client.query(
+          "alter table compliance_checks add column if not exists provider text",
+        );
         const reconciliation = await readFile(
           join(migrationsDir, "0021_canonical_schema_reconciliation.sql"),
           "utf8",
@@ -325,7 +338,9 @@ try {
             [file, checksum],
           );
         }
-        console.log(`registered ${migrationChecksums.size} canonical baseline migrations`);
+        console.log(
+          `registered ${migrationChecksums.size} canonical baseline migrations`,
+        );
       }
       await client.query("commit");
     } catch (error) {
