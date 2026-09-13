@@ -22,7 +22,49 @@ export interface AssignmentResult {
   freightStatus: string;
 }
 
+export interface AssignmentVehicleRequirements {
+  vehicleTypes: readonly string[];
+  bodyTypes: readonly string[];
+  weightKg: number;
+  minimumCapacityKg: number | null;
+  minimumFreeMeters: number | null;
+}
+
+export interface AssignmentVehicleSnapshot {
+  vehicleType: string;
+  bodyType: string;
+  capacityKg: number;
+  freeMeters: number | null;
+}
+
 type AuditInput = Omit<AuditEventInput, "tenantId" | "entityId">;
+
+export function vehicleSatisfiesFreightRequirements(
+  freight: AssignmentVehicleRequirements,
+  vehicle: AssignmentVehicleSnapshot,
+): boolean {
+  const requiredCapacityKg = Math.max(
+    freight.weightKg,
+    freight.minimumCapacityKg ?? 0,
+  );
+  const vehicleTypeMatches =
+    freight.vehicleTypes.length === 0 ||
+    freight.vehicleTypes.includes(vehicle.vehicleType);
+  const bodyTypeMatches =
+    freight.bodyTypes.length === 0 ||
+    freight.bodyTypes.includes(vehicle.bodyType);
+  const freeMetersMatches =
+    freight.minimumFreeMeters === null ||
+    (vehicle.freeMeters !== null &&
+      vehicle.freeMeters >= freight.minimumFreeMeters);
+
+  return (
+    vehicleTypeMatches &&
+    bodyTypeMatches &&
+    vehicle.capacityKg >= requiredCapacityKg &&
+    freeMetersMatches
+  );
+}
 
 const ASSIGNMENT_COLUMNS = `id,
   tenant_id as "tenantId",
@@ -137,26 +179,29 @@ export class AssignmentRepository {
         throw new Error("Vehicle is not assigned to the selected driver");
       }
 
-      const requiredCapacityKg = Math.max(
-        Number(freight.weightKg),
-        Number(freight.minimumCapacityKg ?? 0),
+      const eligible = vehicleSatisfiesFreightRequirements(
+        {
+          vehicleTypes: freight.vehicleTypes,
+          bodyTypes: freight.bodyTypes,
+          weightKg: Number(freight.weightKg),
+          minimumCapacityKg:
+            freight.minimumCapacityKg === null
+              ? null
+              : Number(freight.minimumCapacityKg),
+          minimumFreeMeters:
+            freight.minimumFreeMeters === null
+              ? null
+              : Number(freight.minimumFreeMeters),
+        },
+        {
+          vehicleType: vehicle.vehicleType,
+          bodyType: vehicle.bodyType,
+          capacityKg: Number(vehicle.capacityKg),
+          freeMeters:
+            vehicle.freeMeters === null ? null : Number(vehicle.freeMeters),
+        },
       );
-      const vehicleTypeMatches =
-        freight.vehicleTypes.length === 0 ||
-        freight.vehicleTypes.includes(vehicle.vehicleType);
-      const bodyTypeMatches =
-        freight.bodyTypes.length === 0 ||
-        freight.bodyTypes.includes(vehicle.bodyType);
-      const freeMetersMatches =
-        freight.minimumFreeMeters === null ||
-        (vehicle.freeMeters !== null &&
-          Number(vehicle.freeMeters) >= Number(freight.minimumFreeMeters));
-      if (
-        !vehicleTypeMatches ||
-        !bodyTypeMatches ||
-        Number(vehicle.capacityKg) < requiredCapacityKg ||
-        !freeMetersMatches
-      ) {
+      if (!eligible) {
         throw new Error(
           "Vehicle does not satisfy freight matching requirements",
         );
