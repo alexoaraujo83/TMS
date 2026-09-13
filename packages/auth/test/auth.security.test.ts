@@ -1,10 +1,7 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import {
-  NEXORA_TENANT_ID_CLAIM,
-  verifyAccessToken,
-} from "../src/index.ts";
+import { NEXORA_TENANT_ID_CLAIM, verifyAccessToken } from "../src/index.ts";
 
 const issuer = "https://tenant.example.auth0.com";
 const audience = "urn:nexora:tms:api:development";
