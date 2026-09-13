@@ -1,24 +1,54 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import type { KeyLike } from "jose";
 import { NEXORA_TENANT_ID_CLAIM, verifyAccessToken } from "../src/index.ts";
 
-test("verifyAccessToken accepts a valid RS256 token with the Auth0 namespaced tenant claim", async () => {
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
-  const issuer = "https://tenant.example.auth0.com";
-  const audience = "urn:nexora:tms:api:development";
-  const token = await new SignJWT({
-    [NEXORA_TENANT_ID_CLAIM]: "tenant-a",
-  })
-    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
-    .setSubject("auth0|user-1")
-    .setIssuer(issuer)
-    .setAudience(audience)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(privateKey);
-  const jwk = await exportJWK(publicKey);
+const ISSUER = "https://tenant.example.auth0.com";
+const AUDIENCE = "urn:nexora:tms:api:development";
+const JWKS_URL = "https://jwks.example.test/.well-known/jwks.json";
 
+type SigningKey = KeyLike | Uint8Array;
+
+async function signedToken(
+  privateKey: SigningKey,
+  options: {
+    issuer?: string;
+    audience?: string;
+    tenantId?: string;
+    rootTenantId?: string;
+    algorithm?: "RS256" | "HS256";
+    kid?: string;
+    expiresAt?: number;
+  } = {},
+) {
+  const payload: Record<string, unknown> = {};
+  if (options.tenantId !== undefined) {
+    payload[NEXORA_TENANT_ID_CLAIM] = options.tenantId;
+  }
+  if (options.rootTenantId !== undefined) {
+    payload.tenantId = options.rootTenantId;
+  }
+
+  let builder = new SignJWT(payload).setProtectedHeader({
+    alg: options.algorithm ?? "RS256",
+    kid: options.kid ?? "test-key",
+  });
+  builder = builder
+    .setSubject("auth0|user-1")
+    .setIssuer(options.issuer ?? ISSUER)
+    .setAudience(options.audience ?? AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(options.expiresAt ?? "5m");
+
+  return builder.sign(privateKey);
+}
+
+async function withJwks(
+  publicKey: Awaited<ReturnType<typeof generateKeyPair>>["publicKey"],
+  action: () => Promise<void>,
+) {
+  const jwk = await exportJWK(publicKey);
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
     new Response(
@@ -37,98 +67,164 @@ test("verifyAccessToken accepts a valid RS256 token with the Auth0 namespaced te
     );
 
   try {
-    const claims = await verifyAccessToken(token, {
-      issuer,
-      audience,
-      jwksUrl: "https://jwks.example.test/.well-known/jwks.json",
-    });
-    assert.equal(claims.sub, "auth0|user-1");
-    assert.equal(claims.tenantId, "tenant-a");
+    await action();
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+test("verifyAccessToken accepts canonical Auth0 issuers with or without trailing slash", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, { issuer: `${ISSUER}/` });
+    const claims = await verifyAccessToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwksUrl: JWKS_URL,
+    });
+
+    assert.equal(claims.sub, "auth0|user-1");
+    assert.equal(claims.issuer, `${ISSUER}/`);
+  });
+});
+
+test("verifyAccessToken accepts the Auth0 namespaced tenant claim", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, { tenantId: "tenant-a" });
+    const claims = await verifyAccessToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwksUrl: JWKS_URL,
+    });
+
+    assert.equal(claims.tenantId, "tenant-a");
+  });
 });
 
 test("verifyAccessToken ignores a root tenantId claim", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
-  const issuer = "https://tenant.example.auth0.com";
-  const audience = "urn:nexora:tms:api:development";
-  const token = await new SignJWT({
-    tenantId: "ignored-root-claim",
-    [NEXORA_TENANT_ID_CLAIM]: "tenant-a",
-  })
-    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
-    .setSubject("auth0|user-1")
-    .setIssuer(issuer)
-    .setAudience(audience)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(privateKey);
-  const jwk = await exportJWK(publicKey);
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, {
+      rootTenantId: "ignored-root-claim",
+    });
+    const claims = await verifyAccessToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwksUrl: JWKS_URL,
+    });
+
+    assert.equal(claims.tenantId, undefined);
+  });
+});
+
+test("verifyAccessToken leaves tenant selection undefined when the token has no tenant claim", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey);
+    const claims = await verifyAccessToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwksUrl: JWKS_URL,
+    });
+
+    assert.equal(claims.tenantId, undefined);
+  });
+});
+
+test("verifyAccessToken rejects an invalid audience", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, { audience: "wrong-audience" });
+    await assert.rejects(
+      verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      }),
+    );
+  });
+});
+
+test("verifyAccessToken rejects an invalid issuer", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, {
+      issuer: "https://attacker.example.com",
+    });
+    await assert.rejects(
+      verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      }),
+    );
+  });
+});
+
+test("verifyAccessToken rejects expired tokens", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+
+  await withJwks(publicKey, async () => {
+    const token = await signedToken(privateKey, {
+      expiresAt: Math.floor(Date.now() / 1000) - 60,
+    });
+    await assert.rejects(
+      verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      }),
+    );
+  });
+});
+
+test("verifyAccessToken rejects an unknown signing key", async () => {
+  const { privateKey } = await generateKeyPair("RS256");
+  const { publicKey: otherPublicKey } = await generateKeyPair("RS256");
+
+  const jwk = await exportJWK(otherPublicKey);
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
         keys: [
-          {
-            ...jwk,
-            kty: "RSA",
-            use: "sig",
-            alg: "RS256",
-            kid: "test-key",
-          },
+          { ...jwk, kty: "RSA", use: "sig", alg: "RS256", kid: "other-key" },
         ],
       }),
       { headers: { "content-type": "application/json" } },
     );
 
   try {
-    const claims = await verifyAccessToken(token, {
-      issuer,
-      audience,
-      jwksUrl: "https://jwks.example.test/.well-known/jwks.json",
-    });
-    assert.equal(claims.tenantId, "tenant-a");
+    const token = await signedToken(privateKey);
+    await assert.rejects(
+      verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      }),
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
 test("verifyAccessToken rejects HS256 tokens", async () => {
-  const token = await new SignJWT({ [NEXORA_TENANT_ID_CLAIM]: "tenant-a" })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject("auth0|user-1")
-    .setIssuer("https://tenant.example.auth0.com/")
-    .setAudience("urn:nexora:tms:api:development")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(new TextEncoder().encode("test-only-secret"));
+  const token = await signedToken(new TextEncoder().encode("test-only-secret"), {
+    algorithm: "HS256",
+  });
 
   await assert.rejects(
     verifyAccessToken(token, {
-      issuer: "https://tenant.example.auth0.com/",
-      audience: "urn:nexora:tms:api:development",
-      jwksUrl: "https://jwks.example.test/.well-known/jwks.json",
-    }),
-  );
-});
-
-test("verifyAccessToken rejects a wrong audience", async () => {
-  const { privateKey } = await generateKeyPair("RS256");
-  const token = await new SignJWT({})
-    .setProtectedHeader({ alg: "RS256", kid: "missing-key" })
-    .setSubject("auth0|user-1")
-    .setIssuer("https://tenant.example.auth0.com/")
-    .setAudience("wrong-audience")
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(privateKey);
-
-  await assert.rejects(
-    verifyAccessToken(token, {
-      issuer: "https://tenant.example.auth0.com/",
-      audience: "urn:nexora:tms:api:development",
-      jwksUrl: "https://jwks.example.test/.well-known/jwks.json",
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      jwksUrl: JWKS_URL,
     }),
   );
 });

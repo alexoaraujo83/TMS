@@ -39,17 +39,20 @@ function contextFor(request: Record<string, unknown>) {
   } as never;
 }
 
-async function token(overrides: Record<string, unknown> = {}) {
+async function token(
+  overrides: Record<string, unknown> = {},
+  options: { audience?: string; issuer?: string; expiresAt?: number } = {},
+) {
   return new SignJWT({
     [NEXORA_TENANT_ID_CLAIM]: TENANT_A,
     ...overrides,
   })
     .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
     .setSubject(USER_ID)
-    .setIssuer(ISSUER)
-    .setAudience(AUDIENCE)
+    .setIssuer(options.issuer ?? ISSUER)
+    .setAudience(options.audience ?? AUDIENCE)
     .setIssuedAt()
-    .setExpirationTime("5m")
+    .setExpirationTime(options.expiresAt ?? "5m")
     .sign(privateKey);
 }
 
@@ -139,22 +142,54 @@ test("AuthGuard rejects missing authentication", async () => {
 });
 
 test("AuthGuard rejects a token with an invalid issuer", async () => {
-  const invalid = await new SignJWT({
-    [NEXORA_TENANT_ID_CLAIM]: TENANT_A,
-  })
-    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
-    .setSubject(USER_ID)
-    .setIssuer("https://attacker.example.com")
-    .setAudience(AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(privateKey);
-
+  const invalid = await token({}, { issuer: "https://attacker.example.com" });
   const request = { headers: { authorization: `Bearer ${invalid}` } };
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
       error instanceof Error && error.message === "Invalid access token",
+  );
+});
+
+test("AuthGuard rejects a token with an invalid audience", async () => {
+  const invalid = await token({}, { audience: "wrong-audience" });
+  const request = { headers: { authorization: `Bearer ${invalid}` } };
+
+  await assert.rejects(
+    () => guard([]).canActivate(contextFor(request)),
+    (error: unknown) =>
+      error instanceof Error && error.message === "Invalid access token",
+  );
+});
+
+test("AuthGuard rejects an expired token", async () => {
+  const expired = await token({}, {
+    expiresAt: Math.floor(Date.now() / 1000) - 60,
+  });
+  const request = { headers: { authorization: `Bearer ${expired}` } };
+
+  await assert.rejects(
+    () => guard([]).canActivate(contextFor(request)),
+    (error: unknown) =>
+      error instanceof Error && error.message === "Invalid access token",
+  );
+});
+
+test("AuthGuard requires tenant selection when the token has no tenant claim", async () => {
+  const noTenant = await new SignJWT({})
+    .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
+    .setSubject(USER_ID)
+    .setIssuer(ISSUER)
+    .setAudience(AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
+  const request = { headers: { authorization: `Bearer ${noTenant}` } };
+
+  await assert.rejects(
+    () => guard([]).canActivate(contextFor(request)),
+    (error: unknown) =>
+      error instanceof Error && error.message === "Tenant selection is required",
   );
 });
