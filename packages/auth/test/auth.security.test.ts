@@ -1,7 +1,10 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { verifyAccessToken } from "../src/index.ts";
+import {
+  NEXORA_TENANT_ID_CLAIM,
+  verifyAccessToken,
+} from "../src/index.ts";
 
 const issuer = "https://tenant.example.auth0.com";
 const audience = "urn:nexora:tms:api:development";
@@ -35,7 +38,7 @@ async function token(
   overrides: Record<string, unknown> = {},
 ) {
   return new SignJWT({
-    tenantId: "11111111-1111-1111-1111-111111111111",
+    [NEXORA_TENANT_ID_CLAIM]: "11111111-1111-1111-1111-111111111111",
     ...overrides,
   })
     .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
@@ -64,7 +67,7 @@ test("accepts a valid RS256 access token", async () => {
 
 test("rejects a token signed with an unexpected algorithm", async () => {
   const bad = await new SignJWT({
-    tenantId: "11111111-1111-1111-1111-111111111111",
+    [NEXORA_TENANT_ID_CLAIM]: "11111111-1111-1111-1111-111111111111",
   })
     .setProtectedHeader({ alg: "HS384", typ: "JWT" })
     .setSubject("auth0|user-1")
