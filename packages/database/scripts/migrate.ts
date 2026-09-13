@@ -7,7 +7,8 @@ import { Client } from "pg";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const migrationsDir = join(root, "migrations");
 const databaseUrl = process.env.DATABASE_URL;
-const allowExistingSchemaBaseline = process.env.TMS_ALLOW_EXISTING_SCHEMA_BASELINE === "true";
+const allowExistingSchemaBaseline =
+  process.env.TMS_ALLOW_EXISTING_SCHEMA_BASELINE === "true";
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required");
@@ -37,7 +38,15 @@ const rlsTables = expectedTables.filter(
 );
 
 const requiredColumns: Record<string, string[]> = {
-  users: ["id", "email", "display_name", "status", "auth0_subject", "created_at", "updated_at"],
+  users: [
+    "id",
+    "email",
+    "display_name",
+    "status",
+    "auth0_subject",
+    "created_at",
+    "updated_at",
+  ],
   tenants: ["id", "name", "status", "created_at", "updated_at"],
   tenant_memberships: ["tenant_id", "user_id", "role_id", "status"],
   roles: ["id", "name", "description"],
@@ -77,7 +86,13 @@ const requiredColumns: Record<string, string[]> = {
     "rejected_at",
     "expires_at",
   ],
-  audit_events: ["id", "tenant_id", "actor_user_id", "event_type", "created_at"],
+  audit_events: [
+    "id",
+    "tenant_id",
+    "actor_user_id",
+    "event_type",
+    "created_at",
+  ],
 };
 
 const client = new Client({ connectionString: databaseUrl });
@@ -98,10 +113,15 @@ async function validateExistingSchema(): Promise<void> {
   const foundTables = new Set(tables.rows.map((row) => row.table_name));
   const missingTables = expectedTables.filter((table) => !foundTables.has(table));
   if (missingTables.length > 0) {
-    throw new Error(`Existing schema baseline rejected: missing tables: ${missingTables.join(", ")}`);
+    throw new Error(
+      `Existing schema baseline rejected: missing tables: ${missingTables.join(", ")}`,
+    );
   }
 
-  const columns = await client.query<{ table_name: string; column_name: string }>(
+  const columns = await client.query<{
+    table_name: string;
+    column_name: string;
+  }>(
     `
     select table_name, column_name
     from information_schema.columns
@@ -111,12 +131,19 @@ async function validateExistingSchema(): Promise<void> {
     [Object.keys(requiredColumns)],
   );
 
-  const foundColumns = new Set(columns.rows.map((row) => `${row.table_name}.${row.column_name}`));
-  const missingColumns = Object.entries(requiredColumns).flatMap(([table, names]) =>
-    names.filter((name) => !foundColumns.has(`${table}.${name}`)).map((name) => `${table}.${name}`),
+  const foundColumns = new Set(
+    columns.rows.map((row) => `${row.table_name}.${row.column_name}`),
+  );
+  const missingColumns = Object.entries(requiredColumns).flatMap(
+    ([table, names]) =>
+      names
+        .filter((name) => !foundColumns.has(`${table}.${name}`))
+        .map((name) => `${table}.${name}`),
   );
   if (missingColumns.length > 0) {
-    throw new Error(`Existing schema baseline rejected: missing columns: ${missingColumns.join(", ")}`);
+    throw new Error(
+      `Existing schema baseline rejected: missing columns: ${missingColumns.join(", ")}`,
+    );
   }
 
   const rls = await client.query<{
@@ -134,7 +161,9 @@ async function validateExistingSchema(): Promise<void> {
     [rlsTables],
   );
 
-  const badRls = rls.rows.filter((row) => !row.relrowsecurity || !row.relforcerowsecurity);
+  const badRls = rls.rows.filter(
+    (row) => !row.relrowsecurity || !row.relforcerowsecurity,
+  );
   if (badRls.length > 0) {
     throw new Error(
       `Existing schema baseline rejected: RLS/FORCE RLS missing on ${badRls
@@ -143,7 +172,10 @@ async function validateExistingSchema(): Promise<void> {
     );
   }
 
-  const policies = await client.query<{ tablename: string; policy_count: string }>(
+  const policies = await client.query<{
+    tablename: string;
+    policy_count: string;
+  }>(
     `
     select tablename, count(*)::text as policy_count
     from pg_policies
@@ -153,15 +185,22 @@ async function validateExistingSchema(): Promise<void> {
   `,
     [rlsTables],
   );
-  const policyCounts = new Map(policies.rows.map((row) => [row.tablename, Number(row.policy_count)]));
+  const policyCounts = new Map(
+    policies.rows.map((row) => [row.tablename, Number(row.policy_count)]),
+  );
   const missingPolicies = rlsTables.filter(
     (table) => !policyCounts.has(table) || policyCounts.get(table) === 0,
   );
   if (missingPolicies.length > 0) {
-    throw new Error(`Existing schema baseline rejected: missing RLS policies: ${missingPolicies.join(", ")}`);
+    throw new Error(
+      `Existing schema baseline rejected: missing RLS policies: ${missingPolicies.join(", ")}`,
+    );
   }
 
-  const primaryKeys = await client.query<{ table_name: string; primary_key_count: string }>(
+  const primaryKeys = await client.query<{
+    table_name: string;
+    primary_key_count: string;
+  }>(
     `
     select tc.table_name, count(*)::text as primary_key_count
     from information_schema.table_constraints tc
@@ -175,7 +214,9 @@ async function validateExistingSchema(): Promise<void> {
   const primaryKeyCounts = new Map(
     primaryKeys.rows.map((row) => [row.table_name, Number(row.primary_key_count)]),
   );
-  const missingPrimaryKeys = expectedTables.filter((table) => !primaryKeyCounts.has(table));
+  const missingPrimaryKeys = expectedTables.filter(
+    (table) => !primaryKeyCounts.has(table),
+  );
   if (missingPrimaryKeys.length > 0) {
     throw new Error(
       `Existing schema baseline rejected: missing primary keys: ${missingPrimaryKeys.join(", ")}`,
@@ -217,7 +258,9 @@ async function validateExistingSchema(): Promise<void> {
   `,
   );
   if (auth0Index.rows.length !== 1) {
-    throw new Error("Existing schema baseline rejected: users_auth0_subject_uidx is missing");
+    throw new Error(
+      "Existing schema baseline rejected: users_auth0_subject_uidx is missing",
+    );
   }
 
   const tenantScopedFks = await client.query<{ constraint_name: string }>(
