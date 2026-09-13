@@ -1,18 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SignJWT } from "jose";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import { NEXORA_TENANT_ID_CLAIM } from "@tms/auth";
 import { AuthGuard } from "../src/common/auth.guard.ts";
 
-const SECRET = "test-secret-for-auth-guard-only";
-const ISSUER = "tms";
-const AUDIENCE = "tms-api";
+const ISSUER = "https://tenant.example.auth0.com";
+const AUDIENCE = "urn:nexora:tms:api:development";
+const JWKS_URL = "https://jwks.example.test/.well-known/jwks.json";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const TENANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
-process.env.JWT_SECRET = SECRET;
-process.env.JWT_ISSUER = ISSUER;
-process.env.JWT_AUDIENCE = AUDIENCE;
+const { privateKey, publicKey } = await generateKeyPair("RS256");
+const jwk = await exportJWK(publicKey);
+process.env.AUTH0_ISSUER_BASE_URL = ISSUER;
+process.env.AUTH0_AUDIENCE = AUDIENCE;
+process.env.AUTH0_JWKS_URL = JWKS_URL;
+
+globalThis.fetch = async () =>
+  new Response(
+    JSON.stringify({
+      keys: [
+        {
+          ...jwk,
+          kty: "RSA",
+          use: "sig",
+          alg: "RS256",
+          kid: "test-key",
+        },
+      ],
+    }),
+    { headers: { "content-type": "application/json" } },
+  );
 
 function contextFor(request: Record<string, unknown>) {
   return {
@@ -22,18 +41,16 @@ function contextFor(request: Record<string, unknown>) {
 
 async function token(overrides: Record<string, unknown> = {}) {
   return new SignJWT({
-    tenantId: TENANT_A,
-    roles: ["admin"],
-    permissions: ["*"],
+    [NEXORA_TENANT_ID_CLAIM]: TENANT_A,
     ...overrides,
   })
-    .setProtectedHeader({ alg: "HS256" })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
     .setSubject(USER_ID)
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setIssuedAt()
     .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(SECRET));
+    .sign(privateKey);
 }
 
 function guard(rows: readonly unknown[]) {
@@ -122,14 +139,16 @@ test("AuthGuard rejects missing authentication", async () => {
 });
 
 test("AuthGuard rejects a token with an invalid issuer", async () => {
-  const invalid = await new SignJWT({ tenantId: TENANT_A })
-    .setProtectedHeader({ alg: "HS256" })
+  const invalid = await new SignJWT({
+    [NEXORA_TENANT_ID_CLAIM]: TENANT_A,
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test-key" })
     .setSubject(USER_ID)
-    .setIssuer("attacker")
+    .setIssuer("https://attacker.example.com")
     .setAudience(AUDIENCE)
     .setIssuedAt()
     .setExpirationTime("5m")
-    .sign(new TextEncoder().encode(SECRET));
+    .sign(privateKey);
 
   const request = { headers: { authorization: `Bearer ${invalid}` } };
 
