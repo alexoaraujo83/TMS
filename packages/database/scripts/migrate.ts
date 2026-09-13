@@ -236,18 +236,17 @@ async function validateExistingSchema(): Promise<void> {
     `
     select p.proname, p.prosecdef, p.proconfig
     from pg_proc p
-    join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname='public'
-      and p.proname='check_tenant_membership'
-      and pg_get_function_identity_arguments(p.oid)='text, uuid'
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname = 'check_tenant_membership'
+      and pg_get_function_identity_arguments(p.oid) = 'text, uuid'
   `,
   );
   const resolver = auth0Resolver.rows[0];
-  if (
-    !resolver ||
-    !resolver.prosecdef ||
-    !resolver.proconfig?.includes("search_path=public, pg_catalog")
-  ) {
+  const resolverSearchPath = resolver?.proconfig
+    ?.map((value) => value.replace(/\s+/g, ""))
+    .find((value) => value === "search_path=public,pg_catalog");
+  if (!resolver || !resolver.prosecdef || !resolverSearchPath) {
     throw new Error(
       "Existing schema baseline rejected: canonical Auth0 membership resolver is missing or insecure",
     );
