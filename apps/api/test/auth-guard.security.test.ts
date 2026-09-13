@@ -172,9 +172,12 @@ test("AuthGuard rejects a token with an invalid audience", async () => {
 });
 
 test("AuthGuard rejects an expired token", async () => {
-  const expired = await token({}, {
-    expiresAt: Math.floor(Date.now() / 1000) - 60,
-  });
+  const expired = await token(
+    {},
+    {
+      expiresAt: Math.floor(Date.now() / 1000) - 60,
+    },
+  );
   const request = { headers: { authorization: `Bearer ${expired}` } };
 
   await assert.rejects(
