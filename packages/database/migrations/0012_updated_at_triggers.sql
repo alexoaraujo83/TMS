@@ -2,10 +2,7 @@ create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
 set search_path = pg_catalog
-as 'BEGIN
-  NEW.updated_at = clock_timestamp();
-  RETURN NEW;
-END;';
+as E'BEGIN\n  NEW.updated_at = clock_timestamp()\x3B\n  RETURN NEW\x3B\nEND\x3B';
 
 comment on function public.set_updated_at() is
 'Keeps mutable row updated_at timestamps authoritative at the database boundary.';
