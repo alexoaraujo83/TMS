@@ -11,5 +11,9 @@ as E'BEGIN\n  INSERT INTO roles (tenant_id, name, description)\n  VALUES (p_tena
 revoke all on function public.provision_tenant_iam(uuid) from public;
 grant execute on function public.provision_tenant_iam(uuid) to current_user;
 
+-- Re-run the canonical provisioning after compliance permissions exist so
+-- existing tenants receive the newly introduced operator/admin permissions.
+select public.provision_tenant_iam(id) from tenants;
+
 comment on function public.provision_tenant_iam(uuid) is
 'Creates canonical tenant admin/operator roles and maps effective permissions, including compliance.';
