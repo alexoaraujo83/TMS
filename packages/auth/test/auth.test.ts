@@ -52,7 +52,7 @@ test(
   },
 );
 
-test("verifyAccessToken ignores an untrusted root tenantId claim", async () => {
+test("verifyAccessToken ignores a root tenantId claim", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
   const issuer = "https://tenant.example.auth0.com/";
   const audience = "urn:nexora:tms:api:development";
