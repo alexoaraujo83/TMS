@@ -42,6 +42,11 @@ jobs:
       - run: pnpm --filter @tms/database migrate
       # format:check is mandatory before lint, typecheck, test and build.
       - run: pnpm format:check
+      - if: ${{ failure() }}
+        name: Diagnose Prettier mismatch
+        run: |
+          pnpm exec prettier packages/auth/test/auth.test.ts --write
+          git diff -- packages/auth/test/auth.test.ts
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
