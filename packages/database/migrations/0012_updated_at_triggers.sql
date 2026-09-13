@@ -2,35 +2,31 @@ create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
 set search_path = pg_catalog
-as $$
-begin
-  new.updated_at = clock_timestamp();
-  return new;
-end;
-$$;
+as 'BEGIN
+  NEW.updated_at = clock_timestamp();
+  RETURN NEW;
+END;';
 
 comment on function public.set_updated_at() is
 'Keeps mutable row updated_at timestamps authoritative at the database boundary.';
 
-do $$
-declare
-  table_name text;
-begin
-  foreach table_name in array array[
-    'tenants',
-    'users',
-    'carriers',
-    'drivers',
-    'vehicles',
-    'freights',
-    'freight_assignments'
-  ] loop
-    execute format('drop trigger if exists %I on public.%I', 'trg_' || table_name || '_updated_at', table_name);
-    execute format(
-      'create trigger %I before update on public.%I for each row execute function public.set_updated_at()',
-      'trg_' || table_name || '_updated_at',
-      table_name
-    );
-  end loop;
-end;
-$$;
+DROP TRIGGER IF EXISTS trg_tenants_updated_at ON public.tenants;
+CREATE TRIGGER trg_tenants_updated_at BEFORE UPDATE ON public.tenants FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users;
+CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_carriers_updated_at ON public.carriers;
+CREATE TRIGGER trg_carriers_updated_at BEFORE UPDATE ON public.carriers FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_drivers_updated_at ON public.drivers;
+CREATE TRIGGER trg_drivers_updated_at BEFORE UPDATE ON public.drivers FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_vehicles_updated_at ON public.vehicles;
+CREATE TRIGGER trg_vehicles_updated_at BEFORE UPDATE ON public.vehicles FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_freights_updated_at ON public.freights;
+CREATE TRIGGER trg_freights_updated_at BEFORE UPDATE ON public.freights FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_freight_assignments_updated_at ON public.freight_assignments;
+CREATE TRIGGER trg_freight_assignments_updated_at BEFORE UPDATE ON public.freight_assignments FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
