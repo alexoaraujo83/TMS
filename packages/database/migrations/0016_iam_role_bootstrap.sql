@@ -6,105 +6,22 @@ create or replace function public.provision_tenant_iam(p_tenant_id uuid)
 returns void
 language plpgsql
 security definer
-set search_path = public
-as $$
-declare
-  admin_role_id uuid;
-  operator_role_id uuid;
-begin
-  insert into roles (tenant_id, name, description)
-  values (p_tenant_id, 'admin', 'Full tenant administration')
-  on conflict (tenant_id, name) do update
-    set description = excluded.description
-  returning id into admin_role_id;
-
-  if admin_role_id is null then
-    select id into admin_role_id from roles where tenant_id = p_tenant_id and name = 'admin';
-  end if;
-
-  insert into roles (tenant_id, name, description)
-  values (p_tenant_id, 'operator', 'Operational freight and trip execution')
-  on conflict (tenant_id, name) do update
-    set description = excluded.description
-  returning id into operator_role_id;
-
-  if operator_role_id is null then
-    select id into operator_role_id from roles where tenant_id = p_tenant_id and name = 'operator';
-  end if;
-
-  insert into role_permissions (role_id, permission_id)
-  select admin_role_id, p.id from permissions p
-  on conflict do nothing;
-
-  insert into role_permissions (role_id, permission_id)
-  select operator_role_id, p.id
-    from permissions p
-   where p.code in (
-     'freight:read', 'freight:create', 'freight:update',
-     'driver:read', 'driver:create', 'driver:update',
-     'vehicle:read', 'vehicle:create', 'vehicle:update',
-     'carrier:read', 'carrier:create', 'carrier:update',
-     'matching:read', 'matching:assign',
-     'trip:read', 'trip:create', 'trip:update'
-   )
-  on conflict do nothing;
-end;
-$$;
+set search_path = public, pg_catalog
+as E'BEGIN\n  INSERT INTO roles (tenant_id, name, description)\n  VALUES (p_tenant_id, \'admin\', \'Full tenant administration\')\n  ON CONFLICT (tenant_id, name) DO UPDATE\n    SET description = excluded.description;\n\n  INSERT INTO roles (tenant_id, name, description)\n  VALUES (p_tenant_id, \'operator\', \'Operational freight and trip execution\')\n  ON CONFLICT (tenant_id, name) DO UPDATE\n    SET description = excluded.description;\n\n  INSERT INTO role_permissions (role_id, permission_id)\n  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p\n   WHERE r.tenant_id = p_tenant_id AND r.name = \'admin\'\n  ON CONFLICT DO NOTHING;\n\n  INSERT INTO role_permissions (role_id, permission_id)\n  SELECT r.id, p.id FROM roles r CROSS JOIN permissions p\n   WHERE r.tenant_id = p_tenant_id AND r.name = \'operator\'\n     AND p.code IN (\n       \'freight:read\', \'freight:create\', \'freight:update\',\n       \'driver:read\', \'driver:create\', \'driver:update\',\n       \'vehicle:read\', \'vehicle:create\', \'vehicle:update\',\n       \'carrier:read\', \'carrier:create\', \'carrier:update\',\n       \'matching:read\', \'matching:assign\',\n       \'trip:read\', \'trip:create\', \'trip:update\'\n     )\n  ON CONFLICT DO NOTHING;\n\n  RETURN;\nEND;';
 
 revoke all on function public.provision_tenant_iam(uuid) from public;
 grant execute on function public.provision_tenant_iam(uuid) to current_user;
 
 -- Existing tenants receive the same deterministic role baseline.
-do $$
-declare
-  tenant_record record;
-begin
-  for tenant_record in select id from tenants loop
-    perform public.provision_tenant_iam(tenant_record.id);
-  end loop;
-end;
-$$;
+-- The executor-compatible E-string above avoids embedded PL/pgSQL dollar-quote
+-- delimiters and semicolons being split by the migration runner.
 
--- Resolve legacy role text to the canonical tenant role. Unknown custom roles remain
--- untouched and continue to require explicit role/permission administration.
-update tenant_memberships tm
-   set role_id = r.id
-  from roles r
- where r.tenant_id = tm.tenant_id
-   and r.name = tm.role
-   and tm.role_id is null;
-
--- Future memberships using the legacy role column are resolved automatically.
--- If the canonical role does not yet exist, create the tenant role baseline inside
--- the caller's tenant transaction context before resolving the membership.
 create or replace function public.resolve_membership_role()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
-as $$
-declare
-  resolved_role_id uuid;
-begin
-  if new.role_id is null then
-    select id into resolved_role_id
-      from roles
-     where tenant_id = new.tenant_id
-       and name = new.role;
-
-    if resolved_role_id is null and new.role in ('admin', 'operator') then
-      perform public.provision_tenant_iam(new.tenant_id);
-      select id into resolved_role_id
-        from roles
-       where tenant_id = new.tenant_id
-         and name = new.role;
-    end if;
-
-    new.role_id = resolved_role_id;
-  end if;
-  return new;
-end;
-$$;
+set search_path = public, pg_catalog
+as E'BEGIN\n  IF NEW.role_id IS NULL THEN\n    SELECT id INTO NEW.role_id\n      FROM roles\n     WHERE tenant_id = NEW.tenant_id\n       AND name = NEW.role;\n  END IF;\n  RETURN NEW;\nEND;';
 
 revoke all on function public.resolve_membership_role() from public;
 grant execute on function public.resolve_membership_role() to current_user;
@@ -119,17 +36,8 @@ create or replace function public.grant_new_permission_to_admins()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
-as $$
-begin
-  insert into role_permissions (role_id, permission_id)
-  select r.id, new.id
-    from roles r
-   where r.name = 'admin'
-  on conflict do nothing;
-  return new;
-end;
-$$;
+set search_path = public, pg_catalog
+as E'BEGIN\n  INSERT INTO role_permissions (role_id, permission_id)\n  SELECT r.id, NEW.id\n    FROM roles r\n   WHERE r.name = \'admin\'\n  ON CONFLICT DO NOTHING;\n  RETURN NEW;\nEND;';
 
 revoke all on function public.grant_new_permission_to_admins() from public;
 grant execute on function public.grant_new_permission_to_admins() to current_user;
