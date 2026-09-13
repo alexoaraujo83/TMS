@@ -5,12 +5,7 @@ import { withTransaction } from "./transaction.js";
 
 export type ComplianceStatus = "pending" | "approved" | "rejected" | "expired";
 export type GrStatus =
-  | "pending"
-  | "submitted"
-  | "approved"
-  | "rejected"
-  | "expired"
-  | "cancelled";
+  "pending" | "submitted" | "approved" | "rejected" | "expired" | "cancelled";
 
 type AuditInput = Omit<AuditEventInput, "tenantId" | "entityId">;
 
@@ -309,8 +304,7 @@ function isAllowedComplianceTransition(
   to: ComplianceStatus,
 ) {
   return (
-    (from === "pending" &&
-      ["approved", "rejected", "expired"].includes(to)) ||
+    (from === "pending" && ["approved", "rejected", "expired"].includes(to)) ||
     (from === "approved" && to === "expired")
   );
 }
