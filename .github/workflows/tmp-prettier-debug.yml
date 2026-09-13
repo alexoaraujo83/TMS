@@ -1,0 +1,19 @@
+name: Temporary Prettier Debug
+
+on:
+  push:
+    branches:
+      - tmp/prettier-migrate-debug
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.20.0
+      - run: npm install --global pnpm@11.24.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prettier --write packages/database/scripts/migrate.ts
+      - run: git diff -- packages/database/scripts/migrate.ts
