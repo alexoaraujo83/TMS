@@ -113,11 +113,7 @@ export class ComplianceService {
     return this.repository.listGr(context.tenantId, freightId).catch(mapError);
   }
 
-  transitionGr(
-    context: RequestContext,
-    id: string,
-    dto: TransitionGrDto,
-  ) {
+  transitionGr(context: RequestContext, id: string, dto: TransitionGrDto) {
     return this.repository
       .transitionGr(
         context.tenantId,
@@ -134,5 +130,3 @@ export class ComplianceService {
       .catch(mapError);
   }
 }
-
-// Temporary CI formatter diagnostic trigger.
