@@ -86,13 +86,7 @@ const requiredColumns: Record<string, string[]> = {
     "rejected_at",
     "expires_at",
   ],
-  audit_events: [
-    "id",
-    "tenant_id",
-    "actor_user_id",
-    "action",
-    "created_at",
-  ],
+  audit_events: ["id", "tenant_id", "actor_user_id", "action", "created_at"],
 };
 
 const client = new Client({ connectionString: databaseUrl });
