@@ -9,6 +9,7 @@ import type { BodyType, Freight, VehicleType } from "@tms/freight";
 import type { Pool } from "pg";
 import type { RequestContext } from "../../common/request-context.js";
 import { DATABASE_POOL } from "../../common/database.provider.js";
+import { assertMatchingTenant } from "../matching/matching.contracts.js";
 
 function toFreight(row: FreightRow): Freight {
   return {
@@ -96,6 +97,7 @@ export class MatchingService {
       available: true,
     }));
 
+    assertMatchingTenant(context.tenantId, freight, candidates);
     return rankCandidates(freight, candidates);
   }
 }
