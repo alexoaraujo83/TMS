@@ -154,7 +154,8 @@ test("AuthGuard rejects a token with an invalid issuer", async () => {
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+      error instanceof Error &&
+      error.message === "Invalid access token",
   );
 });
 
@@ -165,7 +166,8 @@ test("AuthGuard rejects a token with an invalid audience", async () => {
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+      error instanceof Error &&
+      error.message === "Invalid access token",
   );
 });
 
@@ -177,7 +179,8 @@ test("AuthGuard rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) =>
+      error instanceof Error && error.message === "Invalid access token",
   );
 });
 
