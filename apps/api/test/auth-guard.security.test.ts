@@ -194,6 +194,7 @@ test("requires tenant selection without a tenant claim", async () => {
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
-      error instanceof Error && error.message === "Tenant selection is required",
+      error instanceof Error &&
+      error.message === "Tenant selection is required",
   );
 });
