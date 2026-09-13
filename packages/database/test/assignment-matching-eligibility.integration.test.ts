@@ -345,28 +345,31 @@ if (!enabled) {
     );
   });
 
-  it("rejects an unavailable vehicle before creating an assignment", async () => {
-    const freshFreightId = randomUUID();
-    await query(
-      `insert into freights (
-         id, tenant_id, status, freight_type, origin_city, origin_state,
-         destination_city, destination_state, cargo_description, quantity,
-         weight_kg
-       ) values (
-         $1, $2, 'matching', 'dedicated', 'Betim', 'MG', 'Divinopolis',
-         'MG', 'Unavailable cargo', 1, 1000
-       )`,
-      [freshFreightId, tenantId],
-    );
-    await assert.rejects(
-      assignments.assign(
-        tenantId,
-        freshFreightId,
-        driverId,
-        unavailableVehicleId,
-        audit,
-      ),
-      /Vehicle is not available for assignment/,
-    );
-  });
+  it(
+    "rejects an unavailable vehicle before creating an assignment",
+    async () => {
+      const freshFreightId = randomUUID();
+      await query(
+        `insert into freights (
+           id, tenant_id, status, freight_type, origin_city, origin_state,
+           destination_city, destination_state, cargo_description, quantity,
+           weight_kg
+         ) values (
+           $1, $2, 'matching', 'dedicated', 'Betim', 'MG', 'Divinopolis',
+           'MG', 'Unavailable cargo', 1, 1000
+         )`,
+        [freshFreightId, tenantId],
+      );
+      await assert.rejects(
+        assignments.assign(
+          tenantId,
+          freshFreightId,
+          driverId,
+          unavailableVehicleId,
+          audit,
+        ),
+        /Vehicle is not available for assignment/,
+      );
+    },
+  );
 }
