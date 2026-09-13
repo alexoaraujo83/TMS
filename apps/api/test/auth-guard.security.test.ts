@@ -175,7 +175,8 @@ test("rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) =>
+      error instanceof Error && error.message === "Invalid access token",
   );
 });
 
