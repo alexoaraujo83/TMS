@@ -84,7 +84,9 @@ export class AssignmentRepository {
         status: string;
         anttStatus: string;
       }>(
-        `select id, carrier_id as "carrierId", status, antt_status as "anttStatus" from drivers
+        `select id, carrier_id as "carrierId", status,
+                antt_status as "anttStatus"
+           from drivers
           where tenant_id = $1 and id = $2
           for update`,
         [tenantId, driverId],
@@ -155,7 +157,9 @@ export class AssignmentRepository {
         Number(vehicle.capacityKg) < requiredCapacityKg ||
         !freeMetersMatches
       ) {
-        throw new Error("Vehicle does not satisfy freight matching requirements");
+        throw new Error(
+          "Vehicle does not satisfy freight matching requirements",
+        );
       }
 
       const existing = await client.query<{ id: string }>(
