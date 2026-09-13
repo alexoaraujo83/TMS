@@ -63,49 +63,55 @@ function guard(rows: readonly unknown[]) {
   } as never);
 }
 
-test("AuthGuard uses database membership for the selected tenant, not JWT permissions", async () => {
-  const request = {
-    headers: {
-      authorization: `Bearer ${await token({ permissions: ["iam:manage"] })}`,
-      "x-tenant-id": TENANT_B,
-    },
-  };
+test(
+  "AuthGuard uses database membership for the selected tenant, not JWT permissions",
+  async () => {
+    const request = {
+      headers: {
+        authorization: `Bearer ${await token({ permissions: ["iam:manage"] })}`,
+        "x-tenant-id": TENANT_B,
+      },
+    };
 
-  const result = await guard([
-    {
+    const result = await guard([
+      {
+        userId: USER_ID,
+        tenantId: TENANT_B,
+        role: "operator",
+        permissions: ["freight:read"],
+        active: true,
+      },
+    ]).canActivate(contextFor(request));
+
+    assert.equal(result, true);
+    assert.deepEqual(request.context, {
+      requestId: "",
       userId: USER_ID,
       tenantId: TENANT_B,
-      role: "operator",
+      roles: ["operator"],
       permissions: ["freight:read"],
-      active: true,
-    },
-  ]).canActivate(contextFor(request));
+    });
+  },
+);
 
-  assert.equal(result, true);
-  assert.deepEqual(request.context, {
-    requestId: "",
-    userId: USER_ID,
-    tenantId: TENANT_B,
-    roles: ["operator"],
-    permissions: ["freight:read"],
-  });
-});
+test(
+  "AuthGuard rejects a forged tenant selection when membership does not exist",
+  async () => {
+    const request = {
+      headers: {
+        authorization: `Bearer ${await token()}`,
+        "x-tenant-id": TENANT_B,
+      },
+    };
 
-test("AuthGuard rejects a forged tenant selection when membership does not exist", async () => {
-  const request = {
-    headers: {
-      authorization: `Bearer ${await token()}`,
-      "x-tenant-id": TENANT_B,
-    },
-  };
-
-  await assert.rejects(
-    () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error &&
-      error.message === "Active tenant membership required",
-  );
-});
+    await assert.rejects(
+      () => guard([]).canActivate(contextFor(request)),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message === "Active tenant membership required",
+    );
+  },
+);
 
 test("AuthGuard rejects an inactive tenant membership", async () => {
   const request = {
@@ -137,7 +143,8 @@ test("AuthGuard rejects missing authentication", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) => error instanceof Error && error.message === "Authentication required",
+    (error: unknown) =>
+      error instanceof Error && error.message === "Authentication required",
   );
 });
 
@@ -174,24 +181,29 @@ test("AuthGuard rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
-  );
-});
-
-test("AuthGuard requires tenant selection when the token has no tenant claim", async () => {
-  const noTenant = await new SignJWT({})
-    .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
-    .setSubject(AUTH0_SUBJECT)
-    .setIssuer(ISSUER)
-    .setAudience(AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(privateKey);
-  const request = { headers: { authorization: `Bearer ${noTenant}` } };
-
-  await assert.rejects(
-    () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
-      error instanceof Error && error.message === "Tenant selection is required",
+      error instanceof Error && error.message === "Invalid access token",
   );
 });
+
+test(
+  "AuthGuard requires tenant selection when the token has no tenant claim",
+  async () => {
+    const noTenant = await new SignJWT({})
+      .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
+      .setSubject(AUTH0_SUBJECT)
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(privateKey);
+    const request = { headers: { authorization: `Bearer ${noTenant}` } };
+
+    await assert.rejects(
+      () => guard([]).canActivate(contextFor(request)),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message === "Tenant selection is required",
+    );
+  },
+);
