@@ -180,24 +180,29 @@ test("AuthGuard rejects an expired token", async () => {
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+      error instanceof Error &&
+      error.message === "Invalid access token",
   );
 });
 
-test("AuthGuard requires tenant selection when the token has no tenant claim", async () => {
-  const noTenant = await new SignJWT({})
-    .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
-    .setSubject(USER_ID)
-    .setIssuer(ISSUER)
-    .setAudience(AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime("5m")
-    .sign(privateKey);
-  const request = { headers: { authorization: `Bearer ${noTenant}` } };
+test(
+  "AuthGuard requires tenant selection when the token has no tenant claim",
+  async () => {
+    const noTenant = await new SignJWT({})
+      .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
+      .setSubject(USER_ID)
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(privateKey);
+    const request = { headers: { authorization: `Bearer ${noTenant}` } };
 
-  await assert.rejects(
-    () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Tenant selection is required",
-  );
-});
+    await assert.rejects(
+      () => guard([]).canActivate(contextFor(request)),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.message === "Tenant selection is required",
+    );
+  },
+);
