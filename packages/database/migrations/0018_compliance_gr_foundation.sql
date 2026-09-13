@@ -57,10 +57,16 @@ create table if not exists gr_requests (
   unique (tenant_id, id)
 );
 
-create unique index if not exists uq_compliance_checks_tenant_id
-  on compliance_checks (tenant_id, id);
-create unique index if not exists uq_gr_requests_tenant_id
-  on gr_requests (tenant_id, id);
+-- Replace legacy constraint names safely before installing the canonical
+-- tenant-scoped composite foreign keys.
+alter table compliance_checks
+  drop constraint if exists compliance_checks_freight_fk;
+alter table compliance_checks
+  drop constraint if exists compliance_checks_assignment_fk;
+alter table gr_requests
+  drop constraint if exists gr_requests_freight_fk;
+alter table gr_requests
+  drop constraint if exists gr_requests_assignment_fk;
 
 alter table compliance_checks
   add constraint compliance_checks_freight_fk
@@ -95,22 +101,26 @@ create index if not exists gr_requests_tenant_status_idx
 create index if not exists gr_requests_freight_idx
   on gr_requests (tenant_id, freight_id, created_at desc);
 
+drop trigger if exists compliance_checks_set_updated_at on compliance_checks;
 create trigger compliance_checks_set_updated_at
 before update on compliance_checks
 for each row execute function public.set_updated_at();
 
+drop trigger if exists gr_requests_set_updated_at on gr_requests;
 create trigger gr_requests_set_updated_at
 before update on gr_requests
 for each row execute function public.set_updated_at();
 
 alter table compliance_checks enable row level security;
 alter table compliance_checks force row level security;
+drop policy if exists compliance_checks_tenant_isolation on compliance_checks;
 create policy compliance_checks_tenant_isolation on compliance_checks
   using (tenant_id::text = current_setting('app.tenant_id', true))
   with check (tenant_id::text = current_setting('app.tenant_id', true));
 
 alter table gr_requests enable row level security;
 alter table gr_requests force row level security;
+drop policy if exists gr_requests_tenant_isolation on gr_requests;
 create policy gr_requests_tenant_isolation on gr_requests
   using (tenant_id::text = current_setting('app.tenant_id', true))
   with check (tenant_id::text = current_setting('app.tenant_id', true));
@@ -119,12 +129,5 @@ insert into role_permissions (role_id, permission_id)
 select r.id, p.id
 from roles r
 join permissions p on p.code in ('compliance:read', 'compliance:create', 'compliance:update')
-where r.name = 'admin'
-on conflict do nothing;
-
-insert into role_permissions (role_id, permission_id)
-select r.id, p.id
-from roles r
-join permissions p on p.code in ('compliance:read', 'compliance:create', 'compliance:update')
-where r.name = 'operator'
+where r.name in ('admin', 'operator')
 on conflict do nothing;
