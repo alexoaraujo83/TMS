@@ -1,6 +1,9 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { TenantContext } from "@tms/tenancy";
 
+export const NEXORA_AUTH_CLAIMS_NAMESPACE = "https://nexora.tms/claims";
+export const NEXORA_TENANT_ID_CLAIM = `${NEXORA_AUTH_CLAIMS_NAMESPACE}/tenant_id`;
+
 export interface AuthClaims {
   sub: string;
   tenantId?: string;
@@ -50,7 +53,9 @@ export async function verifyAccessToken(
   return {
     sub: payload.sub,
     tenantId:
-      typeof payload.tenantId === "string" ? payload.tenantId : undefined,
+      typeof payload[NEXORA_TENANT_ID_CLAIM] === "string"
+        ? payload[NEXORA_TENANT_ID_CLAIM]
+        : undefined,
     issuer,
     audience: payload.aud ?? config.audience,
   };
