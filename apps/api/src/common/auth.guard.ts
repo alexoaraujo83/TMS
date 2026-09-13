@@ -67,7 +67,7 @@ export class AuthGuard implements CanActivate {
 
       request.context = {
         requestId: headerValue(request, "x-request-id") ?? "",
-        userId: claims.sub,
+        userId: membership.userId,
         tenantId: membership.tenantId,
         roles: [membership.role],
         permissions: membership.permissions,
