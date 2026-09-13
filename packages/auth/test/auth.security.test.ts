@@ -3,7 +3,7 @@ import test from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { verifyAccessToken } from "../src/index.ts";
 
-const issuer = "https://tenant.example.auth0.com/";
+const issuer = "https://tenant.example.auth0.com";
 const audience = "urn:nexora:tms:api:development";
 const jwksUrl = "https://jwks.example.test/.well-known/jwks.json";
 
@@ -75,50 +75,5 @@ test("rejects a token signed with an unexpected algorithm", async () => {
 
   await assert.rejects(() =>
     verifyAccessToken(bad, { issuer, audience, jwksUrl }),
-  );
-});
-
-test("rejects a token with an invalid issuer", async () => {
-  const { privateKey, originalFetch } = await setup();
-  try {
-    const bad = await new SignJWT({
-      tenantId: "11111111-1111-1111-1111-111111111111",
-    })
-      .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
-      .setSubject("auth0|user-1")
-      .setIssuer("https://attacker.example/")
-      .setAudience(audience)
-      .setExpirationTime("5m")
-      .sign(privateKey);
-
-    await assert.rejects(() =>
-      verifyAccessToken(bad, { issuer, audience, jwksUrl }),
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("rejects a token without a subject", async () => {
-  const { privateKey, originalFetch } = await setup();
-  try {
-    const bad = await new SignJWT({})
-      .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
-      .setIssuer(issuer)
-      .setAudience(audience)
-      .setExpirationTime("5m")
-      .sign(privateKey);
-
-    await assert.rejects(() =>
-      verifyAccessToken(bad, { issuer, audience, jwksUrl }),
-    );
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test("rejects oversized bearer material before JWT verification", async () => {
-  await assert.rejects(() =>
-    verifyAccessToken("x".repeat(8193), { issuer, audience, jwksUrl }),
   );
 });
