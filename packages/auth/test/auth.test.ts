@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { verifyAccessToken } from "../src/index.js";
+import { verifyAccessToken } from "../src/index.ts";
 
 test("verifyAccessToken accepts a valid RS256 token", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
@@ -48,15 +48,14 @@ test("verifyAccessToken accepts a valid RS256 token", async () => {
 });
 
 test("verifyAccessToken rejects HS256 tokens", async () => {
-  const { privateKey } = await generateKeyPair("RS256");
-  const token = await new SignJWT({})
+  const token = await new SignJWT({ tenantId: "tenant-a" })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject("auth0|user-1")
     .setIssuer("https://tenant.example.auth0.com/")
     .setAudience("urn:nexora:tms:api:development")
     .setIssuedAt()
     .setExpirationTime("5m")
-    .sign(privateKey as never);
+    .sign(new TextEncoder().encode("test-only-secret"));
 
   await assert.rejects(
     verifyAccessToken(token, {
