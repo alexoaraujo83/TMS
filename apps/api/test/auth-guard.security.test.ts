@@ -7,6 +7,7 @@ import { AuthGuard } from "../src/common/auth.guard.ts";
 const ISSUER = "https://tenant.example.auth0.com";
 const AUDIENCE = "urn:nexora:tms:api:development";
 const JWKS_URL = "https://jwks.example.test/.well-known/jwks.json";
+const AUTH0_SUBJECT = "auth0|user-1";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const TENANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -48,7 +49,7 @@ async function token(
     ...overrides,
   })
     .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
-    .setSubject(USER_ID)
+    .setSubject(AUTH0_SUBJECT)
     .setIssuer(options.issuer ?? ISSUER)
     .setAudience(options.audience ?? AUDIENCE)
     .setIssuedAt()
@@ -136,8 +137,7 @@ test("AuthGuard rejects missing authentication", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Authentication required",
+    (error: unknown) => error instanceof Error && error.message === "Authentication required",
   );
 });
 
@@ -174,15 +174,14 @@ test("AuthGuard rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
   );
 });
 
 test("AuthGuard requires tenant selection when the token has no tenant claim", async () => {
   const noTenant = await new SignJWT({})
     .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
-    .setSubject(USER_ID)
+    .setSubject(AUTH0_SUBJECT)
     .setIssuer(ISSUER)
     .setAudience(AUDIENCE)
     .setIssuedAt()
@@ -193,7 +192,6 @@ test("AuthGuard requires tenant selection when the token has no tenant claim", a
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
-      error instanceof Error &&
-      error.message === "Tenant selection is required",
+      error instanceof Error && error.message === "Tenant selection is required",
   );
 });
