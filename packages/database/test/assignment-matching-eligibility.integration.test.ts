@@ -14,7 +14,7 @@ if (!enabled) {
   describe("assignment matching eligibility integration", () => {
     it(
       "is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured",
-      () => {},
+      () => undefined,
     );
   });
 } else {
