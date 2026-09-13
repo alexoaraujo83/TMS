@@ -8,7 +8,10 @@ import { TripExecutionRepository } from "@tms/database";
 import type { Pool } from "pg";
 import { DATABASE_POOL } from "../../common/database.provider.js";
 import type { RequestContext } from "../../common/request-context.js";
-import type { CreateOccurrenceDto, CreatePodDto } from "./trip-execution.dto.js";
+import type {
+  CreateOccurrenceDto,
+  CreatePodDto,
+} from "./trip-execution.dto.js";
 
 @Injectable()
 export class TripExecutionService {
