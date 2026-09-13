@@ -12,7 +12,10 @@ const enabled =
 
 if (!enabled) {
   describe("assignment matching eligibility integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it(
+      "is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured",
+      () => {},
+    );
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
@@ -189,8 +192,12 @@ if (!enabled) {
     try {
       await enableClient.query("begin");
       for (const table of tables) {
-        await enableClient.query(`alter table ${table} enable row level security`);
-        await enableClient.query(`alter table ${table} force row level security`);
+        await enableClient.query(
+          `alter table ${table} enable row level security`,
+        );
+        await enableClient.query(
+          `alter table ${table} force row level security`,
+        );
       }
       await enableClient.query("commit");
     } finally {
@@ -270,45 +277,48 @@ if (!enabled) {
     assert.equal(result.freightStatus, "assigned");
   });
 
-  it("rejects a different vehicle for the same driver when it violates freight requirements", async () => {
-    const freshFreightId = randomUUID();
-    await query(
-      `insert into freights (
-         id, tenant_id, status, freight_type, origin_city, origin_state,
-         destination_city, destination_state, cargo_description, quantity,
-         weight_kg, vehicle_types, body_types, minimum_free_meters,
-         minimum_capacity_kg
-       ) values (
-         $1, $2, 'matching', 'dedicated', 'Betim', 'MG', 'Divinopolis',
-         'MG', 'Wrong vehicle cargo', 1, 5000,
-         ARRAY['truck'], ARRAY['open'], 5, 5000
-       )`,
-      [freshFreightId, tenantId],
-    );
+  it(
+    "rejects a different vehicle for the same driver when it violates freight requirements",
+    async () => {
+      const freshFreightId = randomUUID();
+      await query(
+        `insert into freights (
+           id, tenant_id, status, freight_type, origin_city, origin_state,
+           destination_city, destination_state, cargo_description, quantity,
+           weight_kg, vehicle_types, body_types, minimum_free_meters,
+           minimum_capacity_kg
+         ) values (
+           $1, $2, 'matching', 'dedicated', 'Betim', 'MG', 'Divinopolis',
+           'MG', 'Wrong vehicle cargo', 1, 5000,
+           ARRAY['truck'], ARRAY['open'], 5, 5000
+         )`,
+        [freshFreightId, tenantId],
+      );
 
-    await assert.rejects(
-      assignments.assign(
-        tenantId,
-        freshFreightId,
-        driverId,
-        wrongVehicleId,
-        audit,
-      ),
-      /Vehicle does not satisfy freight matching requirements/,
-    );
+      await assert.rejects(
+        assignments.assign(
+          tenantId,
+          freshFreightId,
+          driverId,
+          wrongVehicleId,
+          audit,
+        ),
+        /Vehicle does not satisfy freight matching requirements/,
+      );
 
-    const state = await query<{ status: string; assignments: string }>(
-      `select f.status, count(fa.id)::text as assignments
-         from freights f
-         left join freight_assignments fa
-           on fa.freight_id = f.id and fa.status = 'active'
-        where f.tenant_id = $1 and f.id = $2
-        group by f.status`,
-      [tenantId, freshFreightId],
-    );
-    assert.equal(state.rows[0]?.status, "matching");
-    assert.equal(state.rows[0]?.assignments, "0");
-  });
+      const state = await query<{ status: string; assignments: string }>(
+        `select f.status, count(fa.id)::text as assignments
+           from freights f
+           left join freight_assignments fa
+             on fa.freight_id = f.id and fa.status = 'active'
+          where f.tenant_id = $1 and f.id = $2
+          group by f.status`,
+        [tenantId, freshFreightId],
+      );
+      assert.equal(state.rows[0]?.status, "matching");
+      assert.equal(state.rows[0]?.assignments, "0");
+    },
+  );
 
   it("rejects a vehicle from another tenant", async () => {
     const freshFreightId = randomUUID();
