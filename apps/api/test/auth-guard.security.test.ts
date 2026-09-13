@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { NEXORA_TENANT_ID_CLAIM } from "@tms/auth";
+import { TMS_TENANT_ID_CLAIM } from "@tms/auth";
 import { AuthGuard } from "../src/common/auth.guard.ts";
 
 const ISSUER = "https://tenant.example.auth0.com";
-const AUDIENCE = "urn:nexora:tms:api:development";
+const AUDIENCE = "urn:tms:api:development";
 const JWKS_URL = "https://jwks.example.test/.well-known/jwks.json";
 const AUTH0_SUBJECT = "auth0|user-1";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -45,7 +45,7 @@ async function token(
   options: { audience?: string; issuer?: string; expiresAt?: number } = {},
 ) {
   return new SignJWT({
-    [NEXORA_TENANT_ID_CLAIM]: TENANT_A,
+    [TMS_TENANT_ID_CLAIM]: TENANT_A,
     ...overrides,
   })
     .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
@@ -175,8 +175,7 @@ test("rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
   );
 });
 
