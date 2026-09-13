@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
 import { AssignmentRepository } from "../src/assignment-repository.js";
-import { MatchingCandidateRepository } from "../src/matching-candidate-repository.js";
+import {
+  MatchingCandidateRepository,
+} from "../src/matching-candidate-repository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const enabled =
