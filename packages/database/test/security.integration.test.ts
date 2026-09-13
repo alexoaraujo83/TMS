@@ -189,26 +189,29 @@ if (!runIntegration) {
       }
     });
 
-    it("rejects changing a row to another tenant through WITH CHECK", async () => {
-      const client = await pool.connect();
-      try {
-        await client.query("begin");
-        await client.query("select set_config($1, $2, true)", [
-          "app.tenant_id",
-          tenantA,
-        ]);
-        await assertRlsViolation(
-          client.query("update freights set tenant_id = $1 where id = $2", [
-            tenantB,
-            freightA,
-          ]),
-          "tenant_id reassignment bypassed RLS",
-        );
-        await client.query("rollback");
-      } finally {
-        client.release();
-      }
-    });
+    it(
+      "rejects changing a row to another tenant through WITH CHECK",
+      async () => {
+        const client = await pool.connect();
+        try {
+          await client.query("begin");
+          await client.query("select set_config($1, $2, true)", [
+            "app.tenant_id",
+            tenantA,
+          ]);
+          await assertRlsViolation(
+            client.query("update freights set tenant_id = $1 where id = $2", [
+              tenantB,
+              freightA,
+            ]),
+            "tenant_id reassignment bypassed RLS",
+          );
+          await client.query("rollback");
+        } finally {
+          client.release();
+        }
+      },
+    );
 
     it("cannot delete a row outside the active tenant", async () => {
       const client = await pool.connect();
@@ -230,54 +233,62 @@ if (!runIntegration) {
       }
     });
 
-    it("denies tenant-owned rows when no tenant context is installed", async () => {
-      const client = await pool.connect();
-      try {
-        await client.query("begin");
-        const result = await client.query("select id from freights");
-        if (result.rowCount !== 0)
-          throw new Error("freight rows are visible without tenant context");
-        await assertRlsViolation(
-          client.query(
-            `insert into freights (id, tenant_id, status, freight_type, origin_city, origin_state, destination_city, destination_state, cargo_description, quantity, weight_kg)
+    it(
+      "denies tenant-owned rows when no tenant context is installed",
+      async () => {
+        const client = await pool.connect();
+        try {
+          await client.query("begin");
+          const result = await client.query("select id from freights");
+          if (result.rowCount !== 0)
+            throw new Error(
+              "freight rows are visible without tenant context",
+            );
+          await assertRlsViolation(
+            client.query(
+              `insert into freights (id, tenant_id, status, freight_type, origin_city, origin_state, destination_city, destination_state, cargo_description, quantity, weight_kg)
              values ($1,$2,'open','dedicated','Santos','SP','Campinas','SP','missing context',1,100)`,
-            [randomUUID(), tenantA],
-          ),
-          "freight insert was accepted without tenant context",
-        );
-        await client.query("rollback");
-      } finally {
-        client.release();
-      }
-    });
+              [randomUUID(), tenantA],
+            ),
+            "freight insert was accepted without tenant context",
+          );
+          await client.query("rollback");
+        } finally {
+          client.release();
+        }
+      },
+    );
 
-    it("switches tenant visibility only within the active transaction", async () => {
-      const client = await pool.connect();
-      try {
-        await client.query("begin");
-        await client.query("select set_config($1, $2, true)", [
-          "app.tenant_id",
-          tenantA,
-        ]);
-        const tenantAResult = await client.query(
-          "select id from freights where id = $1",
-          [freightA],
-        );
-        await client.query("select set_config($1, $2, true)", [
-          "app.tenant_id",
-          tenantB,
-        ]);
-        const tenantBResult = await client.query(
-          "select id from freights where id = $1",
-          [freightA],
-        );
-        await client.query("rollback");
-        if (tenantAResult.rowCount !== 1 || tenantBResult.rowCount !== 0)
-          throw new Error("tenant context switching did not isolate rows");
-      } finally {
-        client.release();
-      }
-    });
+    it(
+      "switches tenant visibility only within the active transaction",
+      async () => {
+        const client = await pool.connect();
+        try {
+          await client.query("begin");
+          await client.query("select set_config($1, $2, true)", [
+            "app.tenant_id",
+            tenantA,
+          ]);
+          const tenantAResult = await client.query(
+            "select id from freights where id = $1",
+            [freightA],
+          );
+          await client.query("select set_config($1, $2, true)", [
+            "app.tenant_id",
+            tenantB,
+          ]);
+          const tenantBResult = await client.query(
+            "select id from freights where id = $1",
+            [freightA],
+          );
+          await client.query("rollback");
+          if (tenantAResult.rowCount !== 1 || tenantBResult.rowCount !== 0)
+            throw new Error("tenant context switching did not isolate rows");
+        } finally {
+          client.release();
+        }
+      },
+    );
 
     it(
       "keeps the membership bootstrap function non-public and callable by the runtime role",
