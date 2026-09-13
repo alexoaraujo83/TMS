@@ -1,0 +1,17 @@
+name: format-probe
+on:
+  push:
+    branches: [main]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.20.0
+      - run: npm install --global pnpm@11.24.0
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          pnpm exec prettier packages/database/test/assignment-matching-eligibility.integration.test.ts > /tmp/formatted.ts
+          diff -u packages/database/test/assignment-matching-eligibility.integration.test.ts /tmp/formatted.ts || true
