@@ -236,10 +236,10 @@ async function validateExistingSchema(): Promise<void> {
     `
     select p.proname, p.prosecdef, p.proconfig
     from pg_proc p
-    join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public'
-      and p.proname = 'check_tenant_membership'
-      and pg_get_function_identity_arguments(p.oid) = 'text, uuid'
+    join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public'
+      and p.proname='check_tenant_membership'
+      and pg_get_function_identity_arguments(p.oid)='text, uuid'
   `,
   );
   const resolver = auth0Resolver.rows[0];
