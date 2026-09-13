@@ -57,7 +57,7 @@ test("verifyAccessToken ignores an untrusted root tenantId claim", async () => {
   const issuer = "https://tenant.example.auth0.com/";
   const audience = "urn:nexora:tms:api:development";
   const token = await new SignJWT({
-    tenantId: "attacker-controlled",
+    tenantId: "ignored-root-claim",
     [NEXORA_TENANT_ID_CLAIM]: "tenant-a",
   })
     .setProtectedHeader({ alg: "RS256", kid: "test-key" })
@@ -73,7 +73,13 @@ test("verifyAccessToken ignores an untrusted root tenantId claim", async () => {
     new Response(
       JSON.stringify({
         keys: [
-          { ...jwk, kty: "RSA", use: "sig", alg: "RS256", kid: "test-key" },
+          {
+            ...jwk,
+            kty: "RSA",
+            use: "sig",
+            alg: "RS256",
+            kid: "test-key",
+          },
         ],
       }),
       { headers: { "content-type": "application/json" } },
