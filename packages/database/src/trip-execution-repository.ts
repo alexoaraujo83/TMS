@@ -3,15 +3,7 @@ import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
 import { assertUuid } from "./query.js";
 import { withTransaction } from "./transaction.js";
 
-export const occurrenceTypes = [
-  "delay",
-  "accident",
-  "breakdown",
-  "cargo_damage",
-  "refusal",
-  "address_issue",
-  "other",
-] as const;
+export const occurrenceTypes = ["delay", "accident", "breakdown", "cargo_damage", "refusal", "address_issue", "other"] as const;
 export const occurrenceSeverities = ["info", "warning", "critical"] as const;
 export type TripOccurrenceType = (typeof occurrenceTypes)[number];
 export type TripOccurrenceSeverity = (typeof occurrenceSeverities)[number];
@@ -131,10 +123,7 @@ export class TripExecutionRepository {
     assertUuid(tenantId, "tenantId");
     assertUuid(tripId, "tripId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const trip = await client.query<{ status: string }>(
-        `select status from trips where tenant_id = $1 and id = $2 for update`,
-        [tenantId, tripId],
-      );
+      const trip = await client.query<{ status: string }>(`select status from trips where tenant_id = $1 and id = $2 for update`, [tenantId, tripId]);
       if (!trip.rows[0]) throw new Error("Trip not found");
       if (trip.rows[0].status !== "delivered") throw new Error("POD requires a delivered trip");
       const existing = await client.query(`select id from trip_pods where tenant_id = $1 and trip_id = $2`, [tenantId, tripId]);
@@ -162,23 +151,20 @@ export class TripExecutionRepository {
   async getPod(tenantId: string, tripId: string) {
     assertUuid(tenantId, "tenantId");
     assertUuid(tripId, "tripId");
-    return withTransaction(this.pool, async (client) => {
+    return withTransaction(this.pool, { tenantId }, async (client) => {
       const result = await client.query<TripPodRecord>(
         `select ${POD_COLUMNS} from trip_pods where tenant_id = $1 and trip_id = $2 limit 1`,
         [tenantId, tripId],
       );
       return result.rows[0] ?? null;
-    }, { tenantId });
+    });
   }
 
   async listTimeline(tenantId: string, tripId: string) {
     assertUuid(tenantId, "tenantId");
     assertUuid(tripId, "tripId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const trip = await client.query(
-        `select id from trips where tenant_id = $1 and id = $2`,
-        [tenantId, tripId],
-      );
+      const trip = await client.query(`select id from trips where tenant_id = $1 and id = $2`, [tenantId, tripId]);
       if (!trip.rows[0]) throw new Error("Trip not found");
       const result = await client.query(
         `with events as (
