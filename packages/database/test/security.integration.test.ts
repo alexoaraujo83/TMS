@@ -17,6 +17,8 @@ if (!runIntegration) {
   let tenantB: string;
   let userA: string;
   let userB: string;
+  let auth0SubjectA: string;
+  let auth0SubjectB: string;
   let freightA: string;
 
   before(async () => {
@@ -50,6 +52,8 @@ if (!runIntegration) {
       tenantB = randomUUID();
       userA = randomUUID();
       userB = randomUUID();
+      auth0SubjectA = "auth0|user-a";
+      auth0SubjectB = "auth0|user-b";
       freightA = randomUUID();
 
       await client.query(
@@ -57,8 +61,8 @@ if (!runIntegration) {
         [tenantA, tenantB, `tenant-a-${tenantA}`, `tenant-b-${tenantB}`],
       );
       await client.query(
-        `insert into users (id, email, display_name, status) values ($1, 'a@test.local', 'User A', 'active'), ($2, 'b@test.local', 'User B', 'active')`,
-        [userA, userB],
+        `insert into users (id, auth0_subject, email, display_name, status) values ($1, $3, 'a@test.local', 'User A', 'active'), ($2, $4, 'b@test.local', 'User B', 'active')`,
+        [userA, userB, auth0SubjectA, auth0SubjectB],
       );
       await client.query(
         `insert into tenant_memberships (user_id, tenant_id, role) values ($1,$2,'operator'),($3,$4,'operator')`,
@@ -164,8 +168,8 @@ if (!runIntegration) {
       const client = await pool.connect();
       try {
         const privileges = await client.query(
-          `select has_function_privilege(current_user, 'public.check_tenant_membership(uuid, uuid)', 'execute') as executable,
-                  has_function_privilege('public', 'public.check_tenant_membership(uuid, uuid)', 'execute') as public_executable`,
+          `select has_function_privilege(current_user, 'public.check_tenant_membership(text, uuid)', 'execute') as executable,
+                  has_function_privilege('public', 'public.check_tenant_membership(text, uuid)', 'execute') as public_executable`,
         );
         if (!privileges.rows[0].executable)
           throw new Error("runtime role cannot execute membership bootstrap");
@@ -175,7 +179,7 @@ if (!runIntegration) {
         const result = await client.query(
           `select user_id as "userId", tenant_id as "tenantId", role, permissions, active
              from public.check_tenant_membership($1, $2)`,
-          [userA, tenantA],
+          [auth0SubjectA, tenantA],
         );
         if (
           result.rowCount !== 1 ||
@@ -187,6 +191,21 @@ if (!runIntegration) {
             "membership bootstrap returned an invalid authoritative result",
           );
         }
+      } finally {
+        client.release();
+      }
+    });
+
+    it("does not resolve an Auth0 subject from another tenant", async () => {
+      const client = await pool.connect();
+      try {
+        const result = await client.query(
+          `select user_id as "userId", tenant_id as "tenantId"
+             from public.check_tenant_membership($1, $2)`,
+          [auth0SubjectA, tenantB],
+        );
+        if (result.rowCount !== 0)
+          throw new Error("cross-tenant Auth0 subject resolved as a membership");
       } finally {
         client.release();
       }
