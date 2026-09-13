@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
+  MatchingCandidateRepository,
   PostgresFreightRepository,
-  VehicleRepository,
   type FreightRow,
 } from "@tms/database";
 import { rankCandidates, type MatchResult } from "@tms/matching";
@@ -63,11 +63,11 @@ function toFreight(row: FreightRow): Freight {
 @Injectable()
 export class MatchingService {
   private readonly freights: PostgresFreightRepository;
-  private readonly vehicles: VehicleRepository;
+  private readonly candidates: MatchingCandidateRepository;
 
   constructor(@Inject(DATABASE_POOL) pool: Pool) {
     this.freights = new PostgresFreightRepository(pool);
-    this.vehicles = new VehicleRepository(pool);
+    this.candidates = new MatchingCandidateRepository(pool);
   }
 
   async rank(
@@ -78,7 +78,7 @@ export class MatchingService {
     if (!row) throw new NotFoundException("Freight not found");
 
     const freight = toFreight(row);
-    const records = await this.vehicles.findMatchingCandidates(
+    const records = await this.candidates.findAvailable(
       context.tenantId,
       row.vehicleTypes,
       row.bodyTypes,
@@ -91,10 +91,15 @@ export class MatchingService {
     const candidates = records.map((record) => ({
       driverId: record.driverId,
       tenantId: record.tenantId,
+      vehicleId: record.vehicleId,
+      driverName: record.driverName,
+      plate: record.plate,
       vehicleType: record.vehicleType as VehicleType,
       bodyType: record.bodyType as BodyType,
       capacityKg: Number(record.capacityKg),
-      available: true,
+      freeMeters:
+        record.freeMeters === null ? undefined : Number(record.freeMeters),
+      available: record.availability === "available",
     }));
 
     assertMatchingTenant(context.tenantId, freight, candidates);

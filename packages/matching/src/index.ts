@@ -12,6 +12,10 @@ export interface MatchCandidate {
   bodyType: BodyType;
   capacityKg: number;
   available: boolean;
+  vehicleId?: string;
+  driverName?: string;
+  plate?: string;
+  freeMeters?: number;
   distanceKm?: number;
   routeCompatibility?: number;
   historicalReliability?: number;

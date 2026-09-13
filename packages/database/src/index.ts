@@ -28,6 +28,10 @@ export {
   VehicleRepository,
 } from "./operational-repositories.js";
 export {
+  MatchingCandidateRepository,
+  type EnrichedMatchingCandidateRecord,
+} from "./matching-candidate-repository.js";
+export {
   AssignmentRepository,
   type AssignmentResult,
   type FreightAssignmentRecord,
