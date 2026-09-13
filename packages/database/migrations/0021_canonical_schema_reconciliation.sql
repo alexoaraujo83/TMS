@@ -36,8 +36,22 @@ alter table compliance_checks
     or (status in ('approved', 'rejected', 'expired') and checked_at is not null)
   );
 
-alter table compliance_checks
-  add constraint compliance_checks_tenant_id_unique unique (tenant_id, id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.compliance_checks'::regclass
+      AND contype = 'u'
+      AND conkey = ARRAY[
+        (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.compliance_checks'::regclass AND attname = 'tenant_id'),
+        (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.compliance_checks'::regclass AND attname = 'id')
+      ]::smallint[]
+  ) THEN
+    ALTER TABLE compliance_checks
+      ADD CONSTRAINT compliance_checks_tenant_id_unique UNIQUE (tenant_id, id);
+  END IF;
+END $$;
 
 alter table compliance_checks
   drop constraint if exists compliance_checks_freight_fk;
@@ -101,8 +115,22 @@ alter table gr_requests
     or (status in ('expired', 'cancelled') and rejected_at is null)
   );
 
-alter table gr_requests
-  add constraint gr_requests_tenant_id_unique unique (tenant_id, id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.gr_requests'::regclass
+      AND contype = 'u'
+      AND conkey = ARRAY[
+        (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.gr_requests'::regclass AND attname = 'tenant_id'),
+        (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.gr_requests'::regclass AND attname = 'id')
+      ]::smallint[]
+  ) THEN
+    ALTER TABLE gr_requests
+      ADD CONSTRAINT gr_requests_tenant_id_unique UNIQUE (tenant_id, id);
+  END IF;
+END $$;
 
 alter table gr_requests
   drop constraint if exists gr_requests_freight_fk;
