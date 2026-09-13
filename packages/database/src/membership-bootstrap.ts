@@ -10,7 +10,7 @@ export interface MembershipBootstrapRecord {
 
 export async function verifyTenantMembership(
   pool: Pool,
-  userId: string,
+  auth0Subject: string,
   tenantId: string,
 ): Promise<MembershipBootstrapRecord | null> {
   const result = await pool.query<MembershipBootstrapRecord>(
@@ -21,7 +21,7 @@ export async function verifyTenantMembership(
             active
        from public.check_tenant_membership($1, $2)
       limit 1`,
-    [userId, tenantId],
+    [auth0Subject, tenantId],
   );
 
   return result.rows[0] ?? null;
