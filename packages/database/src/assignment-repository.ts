@@ -52,8 +52,20 @@ export class AssignmentRepository {
     assertUuid(vehicleId, "vehicleId");
 
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const freightResult = await client.query<{ id: string; status: string }>(
-        `select id, status from freights
+      const freightResult = await client.query<{
+        id: string;
+        status: string;
+        weightKg: string;
+        vehicleTypes: readonly string[];
+        bodyTypes: readonly string[];
+        minimumFreeMeters: string | null;
+        minimumCapacityKg: string | null;
+      }>(
+        `select id, status, weight_kg as "weightKg",
+                vehicle_types as "vehicleTypes", body_types as "bodyTypes",
+                minimum_free_meters as "minimumFreeMeters",
+                minimum_capacity_kg as "minimumCapacityKg"
+           from freights
           where tenant_id = $1 and id = $2
           for update`,
         [tenantId, freightId],
@@ -101,8 +113,15 @@ export class AssignmentRepository {
         id: string;
         driverId: string | null;
         status: string;
+        vehicleType: string;
+        bodyType: string;
+        capacityKg: string;
+        freeMeters: string | null;
       }>(
-        `select id, driver_id as "driverId", status from vehicles
+        `select id, driver_id as "driverId", status,
+                vehicle_type as "vehicleType", body_type as "bodyType",
+                capacity_kg as "capacityKg", free_meters as "freeMeters"
+           from vehicles
           where tenant_id = $1 and id = $2
           for update`,
         [tenantId, vehicleId],
@@ -114,6 +133,29 @@ export class AssignmentRepository {
       }
       if (vehicle.driverId !== driverId) {
         throw new Error("Vehicle is not assigned to the selected driver");
+      }
+
+      const requiredCapacityKg = Math.max(
+        Number(freight.weightKg),
+        Number(freight.minimumCapacityKg ?? 0),
+      );
+      const vehicleTypeMatches =
+        freight.vehicleTypes.length === 0 ||
+        freight.vehicleTypes.includes(vehicle.vehicleType);
+      const bodyTypeMatches =
+        freight.bodyTypes.length === 0 ||
+        freight.bodyTypes.includes(vehicle.bodyType);
+      const freeMetersMatches =
+        freight.minimumFreeMeters === null ||
+        (vehicle.freeMeters !== null &&
+          Number(vehicle.freeMeters) >= Number(freight.minimumFreeMeters));
+      if (
+        !vehicleTypeMatches ||
+        !bodyTypeMatches ||
+        Number(vehicle.capacityKg) < requiredCapacityKg ||
+        !freeMetersMatches
+      ) {
+        throw new Error("Vehicle does not satisfy freight matching requirements");
       }
 
       const existing = await client.query<{ id: string }>(
