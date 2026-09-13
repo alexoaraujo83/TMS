@@ -73,21 +73,24 @@ async function withJwks(
   }
 }
 
-test("verifyAccessToken accepts canonical Auth0 issuers with or without trailing slash", async () => {
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
+test(
+  "verifyAccessToken accepts canonical Auth0 issuers with or without trailing slash",
+  async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
 
-  await withJwks(publicKey, async () => {
-    const token = await signedToken(privateKey, { issuer: `${ISSUER}/` });
-    const claims = await verifyAccessToken(token, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      jwksUrl: JWKS_URL,
+    await withJwks(publicKey, async () => {
+      const token = await signedToken(privateKey, { issuer: `${ISSUER}/` });
+      const claims = await verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      });
+
+      assert.equal(claims.sub, "auth0|user-1");
+      assert.equal(claims.issuer, `${ISSUER}/`);
     });
-
-    assert.equal(claims.sub, "auth0|user-1");
-    assert.equal(claims.issuer, `${ISSUER}/`);
-  });
-});
+  },
+);
 
 test("verifyAccessToken accepts the Auth0 namespaced tenant claim", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
@@ -121,20 +124,23 @@ test("verifyAccessToken ignores a root tenantId claim", async () => {
   });
 });
 
-test("verifyAccessToken leaves tenant selection undefined when the token has no tenant claim", async () => {
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
+test(
+  "verifyAccessToken leaves tenant selection undefined when the token has no tenant claim",
+  async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
 
-  await withJwks(publicKey, async () => {
-    const token = await signedToken(privateKey);
-    const claims = await verifyAccessToken(token, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      jwksUrl: JWKS_URL,
+    await withJwks(publicKey, async () => {
+      const token = await signedToken(privateKey);
+      const claims = await verifyAccessToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        jwksUrl: JWKS_URL,
+      });
+
+      assert.equal(claims.tenantId, undefined);
     });
-
-    assert.equal(claims.tenantId, undefined);
-  });
-});
+  },
+);
 
 test("verifyAccessToken rejects an invalid audience", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
@@ -195,7 +201,13 @@ test("verifyAccessToken rejects an unknown signing key", async () => {
     new Response(
       JSON.stringify({
         keys: [
-          { ...jwk, kty: "RSA", use: "sig", alg: "RS256", kid: "other-key" },
+          {
+            ...jwk,
+            kty: "RSA",
+            use: "sig",
+            alg: "RS256",
+            kid: "other-key",
+          },
         ],
       }),
       { headers: { "content-type": "application/json" } },
