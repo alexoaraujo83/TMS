@@ -1,19 +1,42 @@
 -- Extend the canonical tenant IAM baseline with compliance permissions.
 -- Keep the routine executor-compatible and preserve tenant-scoped role assignment.
 
-create or replace function public.provision_tenant_iam(p_tenant_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public, pg_catalog
-as E'BEGIN\n  INSERT INTO roles (tenant_id, name, description)\n  VALUES (p_tenant_id, \'admin\', \'Full tenant administration\')\n  ON CONFLICT (tenant_id, name) DO UPDATE\n    SET description = excluded.description;\n\n  INSERT INTO roles (tenant_id, name, description)\n  VALUES (p_tenant_id, \'operator\', \'Operational freight, trip and compliance execution\')\n  ON CONFLICT (tenant_id, name) DO UPDATE\n    SET description = excluded.description;\n\n  INSERT INTO role_permissions (role_id, permission_id)\n  SELECT r.id, p.id\n    FROM roles r\n    CROSS JOIN permissions p\n   WHERE r.tenant_id = p_tenant_id\n     AND r.name = \'admin\'\n  ON CONFLICT DO NOTHING;\n\n  INSERT INTO role_permissions (role_id, permission_id)\n  SELECT r.id, p.id\n    FROM roles r\n    CROSS JOIN permissions p\n   WHERE r.tenant_id = p_tenant_id\n     AND r.name = \'operator\'\n     AND p.code IN (\n       \'freight:read\', \'freight:create\', \'freight:update\',\n       \'driver:read\', \'driver:create\', \'driver:update\',\n       \'vehicle:read\', \'vehicle:create\', \'vehicle:update\',\n       \'carrier:read\', \'carrier:create\', \'carrier:update\',\n       \'matching:read\', \'matching:assign\',\n       \'trip:read\', \'trip:create\', \'trip:update\',\n       \'compliance:read\', \'compliance:create\', \'compliance:update\'\n     )\n  ON CONFLICT DO NOTHING;\n\n  RETURN;\nEND;';
+insert into roles (tenant_id, name, description)
+select t.id, r.name, r.description
+from tenants t
+cross join (values
+  ('admin', 'Full tenant administration'),
+  ('operator', 'Operational freight, trip and compliance execution')
+) as r(name, description)
+on conflict (tenant_id, name) do update
+set description = excluded.description;
 
-revoke all on function public.provision_tenant_iam(uuid) from public;
-grant execute on function public.provision_tenant_iam(uuid) to current_user;
+insert into role_permissions (role_id, permission_id)
+select r.id, p.id
+from roles r
+cross join permissions p
+where r.name = 'admin'
+on conflict do nothing;
 
--- Re-run the canonical provisioning after compliance permissions exist so
--- existing tenants receive the newly introduced operator/admin permissions.
-select public.provision_tenant_iam(id) from tenants;
+insert into role_permissions (role_id, permission_id)
+select r.id, p.id
+from roles r
+cross join permissions p
+where r.name = 'operator'
+  and p.code in (
+    'freight:read', 'freight:create', 'freight:update',
+    'driver:read', 'driver:create', 'driver:update',
+    'vehicle:read', 'vehicle:create', 'vehicle:update',
+    'carrier:read', 'carrier:create', 'carrier:update',
+    'matching:read', 'matching:assign',
+    'trip:read', 'trip:create', 'trip:update',
+    'compliance:read', 'compliance:create', 'compliance:update'
+  )
+on conflict do nothing;
 
-comment on function public.provision_tenant_iam(uuid) is
-'Creates canonical tenant admin/operator roles and maps effective permissions, including compliance.';
+update tenant_memberships tm
+set role_id = r.id
+from roles r
+where r.tenant_id = tm.tenant_id
+  and r.name = tm.role
+  and tm.role_id is distinct from r.id;
