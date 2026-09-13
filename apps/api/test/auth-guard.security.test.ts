@@ -136,7 +136,8 @@ test("AuthGuard rejects missing authentication", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) => error instanceof Error && error.message === "Authentication required",
+    (error: unknown) =>
+      error instanceof Error && error.message === "Authentication required",
   );
 });
 
