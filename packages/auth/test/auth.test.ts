@@ -5,7 +5,7 @@ import { NEXORA_TENANT_ID_CLAIM, verifyAccessToken } from "../src/index.ts";
 
 test("verifyAccessToken accepts a valid RS256 token with the Auth0 namespaced tenant claim", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
-  const issuer = "https://tenant.example.auth0.com/";
+  const issuer = "https://tenant.example.auth0.com";
   const audience = "urn:nexora:tms:api:development";
   const token = await new SignJWT({
     [NEXORA_TENANT_ID_CLAIM]: "tenant-a",
@@ -51,7 +51,7 @@ test("verifyAccessToken accepts a valid RS256 token with the Auth0 namespaced te
 
 test("verifyAccessToken ignores a root tenantId claim", async () => {
   const { privateKey, publicKey } = await generateKeyPair("RS256");
-  const issuer = "https://tenant.example.auth0.com/";
+  const issuer = "https://tenant.example.auth0.com";
   const audience = "urn:nexora:tms:api:development";
   const token = await new SignJWT({
     tenantId: "ignored-root-claim",
