@@ -12,7 +12,7 @@
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "format": "prettier --write .",
-    "format:check": "prettier --write apps/api/test/auth-guard.security.test.ts && git diff -- apps/api/test/auth-guard.security.test.ts && prettier --check .",
+    "format:check": "prettier --check .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
