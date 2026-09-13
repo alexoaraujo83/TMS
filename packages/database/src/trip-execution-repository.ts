@@ -3,7 +3,15 @@ import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
 import { assertUuid } from "./query.js";
 import { withTransaction } from "./transaction.js";
 
-export const occurrenceTypes = ["delay", "accident", "breakdown", "cargo_damage", "refusal", "address_issue", "other"] as const;
+export const occurrenceTypes = [
+  "delay",
+  "accident",
+  "breakdown",
+  "cargo_damage",
+  "refusal",
+  "address_issue",
+  "other",
+] as const;
 export const occurrenceSeverities = ["info", "warning", "critical"] as const;
 export type TripOccurrenceType = (typeof occurrenceTypes)[number];
 export type TripOccurrenceSeverity = (typeof occurrenceSeverities)[number];
@@ -81,17 +89,34 @@ const POD_COLUMNS = `id,
 export class TripExecutionRepository {
   constructor(private readonly pool: Pool) {}
 
-  async createOccurrence(tenantId: string, tripId: string, input: CreateOccurrenceInput, audit: AuditInput) {
+  async createOccurrence(
+    tenantId: string,
+    tripId: string,
+    input: CreateOccurrenceInput,
+    audit: AuditInput,
+  ) {
     assertUuid(tenantId, "tenantId");
     assertUuid(tripId, "tripId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const trip = await client.query(`select id from trips where tenant_id = $1 and id = $2`, [tenantId, tripId]);
+      const trip = await client.query(
+        `select id from trips where tenant_id = $1 and id = $2`,
+        [tenantId, tripId],
+      );
       if (!trip.rows[0]) throw new Error("Trip not found");
       const result = await client.query<TripOccurrenceRecord>(
         `insert into trip_occurrences (tenant_id, trip_id, type, severity, description, occurred_at, metadata, created_by)
          values ($1, $2, $3, $4, $5, coalesce($6, now()), $7, $8)
          returning ${OCCURRENCE_COLUMNS}`,
-        [tenantId, tripId, input.type, input.severity, input.description, input.occurredAt ?? null, JSON.stringify(input.metadata ?? {}), audit.actorUserId],
+        [
+          tenantId,
+          tripId,
+          input.type,
+          input.severity,
+          input.description,
+          input.occurredAt ?? null,
+          JSON.stringify(input.metadata ?? {}),
+          audit.actorUserId,
+        ],
       );
       const occurrence = result.rows[0];
       if (!occurrence) throw new Error("Occurrence creation failed");
@@ -101,7 +126,11 @@ export class TripExecutionRepository {
         entityId: occurrence.id,
         action: "trip.occurrence_created",
         entityType: "trip_occurrence",
-        afterState: { tripId, type: input.type, severity: input.severity },
+        afterState: {
+          tripId,
+          type: input.type,
+          severity: input.severity,
+        },
       });
       return occurrence;
     });
@@ -119,20 +148,42 @@ export class TripExecutionRepository {
     });
   }
 
-  async createPod(tenantId: string, tripId: string, input: CreatePodInput, audit: AuditInput) {
+  async createPod(
+    tenantId: string,
+    tripId: string,
+    input: CreatePodInput,
+    audit: AuditInput,
+  ) {
     assertUuid(tenantId, "tenantId");
     assertUuid(tripId, "tripId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const trip = await client.query<{ status: string }>(`select status from trips where tenant_id = $1 and id = $2 for update`, [tenantId, tripId]);
+      const trip = await client.query<{ status: string }>(
+        `select status from trips where tenant_id = $1 and id = $2 for update`,
+        [tenantId, tripId],
+      );
       if (!trip.rows[0]) throw new Error("Trip not found");
-      if (trip.rows[0].status !== "delivered") throw new Error("POD requires a delivered trip");
-      const existing = await client.query(`select id from trip_pods where tenant_id = $1 and trip_id = $2`, [tenantId, tripId]);
+      if (trip.rows[0].status !== "delivered") {
+        throw new Error("POD requires a delivered trip");
+      }
+      const existing = await client.query(
+        `select id from trip_pods where tenant_id = $1 and trip_id = $2`,
+        [tenantId, tripId],
+      );
       if (existing.rows[0]) throw new Error("POD already exists for trip");
       const result = await client.query<TripPodRecord>(
         `insert into trip_pods (tenant_id, trip_id, recipient_name, received_at, document_ref, notes, metadata, created_by)
          values ($1, $2, $3, $4, $5, $6, $7, $8)
          returning ${POD_COLUMNS}`,
-        [tenantId, tripId, input.recipientName, input.receivedAt, input.documentRef, input.notes ?? null, JSON.stringify(input.metadata ?? {}), audit.actorUserId],
+        [
+          tenantId,
+          tripId,
+          input.recipientName,
+          input.receivedAt,
+          input.documentRef,
+          input.notes ?? null,
+          JSON.stringify(input.metadata ?? {}),
+          audit.actorUserId,
+        ],
       );
       const pod = result.rows[0];
       if (!pod) throw new Error("POD creation failed");
@@ -142,7 +193,12 @@ export class TripExecutionRepository {
         entityId: pod.id,
         action: "trip.pod_created",
         entityType: "trip_pod",
-        afterState: { tripId, recipientName: input.recipientName, receivedAt: input.receivedAt.toISOString(), documentRef: input.documentRef },
+        afterState: {
+          tripId,
+          recipientName: input.recipientName,
+          receivedAt: input.receivedAt.toISOString(),
+          documentRef: input.documentRef,
+        },
       });
       return pod;
     });
@@ -164,7 +220,10 @@ export class TripExecutionRepository {
     assertUuid(tenantId, "tenantId");
     assertUuid(tripId, "tripId");
     return withTransaction(this.pool, { tenantId }, async (client) => {
-      const trip = await client.query(`select id from trips where tenant_id = $1 and id = $2`, [tenantId, tripId]);
+      const trip = await client.query(
+        `select id from trips where tenant_id = $1 and id = $2`,
+        [tenantId, tripId],
+      );
       if (!trip.rows[0]) throw new Error("Trip not found");
       const result = await client.query(
         `with events as (

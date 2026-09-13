@@ -1,4 +1,12 @@
-import { IsIn, IsISO8601, IsObject, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import {
+  IsIn,
+  IsISO8601,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 import { occurrenceSeverities, occurrenceTypes } from "@tms/database";
 
 export class CreateOccurrenceDto {

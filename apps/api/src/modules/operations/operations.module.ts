@@ -10,6 +10,11 @@ import { TripExecutionService } from "./trip-execution.service.js";
 @Module({
   imports: [DatabaseModule],
   controllers: [OperationsController, TripExecutionController],
-  providers: [OperationsService, TripExecutionService, AuthGuard, PermissionGuard],
+  providers: [
+    OperationsService,
+    TripExecutionService,
+    AuthGuard,
+    PermissionGuard,
+  ],
 })
 export class OperationsModule {}
