@@ -8,7 +8,8 @@ import { TripExecutionRepository } from "../src/trip-execution-repository.js";
 import { TripRepository } from "../src/trip-repository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
-const enabled = process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
+const enabled =
+  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
 if (!enabled) {
   describe("trip execution integration", () => {
@@ -28,7 +29,10 @@ if (!enabled) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      await client.query("select set_config($1, $2, true)", ["app.tenant_id", tenantId]);
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
       const result = await client.query<T>(text, values);
       await client.query("commit");
       return result;
@@ -123,7 +127,9 @@ if (!enabled) {
           [tenantId, freightId],
         )
       ).rows[0].id;
-      tripId = (await trips.create(tenantId, freightId, assignmentId, audit)).id;
+      tripId = (
+        await trips.create(tenantId, freightId, assignmentId, audit)
+      ).id;
     } finally {
       client.release();
     }
