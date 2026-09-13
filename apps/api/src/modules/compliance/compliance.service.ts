@@ -134,3 +134,5 @@ export class ComplianceService {
       .catch(mapError);
   }
 }
+
+// Temporary CI formatter diagnostic trigger.
