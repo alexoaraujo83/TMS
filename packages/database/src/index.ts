@@ -71,6 +71,7 @@ export {
   type EnqueueOutboxEventInput,
   type OutboxEventRecord,
   type OutboxEventStatus,
+  type OutboxFailureOptions,
 } from "./outbox-repository.js";
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";

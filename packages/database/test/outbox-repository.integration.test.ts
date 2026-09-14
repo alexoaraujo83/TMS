@@ -92,7 +92,91 @@ if (!enabled) {
     assert.equal(published.status, "published");
     assert.ok(published.publishedAt instanceof Date);
 
-    await assert.rejects(outbox.markPublished(tenantId, event.id), /OUTBOX_EVENT_NOT_PUBLISHABLE/);
+    await assert.rejects(
+      outbox.markPublished(tenantId, event.id),
+      /OUTBOX_EVENT_NOT_PUBLISHABLE/,
+    );
+  });
+
+  it("claims pending events and increments attempts atomically", async () => {
+    const first = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.created",
+    });
+    const second = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.updated",
+    });
+
+    const claimed = await outbox.claimPending(tenantId, 2);
+    assert.deepEqual(
+      claimed.map((event) => event.id),
+      [first.id, second.id],
+    );
+    assert.deepEqual(
+      claimed.map((event) => event.attempts),
+      [1, 1],
+    );
+    assert.equal(
+      claimed.every((event) => event.availableAt.getTime() > Date.now()),
+      true,
+    );
+    assert.deepEqual(await outbox.listPending(tenantId), []);
+  });
+
+  it("uses skip-locked claims to avoid duplicate concurrent work", async () => {
+    const first = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.created",
+    });
+    const second = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.updated",
+    });
+
+    const [claimA, claimB] = await Promise.all([
+      outbox.claimPending(tenantId, 1),
+      outbox.claimPending(tenantId, 1),
+    ]);
+    const claimedIds = [claimA[0]?.id, claimB[0]?.id].filter(
+      (id): id is string => Boolean(id),
+    );
+
+    assert.deepEqual(new Set(claimedIds), new Set([first.id, second.id]));
+  });
+
+  it("retries failures and moves an exhausted event to failed", async () => {
+    const event = await outbox.enqueue({
+      tenantId,
+      aggregateType: "finance",
+      eventType: "financial_entry.created",
+    });
+
+    const claimed = await outbox.claimPending(tenantId, 1);
+    assert.equal(claimed[0]?.id, event.id);
+
+    const retry = await outbox.markFailed(tenantId, event.id, "temporary", {
+      maxAttempts: 2,
+      retryAt: new Date(),
+    });
+    assert.equal(retry.status, "pending");
+    assert.equal(retry.lastError, "temporary");
+    assert.equal(retry.attempts, 1);
+
+    const claimedAgain = await outbox.claimPending(tenantId, 1);
+    assert.equal(claimedAgain[0]?.id, event.id);
+    assert.equal(claimedAgain[0]?.attempts, 2);
+
+    const failed = await outbox.markFailed(tenantId, event.id, "permanent", {
+      maxAttempts: 2,
+    });
+    assert.equal(failed.status, "failed");
+    assert.equal(failed.attempts, 2);
+    assert.equal(failed.lastError, "permanent");
   });
 
   it("isolates events by tenant", async () => {
