@@ -1,0 +1,157 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  DurableJobProcessor,
+  type DurableJob,
+  type DurableJobStore,
+  retryDelayMs,
+} from "./durable-jobs-worker.js";
+
+function job(overrides: Partial<DurableJob> = {}): DurableJob {
+  return {
+    id: crypto.randomUUID(),
+    tenantId: "00000000-0000-0000-0000-000000000001",
+    jobType: "test.job",
+    payload: {},
+    status: "running",
+    attempts: 1,
+    maxAttempts: 5,
+    availableAt: new Date(),
+    leaseToken: crypto.randomUUID(),
+    lastError: null,
+    completedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+class FakeStore implements DurableJobStore {
+  completed: Array<[string, string, string]> = [];
+  failed: Array<[string, string, string, string, Date]> = [];
+
+  constructor(private readonly jobs: DurableJob[]) {}
+
+  async claimPending(): Promise<DurableJob[]> {
+    return this.jobs;
+  }
+
+  async complete(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+  ): Promise<DurableJob> {
+    this.completed.push([tenantId, id, leaseToken]);
+    return job({ id, tenantId, leaseToken, status: "completed" });
+  }
+
+  async fail(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+    error: string,
+    retryAt: Date,
+  ): Promise<DurableJob> {
+    this.failed.push([tenantId, id, leaseToken, error, retryAt]);
+    return job({ id, tenantId, leaseToken, status: "failed" });
+  }
+}
+
+test("retry delay doubles and is capped", () => {
+  assert.equal(retryDelayMs(1), 1000);
+  assert.equal(retryDelayMs(2), 2000);
+  assert.equal(retryDelayMs(3), 4000);
+  assert.equal(retryDelayMs(20), 300000);
+});
+
+test("successful jobs complete with their lease token", async () => {
+  const first = job();
+  const second = job();
+  const store = new FakeStore([first, second]);
+  const handled: string[] = [];
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([
+      [
+        "test.job",
+        async (current) => {
+          handled.push(current.id);
+        },
+      ],
+    ]),
+  );
+
+  const result = await processor.process(first.tenantId, 50);
+
+  assert.deepEqual(result, { claimed: 2, completed: 2, failed: 0 });
+  assert.deepEqual(handled, [first.id, second.id]);
+  assert.deepEqual(store.completed, [
+    [first.tenantId, first.id, first.leaseToken!],
+    [second.tenantId, second.id, second.leaseToken!],
+  ]);
+});
+
+test("one failing job does not stop the batch", async () => {
+  const first = job({ id: "job-fails" });
+  const second = job({ id: "job-succeeds" });
+  const store = new FakeStore([first, second]);
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([
+      [
+        "test.job",
+        async (current) => {
+          if (current.id === first.id) throw new Error("handler failed");
+        },
+      ],
+    ]),
+    { now: () => 1_000_000 },
+  );
+
+  const result = await processor.process(first.tenantId, 50);
+
+  assert.deepEqual(result, { claimed: 2, completed: 1, failed: 1 });
+  assert.equal(store.failed[0]?.[3], "handler failed");
+  assert.equal(store.failed[0]?.[4].getTime(), 1_001_000);
+  assert.equal(store.completed[0]?.[1], second.id);
+});
+
+test("unknown job types are failed and do not abort later jobs", async () => {
+  const unknown = job({ id: "unknown", jobType: "missing.job" });
+  const known = job({ id: "known" });
+  const store = new FakeStore([unknown, known]);
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([["test.job", async () => undefined]]),
+  );
+
+  const result = await processor.process(unknown.tenantId, 50);
+
+  assert.deepEqual(result, { claimed: 2, completed: 1, failed: 1 });
+  assert.equal(store.failed[0]?.[3], "DURABLE_JOB_HANDLER_NOT_FOUND:missing.job");
+  assert.equal(store.completed[0]?.[1], known.id);
+});
+
+test("long non-Error failures are truncated before persistence", async () => {
+  const current = job();
+  const store = new FakeStore([current]);
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([["test.job", async () => { throw "x".repeat(5000); }]]),
+  );
+
+  await processor.process(current.tenantId, 50);
+
+  assert.equal(store.failed[0]?.[3].length, 4000);
+});
+
+test("empty batches are a no-op", async () => {
+  const store = new FakeStore([]);
+  const processor = new DurableJobProcessor(store, new Map());
+
+  assert.deepEqual(await processor.process("00000000-0000-0000-0000-000000000001"), {
+    claimed: 0,
+    completed: 0,
+    failed: 0,
+  });
+});
