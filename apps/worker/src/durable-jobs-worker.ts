@@ -1,10 +1,20 @@
-import type { DurableJobRecord } from "../../packages/database/src/durable-jobs-repository.js";
+export interface DurableJob {
+  id: string;
+  tenantId: string;
+  jobType: string;
+  payload: Record<string, unknown>;
+  status: "pending" | "running" | "completed" | "failed";
+  attempts: number;
+  maxAttempts: number;
+  availableAt: Date;
+  leaseToken: string | null;
+  lastError: string | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export type DurableJob = DurableJobRecord;
-
-export type DurableJobHandler = (
-  job: DurableJob,
-) => Promise<void>;
+export type DurableJobHandler = (job: DurableJob) => Promise<void>;
 
 export interface DurableJobStore {
   claimPending(tenantId: string, limit: number): Promise<DurableJob[]>;
