@@ -1,15 +1,12 @@
 import type { Pool } from "pg";
-import { withTenantContext } from "./tenant-context.js";
+import { withTenantTransaction } from "./tenant-context.js";
 import type { DurableJob, DurableJobStore } from "./durable-jobs-worker.js";
 
 export class PgDurableJobStore implements DurableJobStore {
   constructor(private readonly pool: Pool) {}
 
   async claimPending(tenantId: string, limit: number): Promise<DurableJob[]> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("begin");
-      await withTenantContext(client, tenantId);
+    return withTenantTransaction(this.pool, tenantId, async (client) => {
       const result = await client.query(
         `with claimed as (
            select id, gen_random_uuid() as lease_token
@@ -33,14 +30,8 @@ export class PgDurableJobStore implements DurableJobStore {
            available_at, lease_token, last_error, completed_at, created_at, updated_at`,
         [tenantId, limit],
       );
-      await client.query("commit");
       return result.rows.map(mapJob);
-    } catch (error) {
-      await client.query("rollback");
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async complete(
@@ -86,7 +77,7 @@ export class PgDurableJobStore implements DurableJobStore {
     extraParams: unknown[],
     errorCode: string,
   ): Promise<DurableJob> {
-    return withTenantContext(this.pool, tenantId, async (client) => {
+    return withTenantTransaction(this.pool, tenantId, async (client) => {
       const result = await client.query(
         `update durable_jobs
          ${setClause}
