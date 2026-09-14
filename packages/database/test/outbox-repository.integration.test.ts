@@ -82,18 +82,28 @@ if (!enabled) {
     assert.equal(event.tenantId, tenantId);
     assert.equal(event.status, "pending");
     assert.equal(event.attempts, 0);
+    assert.equal(event.leaseToken, null);
     assert.deepEqual(event.payload, { source: "integration-test" });
 
     const pending = await outbox.listPending(tenantId);
     assert.equal(pending.length, 1);
     assert.equal(pending[0]?.id, event.id);
 
-    const published = await outbox.markPublished(tenantId, event.id);
+    const claimed = await outbox.claimPending(tenantId, 1);
+    assert.equal(claimed[0]?.id, event.id);
+    assert.ok(claimed[0]?.leaseToken);
+
+    const published = await outbox.markPublished(
+      tenantId,
+      event.id,
+      claimed[0]!.leaseToken!,
+    );
     assert.equal(published.status, "published");
+    assert.equal(published.leaseToken, null);
     assert.ok(published.publishedAt instanceof Date);
 
     await assert.rejects(
-      outbox.markPublished(tenantId, event.id),
+      outbox.markPublished(tenantId, event.id, claimed[0]!.leaseToken!),
       /OUTBOX_EVENT_NOT_PUBLISHABLE/,
     );
   });
@@ -123,6 +133,7 @@ if (!enabled) {
       claimed.every((event) => event.availableAt.getTime() > Date.now()),
       true,
     );
+    assert.equal(claimed.every((event) => Boolean(event.leaseToken)), true);
     assert.deepEqual(await outbox.listPending(tenantId), []);
   });
 
@@ -147,6 +158,46 @@ if (!enabled) {
     );
 
     assert.deepEqual(new Set(claimedIds), new Set([first.id, second.id]));
+    assert.notEqual(claimA[0]?.leaseToken, claimB[0]?.leaseToken);
+  });
+
+  it("rejects stale lease finalization after an event is reclaimed", async () => {
+    const event = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.created",
+    });
+
+    const firstClaim = await outbox.claimPending(tenantId, 1);
+    const firstLease = firstClaim[0]?.leaseToken;
+    assert.ok(firstLease);
+
+    const client = await pool.connect();
+    try {
+      await client.query(
+        "update outbox_events set available_at = now() where id = $1",
+        [event.id],
+      );
+    } finally {
+      client.release();
+    }
+
+    const secondClaim = await outbox.claimPending(tenantId, 1);
+    const secondLease = secondClaim[0]?.leaseToken;
+    assert.ok(secondLease);
+    assert.notEqual(firstLease, secondLease);
+
+    await assert.rejects(
+      outbox.markPublished(tenantId, event.id, firstLease),
+      /OUTBOX_EVENT_NOT_PUBLISHABLE/,
+    );
+
+    const published = await outbox.markPublished(
+      tenantId,
+      event.id,
+      secondLease,
+    );
+    assert.equal(published.status, "published");
   });
 
   it("retries failures and moves an exhausted event to failed", async () => {
@@ -159,11 +210,18 @@ if (!enabled) {
     const claimed = await outbox.claimPending(tenantId, 1);
     assert.equal(claimed[0]?.id, event.id);
 
-    const retry = await outbox.markFailed(tenantId, event.id, "temporary", {
-      maxAttempts: 2,
-      retryAt: new Date(),
-    });
+    const retry = await outbox.markFailed(
+      tenantId,
+      event.id,
+      claimed[0]!.leaseToken!,
+      "temporary",
+      {
+        maxAttempts: 2,
+        retryAt: new Date(),
+      },
+    );
     assert.equal(retry.status, "pending");
+    assert.equal(retry.leaseToken, null);
     assert.equal(retry.lastError, "temporary");
     assert.equal(retry.attempts, 1);
 
@@ -171,10 +229,17 @@ if (!enabled) {
     assert.equal(claimedAgain[0]?.id, event.id);
     assert.equal(claimedAgain[0]?.attempts, 2);
 
-    const failed = await outbox.markFailed(tenantId, event.id, "permanent", {
-      maxAttempts: 2,
-    });
+    const failed = await outbox.markFailed(
+      tenantId,
+      event.id,
+      claimedAgain[0]!.leaseToken!,
+      "permanent",
+      {
+        maxAttempts: 2,
+      },
+    );
     assert.equal(failed.status, "failed");
+    assert.equal(failed.leaseToken, null);
     assert.equal(failed.attempts, 2);
     assert.equal(failed.lastError, "permanent");
   });
@@ -189,7 +254,7 @@ if (!enabled) {
 
     assert.deepEqual(await outbox.listPending(otherTenantId), []);
     await assert.rejects(
-      outbox.markPublished(otherTenantId, event.id),
+      outbox.markPublished(otherTenantId, event.id, randomUUID()),
       /OUTBOX_EVENT_NOT_PUBLISHABLE/,
     );
   });
