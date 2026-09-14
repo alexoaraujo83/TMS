@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
+import { assertComplianceRelease } from "./compliance-release.js";
 import { assertUuid } from "./query.js";
 import { withTransaction } from "./transaction.js";
 
@@ -119,6 +120,7 @@ export class AssignmentRepository {
           `Freight status ${freight.status} is not eligible for assignment`,
         );
       }
+      await assertComplianceRelease(client, tenantId, freightId);
 
       const driverResult = await client.query<{
         id: string;
