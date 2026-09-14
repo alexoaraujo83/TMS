@@ -92,6 +92,7 @@ export class OutboxRepository {
          )
          update outbox_events as event
          set attempts = event.attempts + 1,
+             available_at = now() + interval '5 minutes',
              updated_at = now()
          from claimed
          where event.id = claimed.id
