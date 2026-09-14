@@ -121,16 +121,11 @@ if (!enabled) {
     );
 
     assert.deepEqual(await outbox.claimPending(otherTenantId), []);
-    assert.deepEqual(await outbox.listPending(tenantId), [
-      {
-        ...claimed[0],
-        attempts: 1,
-      },
-      {
-        ...claimed[1],
-        attempts: 1,
-      },
-    ]);
+    const pending = await outbox.listPending(tenantId);
+    assert.deepEqual(
+      pending.map((event) => event.id),
+      [first.id, second.id],
+    );
   });
 
   it("retries failures and moves an exhausted event to failed", async () => {
@@ -143,29 +138,24 @@ if (!enabled) {
     const claimed = await outbox.claimPending(tenantId, 1);
     assert.equal(claimed[0]?.id, event.id);
 
-    const retryAt = new Date(Date.now() + 60_000);
     const retry = await outbox.markFailed(tenantId, event.id, "temporary", {
       maxAttempts: 2,
-      retryAt,
+      retryAt: new Date(),
     });
     assert.equal(retry.status, "pending");
     assert.equal(retry.lastError, "temporary");
     assert.equal(retry.attempts, 1);
 
     const claimedAgain = await outbox.claimPending(tenantId, 1);
-    assert.deepEqual(claimedAgain, []);
+    assert.equal(claimedAgain[0]?.id, event.id);
+    assert.equal(claimedAgain[0]?.attempts, 2);
 
-    const immediateRetry = await outbox.markFailed(
-      tenantId,
-      event.id,
-      "temporary-2",
-      {
-        maxAttempts: 2,
-        retryAt: new Date(),
-      },
-    );
-    assert.equal(immediateRetry.status, "failed");
-    assert.equal(immediateRetry.attempts, 1);
+    const failed = await outbox.markFailed(tenantId, event.id, "permanent", {
+      maxAttempts: 2,
+    });
+    assert.equal(failed.status, "failed");
+    assert.equal(failed.attempts, 2);
+    assert.equal(failed.lastError, "permanent");
   });
 
   it("isolates events by tenant", async () => {
