@@ -3,6 +3,7 @@ import { DurableJobProcessor } from "./durable-jobs-worker.js";
 import { PgDurableJobStore } from "./durable-jobs-store.js";
 import { OutboxProcessor } from "./outbox-worker.js";
 import { PgOutboxStore } from "./outbox-store.js";
+import { WebhookPublisher } from "./webhook-publisher.js";
 
 function positiveIntegerEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -21,8 +22,13 @@ const tenantIds = (process.env.OUTBOX_TENANT_IDS ?? "")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+const webhookUrls = (process.env.OUTBOX_WEBHOOK_URLS ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const intervalMs = positiveIntegerEnv("OUTBOX_POLL_INTERVAL_MS", 5000);
 const batchSize = positiveIntegerEnv("OUTBOX_BATCH_SIZE", 50);
+const webhookTimeoutMs = positiveIntegerEnv("OUTBOX_WEBHOOK_TIMEOUT_MS", 10000);
 const durableJobsEnabled = process.env.DURABLE_JOBS_ENABLED === "true";
 
 const startedAt = new Date().toISOString();
@@ -35,6 +41,7 @@ console.log(
     durableJobsEnabled,
     intervalMs,
     batchSize,
+    webhookEndpoints: webhookUrls.length,
   }),
 );
 
@@ -49,7 +56,16 @@ if (!databaseUrl || tenantIds.length === 0) {
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
   const outboxStore = new PgOutboxStore(pool);
+  const webhookPublisher = new WebhookPublisher(webhookUrls, {
+    timeoutMs: webhookTimeoutMs,
+    secret: process.env.OUTBOX_WEBHOOK_SECRET,
+  });
   const outboxProcessor = new OutboxProcessor(outboxStore, async (event) => {
+    if (webhookUrls.length > 0) {
+      await webhookPublisher.publish(event);
+      return;
+    }
+
     console.log(
       JSON.stringify({
         event: "outbox.dispatch",
