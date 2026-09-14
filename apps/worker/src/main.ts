@@ -4,13 +4,25 @@ import { PgDurableJobStore } from "./durable-jobs-store.js";
 import { OutboxProcessor } from "./outbox-worker.js";
 import { PgOutboxStore } from "./outbox-store.js";
 
+function positiveIntegerEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`INVALID_WORKER_CONFIG:${name}`);
+  }
+
+  return value;
+}
+
 const databaseUrl = process.env.DATABASE_URL;
 const tenantIds = (process.env.OUTBOX_TENANT_IDS ?? "")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
-const intervalMs = Number(process.env.OUTBOX_POLL_INTERVAL_MS ?? 5000);
-const batchSize = Number(process.env.OUTBOX_BATCH_SIZE ?? 50);
+const intervalMs = positiveIntegerEnv("OUTBOX_POLL_INTERVAL_MS", 5000);
+const batchSize = positiveIntegerEnv("OUTBOX_BATCH_SIZE", 50);
 const durableJobsEnabled = process.env.DURABLE_JOBS_ENABLED === "true";
 
 const startedAt = new Date().toISOString();
@@ -21,6 +33,8 @@ console.log(
     startedAt,
     configuredTenants: tenantIds.length,
     durableJobsEnabled,
+    intervalMs,
+    batchSize,
   }),
 );
 
@@ -66,51 +80,100 @@ if (!databaseUrl || tenantIds.length === 0) {
     ]),
   );
 
-  let running = false;
-  const run = async () => {
-    if (running) return;
-    running = true;
-    try {
-      for (const tenantId of tenantIds) {
-        const outboxResult = await outboxProcessor.process(tenantId, batchSize);
-        if (outboxResult.claimed > 0) {
-          console.log(
-            JSON.stringify({
-              event: "outbox.processed",
-              tenantId,
-              ...outboxResult,
-            }),
-          );
-        }
+  let shuttingDown = false;
+  let activeRun: Promise<void> | null = null;
 
-        if (durableJobsEnabled) {
-          const durableJobResult = await durableJobProcessor.process(
+  const run = async () => {
+    if (shuttingDown || activeRun) return;
+
+    const execution = (async () => {
+      const runStartedAt = Date.now();
+      try {
+        for (const tenantId of tenantIds) {
+          if (shuttingDown) break;
+
+          const outboxResult = await outboxProcessor.process(
             tenantId,
             batchSize,
           );
-          if (durableJobResult.claimed > 0) {
+          if (outboxResult.claimed > 0) {
             console.log(
               JSON.stringify({
-                event: "durable_job.processed",
+                event: "outbox.processed",
                 tenantId,
-                ...durableJobResult,
+                durationMs: Date.now() - runStartedAt,
+                ...outboxResult,
               }),
             );
           }
+
+          if (durableJobsEnabled && !shuttingDown) {
+            const durableJobResult = await durableJobProcessor.process(
+              tenantId,
+              batchSize,
+            );
+            if (durableJobResult.claimed > 0) {
+              console.log(
+                JSON.stringify({
+                  event: "durable_job.processed",
+                  tenantId,
+                  durationMs: Date.now() - runStartedAt,
+                  ...durableJobResult,
+                }),
+              );
+            }
+          }
         }
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            event: "worker.error",
+            error: error instanceof Error ? error.message : String(error),
+            durationMs: Date.now() - runStartedAt,
+          }),
+        );
       }
-    } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: "worker.error",
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      );
+    })();
+
+    activeRun = execution;
+    try {
+      await execution;
     } finally {
-      running = false;
+      activeRun = null;
     }
   };
 
+  const timer = setInterval(() => void run(), intervalMs);
+
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    clearInterval(timer);
+
+    console.log(
+      JSON.stringify({
+        service: "tms-worker",
+        status: "stopping",
+        signal,
+      }),
+    );
+
+    if (activeRun) {
+      await activeRun;
+    }
+
+    await pool.end();
+
+    console.log(
+      JSON.stringify({
+        service: "tms-worker",
+        status: "stopped",
+      }),
+    );
+  };
+
+  process.once("SIGINT", () => void shutdown("SIGINT"));
+  process.once("SIGTERM", () => void shutdown("SIGTERM"));
+
   void run();
-  setInterval(() => void run(), intervalMs);
 }
