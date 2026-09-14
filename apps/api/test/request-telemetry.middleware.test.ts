@@ -67,3 +67,18 @@ test("generates a correlation id when the request has none", () => {
 
   assert.match(events[0]?.requestId ?? "", /^[0-9a-f-]{36}$/);
 });
+
+test("does not let telemetry sink failures escape the response lifecycle", () => {
+  const middleware = new RequestTelemetryMiddleware({
+    emit: () => {
+      throw new Error("TELEMETRY_SINK_FAILED");
+    },
+    now: () => 1000,
+  });
+  const req = createRequest("request-456");
+  const res = createResponse();
+
+  middleware.use(req as never, res as never, () => undefined);
+
+  assert.doesNotThrow(() => res.emit("finish"));
+});
