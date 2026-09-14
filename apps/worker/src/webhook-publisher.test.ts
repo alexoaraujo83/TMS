@@ -1,80 +1,93 @@
-import { describe, expect, it, vi } from "vitest";
+import assert from "node:assert/strict";
+import test from "node:test";
 import { WebhookPublisher } from "./webhook-publisher.js";
 
-describe("WebhookPublisher", () => {
-  const event = {
-    id: "event-1",
-    tenantId: "tenant-1",
-    aggregateType: "freight",
-    aggregateId: "freight-1",
-    eventType: "freight.created",
-    payload: { reference: "ABC-123" },
+const event = {
+  id: "event-1",
+  tenantId: "tenant-1",
+  aggregateType: "freight",
+  aggregateId: "freight-1",
+  eventType: "freight.created",
+  payload: { reference: "ABC-123" },
+};
+
+test("posts JSON without altering the event payload", async () => {
+  const calls: Array<[string, RequestInit | undefined]> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push([String(url), init]);
+    return new Response(null, { status: 204 });
   };
-
-  it("posts JSON without altering the event payload", async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValue(new Response(null, { status: 204 }));
-    const publisher = new WebhookPublisher(["https://example.test/hook"], {
-      fetchImpl,
-    });
-
-    await publisher.publish(event);
-
-    expect(fetchImpl).toHaveBeenCalledOnce();
-    const [, request] = fetchImpl.mock.calls[0];
-    expect(request.method).toBe("POST");
-    expect(request.headers.get("content-type")).toBe("application/json");
-    expect(JSON.parse(request.body as string)).toEqual(event);
+  const publisher = new WebhookPublisher(["https://example.test/hook"], {
+    fetchImpl,
   });
 
-  it("adds a deterministic HMAC signature when configured", async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValue(new Response(null, { status: 200 }));
-    const publisher = new WebhookPublisher(["https://example.test/hook"], {
-      secret: "test-secret",
-      fetchImpl,
-    });
+  await publisher.publish(event);
 
-    await publisher.publish(event);
+  assert.equal(calls.length, 1);
+  const request = calls[0]?.[1];
+  assert.equal(request?.method, "POST");
+  assert.equal(
+    new Headers(request?.headers).get("content-type"),
+    "application/json",
+  );
+  assert.deepEqual(JSON.parse(request?.body as string), event);
+});
 
-    const [, request] = fetchImpl.mock.calls[0];
-    expect(request.headers.get("x-tms-signature")).toMatch(/^[a-f0-9]{64}$/);
+test("adds a deterministic HMAC signature when configured", async () => {
+  const calls: Array<[string, RequestInit | undefined]> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push([String(url), init]);
+    return new Response(null, { status: 200 });
+  };
+  const publisher = new WebhookPublisher(["https://example.test/hook"], {
+    secret: "test-secret",
+    fetchImpl,
   });
 
-  it("fails publication on a non-success HTTP response", async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockResolvedValue(new Response(null, { status: 503 }));
-    const publisher = new WebhookPublisher(["https://example.test/hook"], {
-      fetchImpl,
-    });
+  await publisher.publish(event);
 
-    await expect(publisher.publish(event)).rejects.toThrow("WEBHOOK_HTTP_503");
+  const request = calls[0]?.[1];
+  assert.match(
+    new Headers(request?.headers).get("x-tms-signature") ?? "",
+    /^[a-f0-9]{64}$/,
+  );
+});
+
+test("fails publication on a non-success HTTP response", async () => {
+  const fetchImpl = async () => new Response(null, { status: 503 });
+  const publisher = new WebhookPublisher(["https://example.test/hook"], {
+    fetchImpl,
   });
 
-  it("rejects unsupported URL protocols", () => {
-    expect(() => new WebhookPublisher(["ftp://example.test/hook"])).toThrow(
-      "INVALID_WEBHOOK_URL",
-    );
-  });
+  await assert.rejects(publisher.publish(event), /WEBHOOK_HTTP_503/);
+});
 
-  it("rejects a non-positive timeout", () => {
-    expect(
-      () =>
-        new WebhookPublisher(["https://example.test/hook"], {
-          timeoutMs: 0,
-        }),
-    ).toThrow("INVALID_WEBHOOK_TIMEOUT");
-  });
+test("rejects unsupported URL protocols", () => {
+  assert.throws(
+    () => new WebhookPublisher(["ftp://example.test/hook"]),
+    /INVALID_WEBHOOK_URL/,
+  );
+});
 
-  it("does not perform a request when no endpoints are configured", async () => {
-    const fetchImpl = vi.fn();
-    const publisher = new WebhookPublisher([], { fetchImpl });
+test("rejects a non-positive timeout", () => {
+  assert.throws(
+    () =>
+      new WebhookPublisher(["https://example.test/hook"], {
+        timeoutMs: 0,
+      }),
+    /INVALID_WEBHOOK_TIMEOUT/,
+  );
+});
 
-    await publisher.publish(event);
+test("does not perform a request when no endpoints are configured", async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    return new Response(null, { status: 200 });
+  };
+  const publisher = new WebhookPublisher([], { fetchImpl });
 
-    expect(fetchImpl).not.toHaveBeenCalled();
-  });
+  await publisher.publish(event);
+
+  assert.equal(calls, 0);
 });
