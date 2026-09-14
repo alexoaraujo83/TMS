@@ -158,4 +158,14 @@
 - preserve recovery evidence without exposing credentials
 - keep production readiness **NOT PROVEN** until a real restore drill succeeds
 
+### Stage 10.11 — Disaster Recovery / Restore Evidence
+
+- execute a real snapshot creation and restore
+- validate restored PostgreSQL version, schema, table inventory and migration state
+- record observed restore duration without treating it as an approved RTO target
+- distinguish recovery mechanism proof from safe isolated production-readiness proof
+- require `finalize: false` for future routine isolated drills
+- require explicit approval before deleting temporary recovery branches
+- keep backup/recovery readiness **NOT PROVEN** until isolated recovery, recurring policy, RPO and RTO targets are established
+
 No stage is considered production-ready merely because its UI exists. Completion requires end-to-end traceability and passing quality/security gates.
