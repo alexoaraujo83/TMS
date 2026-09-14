@@ -17,7 +17,7 @@ export class PgOutboxStore implements OutboxStore {
       ]);
       const result = await client.query(
         `with claimed as (
-           select id
+           select id, gen_random_uuid() as lease_token
            from outbox_events
            where tenant_id = $1
              and status = 'pending'
@@ -29,11 +29,13 @@ export class PgOutboxStore implements OutboxStore {
          update outbox_events as event
          set attempts = event.attempts + 1,
              available_at = now() + interval '5 minutes',
+             lease_token = claimed.lease_token,
              updated_at = now()
          from claimed
          where event.id = claimed.id
          returning event.id, event.tenant_id, event.aggregate_type,
-           event.aggregate_id, event.event_type, event.payload, event.attempts`,
+           event.aggregate_id, event.event_type, event.payload, event.attempts,
+           event.lease_token`,
         [tenantId, limit],
       );
       await client.query("commit");
@@ -45,6 +47,7 @@ export class PgOutboxStore implements OutboxStore {
         eventType: String(row.event_type),
         payload: row.payload as Record<string, unknown>,
         attempts: Number(row.attempts),
+        leaseToken: String(row.lease_token),
       }));
     } catch (error) {
       await client.query("rollback");
@@ -54,7 +57,11 @@ export class PgOutboxStore implements OutboxStore {
     }
   }
 
-  async markPublished(tenantId: string, id: string): Promise<void> {
+  async markPublished(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+  ): Promise<void> {
     const client = await this.pool.connect();
     try {
       await client.query("begin");
@@ -65,10 +72,11 @@ export class PgOutboxStore implements OutboxStore {
       const result = await client.query(
         `update outbox_events
          set status = 'published', published_at = now(), last_error = null,
-             updated_at = now()
+             lease_token = null, updated_at = now()
          where tenant_id = $1 and id = $2 and status = 'pending'
+           and lease_token = $3
          returning id`,
-        [tenantId, id],
+        [tenantId, id, leaseToken],
       );
       if (!result.rows[0]) {
         throw new Error("OUTBOX_EVENT_NOT_PUBLISHABLE");
@@ -85,6 +93,7 @@ export class PgOutboxStore implements OutboxStore {
   async markFailed(
     tenantId: string,
     id: string,
+    leaseToken: string,
     error: string,
     retryAt: Date,
   ): Promise<void> {
@@ -100,10 +109,12 @@ export class PgOutboxStore implements OutboxStore {
          set status = case when attempts >= 5 then 'failed' else 'pending' end,
              available_at = case when attempts >= 5 then available_at else $4 end,
              last_error = $3,
+             lease_token = null,
              updated_at = now()
          where tenant_id = $1 and id = $2 and status = 'pending'
+           and lease_token = $5
          returning id`,
-        [tenantId, id, error.slice(0, 4000), retryAt],
+        [tenantId, id, error.slice(0, 4000), retryAt, leaseToken],
       );
       if (!result.rows[0]) {
         throw new Error("OUTBOX_EVENT_NOT_FAILABLE");
