@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-required=(DATABASE_URL S3_ENDPOINT S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_REGION BACKUP_PASSPHRASE)
+required=(NEON_DATABASE_URL S3_ENDPOINT S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_REGION BACKUP_ENCRYPTION_KEY)
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
     echo "missing required environment variable: ${name}" >&2
@@ -26,11 +26,11 @@ manifest="$tmp_dir/tms-${run_id}.json"
 start_epoch="$(date +%s)"
 echo "backup_start=${run_id}"
 
-pg_dump --dbname="$DATABASE_URL" --format=custom --compress=zstd:3 --file="$plain"
+pg_dump --dbname="$NEON_DATABASE_URL" --format=custom --compress=zstd:3 --file="$plain"
 
 openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
   -in "$plain" -out "$cipher" \
-  -pass env:BACKUP_PASSPHRASE
+  -pass env:BACKUP_ENCRYPTION_KEY
 
 sha256sum "$cipher" > "$sha_file"
 checksum="$(awk '{print $1}' "$sha_file")"
@@ -58,7 +58,7 @@ aws --endpoint-url "$S3_ENDPOINT" s3 cp "$manifest" "s3://${S3_BUCKET}/${manifes
 
 remote_size="$(aws --endpoint-url "$S3_ENDPOINT" s3api head-object --bucket "$S3_BUCKET" --key "$object" --query 'ContentLength' --output text)"
 if [[ "$remote_size" != "$size" ]]; then
-  echo "checksum verification failed: local_size=${size} remote_size=${remote_size}" >&2
+  echo "size verification failed: local_size=${size} remote_size=${remote_size}" >&2
   exit 1
 fi
 
