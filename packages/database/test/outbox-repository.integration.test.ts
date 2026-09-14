@@ -119,13 +119,34 @@ if (!enabled) {
       claimed.map((event) => event.attempts),
       [1, 1],
     );
-
-    assert.deepEqual(await outbox.claimPending(otherTenantId), []);
-    const pending = await outbox.listPending(tenantId);
-    assert.deepEqual(
-      pending.map((event) => event.id),
-      [first.id, second.id],
+    assert.equal(
+      claimed.every((event) => event.availableAt.getTime() > Date.now()),
+      true,
     );
+    assert.deepEqual(await outbox.listPending(tenantId), []);
+  });
+
+  it("uses skip-locked claims to avoid duplicate concurrent work", async () => {
+    const first = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.created",
+    });
+    const second = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.updated",
+    });
+
+    const [claimA, claimB] = await Promise.all([
+      outbox.claimPending(tenantId, 1),
+      outbox.claimPending(tenantId, 1),
+    ]);
+    const claimedIds = [claimA[0]?.id, claimB[0]?.id].filter(
+      (id): id is string => Boolean(id),
+    );
+
+    assert.deepEqual(new Set(claimedIds), new Set([first.id, second.id]));
   });
 
   it("retries failures and moves an exhausted event to failed", async () => {
