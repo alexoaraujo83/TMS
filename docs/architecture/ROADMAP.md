@@ -110,4 +110,13 @@
 - cost/performance tuning
 - production readiness review
 
+### Stage 10.5 — Webhook Delivery Foundation
+
+- HTTP(S) webhook publisher over the existing outbox
+- timeout and protocol validation
+- optional HMAC-SHA256 signing
+- delivery failures delegated to existing outbox retry/lease semantics
+- executable unit coverage
+- operational documentation
+
 No stage is considered production-ready merely because its UI exists. Completion requires end-to-end traceability and passing quality/security gates.
