@@ -16,13 +16,15 @@ function event(id: string, attempts = 1): OutboxEvent {
     eventType: "freight.created",
     payload: { id },
     attempts,
+    leaseToken: `lease-${id}`,
   };
 }
 
 class MemoryStore implements OutboxStore {
-  readonly published: string[] = [];
+  readonly published: Array<{ id: string; leaseToken: string }> = [];
   readonly failed: Array<{
     id: string;
+    leaseToken: string;
     error: string;
     retryAt: Date;
   }> = [];
@@ -36,17 +38,22 @@ class MemoryStore implements OutboxStore {
     return this.events.slice(0, limit);
   }
 
-  async markPublished(_tenantId: string, id: string): Promise<void> {
-    this.published.push(id);
+  async markPublished(
+    _tenantId: string,
+    id: string,
+    leaseToken: string,
+  ): Promise<void> {
+    this.published.push({ id, leaseToken });
   }
 
   async markFailed(
     _tenantId: string,
     id: string,
+    leaseToken: string,
     error: string,
     retryAt: Date,
   ): Promise<void> {
-    this.failed.push({ id, error, retryAt });
+    this.failed.push({ id, leaseToken, error, retryAt });
   }
 }
 
@@ -57,7 +64,7 @@ test("retryDelayMs uses exponential backoff and caps the delay", () => {
   assert.equal(retryDelayMs(20), 300000);
 });
 
-test("processor publishes every successfully handled event", async () => {
+test("processor publishes every successfully handled event with its lease", async () => {
   const store = new MemoryStore([event("1"), event("2")]);
   const handled: string[] = [];
   const processor = new OutboxProcessor(store, async (outboxEvent) => {
@@ -68,7 +75,10 @@ test("processor publishes every successfully handled event", async () => {
 
   assert.deepEqual(result, { claimed: 2, published: 2, failed: 0 });
   assert.deepEqual(handled, ["1", "2"]);
-  assert.deepEqual(store.published, ["1", "2"]);
+  assert.deepEqual(store.published, [
+    { id: "1", leaseToken: "lease-1" },
+    { id: "2", leaseToken: "lease-2" },
+  ]);
   assert.equal(store.failed.length, 0);
 });
 
@@ -84,9 +94,10 @@ test("processor marks a failed handler for retry and continues the batch", async
   const result = await processor.process("tenant-1", 50);
 
   assert.deepEqual(result, { claimed: 2, published: 1, failed: 1 });
-  assert.deepEqual(store.published, ["2"]);
+  assert.deepEqual(store.published, [{ id: "2", leaseToken: "lease-2" }]);
   assert.equal(store.failed.length, 1);
   assert.equal(store.failed[0]?.id, "1");
+  assert.equal(store.failed[0]?.leaseToken, "lease-1");
   assert.equal(store.failed[0]?.error, "broker unavailable");
   assert.ok(store.failed[0]?.retryAt.getTime() >= before + 1990);
   assert.ok(store.failed[0]?.retryAt.getTime() <= Date.now() + 2100);
