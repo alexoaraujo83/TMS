@@ -104,7 +104,7 @@ test("one failing job does not stop the batch", async () => {
           if (current.id === first.id) throw new Error("handler failed");
         },
       ],
-    ),
+    ]),
     { now: () => 1_000_000 },
   );
 
@@ -212,7 +212,7 @@ test("telemetry distinguishes retry from terminal failure", async () => {
           throw new Error("boom");
         },
       ],
-    ),
+    ]),
     {
       now: () => 2_000_000,
       onTelemetry: (event) => events.push(event),
