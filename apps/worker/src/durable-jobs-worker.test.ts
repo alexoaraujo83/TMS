@@ -54,7 +54,16 @@ class FakeStore implements DurableJobStore {
     retryAt: Date,
   ): Promise<DurableJob> {
     this.failed.push([tenantId, id, leaseToken, error, retryAt]);
-    return job({ id, tenantId, leaseToken, status: "failed" });
+    const current = this.jobs.find((candidate) => candidate.id === id);
+    const terminal = current ? current.attempts >= current.maxAttempts : true;
+    return job({
+      id,
+      tenantId,
+      leaseToken,
+      status: terminal ? "failed" : "pending",
+      attempts: current?.attempts ?? 1,
+      maxAttempts: current?.maxAttempts ?? 1,
+    });
   }
 }
 
