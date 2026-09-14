@@ -70,3 +70,18 @@ test("PermissionGuard fails closed when no permission metadata is declared", () 
       error.message === "Permission requirement is not configured",
   );
 });
+
+test("PermissionGuard accepts the finance read permission", () => {
+  assert.equal(
+    guard("finance:read").canActivate(contextFor(["finance:read"])),
+    true,
+  );
+});
+
+test("PermissionGuard denies finance access without the finance permission", () => {
+  assert.throws(
+    () => guard("finance:create").canActivate(contextFor(["freight:create"])),
+    (error: unknown) =>
+      error instanceof Error && error.message === "Insufficient permission",
+  );
+});
