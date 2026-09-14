@@ -93,7 +93,10 @@ export class FinanceRepository {
     });
   }
 
-  async listByFreight(tenantId: string, freightId: string): Promise<FinancialEntryRecord[]> {
+  async listByFreight(
+    tenantId: string,
+    freightId: string,
+  ): Promise<FinancialEntryRecord[]> {
     return withTenantContext(this.pool, tenantId, async (client: any) => {
       const result = await client.query(
         `select id, tenant_id, freight_id, assignment_id, trip_id, direction,
