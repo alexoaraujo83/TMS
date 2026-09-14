@@ -58,7 +58,14 @@ export {
   type GrStatus,
 } from "./compliance-repository.js";
 export { assertComplianceRelease } from "./compliance-release.js";
-export { FinanceRepository } from "./finance-repository.js";
+export {
+  FinanceRepository,
+  type CreateFinancialEntryInput,
+  type FinancialDirection,
+  type FinancialEntryRecord,
+  type FinancialEntryStatus,
+  type FinancialEntryType,
+} from "./finance-repository.js";
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
