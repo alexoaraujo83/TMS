@@ -75,10 +75,8 @@ if (!enabled) {
       jobType: "integration.test",
       payload: { source: "integration-test" },
     });
-
     assert.equal(job.status, "pending");
     assert.equal(job.attempts, 0);
-
     const claimed = await jobs.claimPending(tenantId, 10);
     assert.equal(claimed.length, 1);
     assert.equal(claimed[0].id, job.id);
@@ -93,12 +91,10 @@ if (!enabled) {
       jobType: "integration.complete",
     });
     const [claimed] = await jobs.claimPending(tenantId, 1);
-
     await assert.rejects(
       jobs.complete(tenantId, job.id, randomUUID()),
       /DURABLE_JOB_NOT_COMPLETABLE/,
     );
-
     const completed = await jobs.complete(
       tenantId,
       job.id,
@@ -124,7 +120,6 @@ if (!enabled) {
       new Date(),
     );
     assert.equal(retried.status, "pending");
-
     const [second] = await jobs.claimPending(tenantId, 1);
     const failed = await jobs.fail(
       tenantId,
@@ -140,5 +135,34 @@ if (!enabled) {
     await jobs.enqueue({ tenantId, jobType: "integration.isolated" });
     const claimed = await jobs.claimPending(otherTenantId, 10);
     assert.equal(claimed.length, 0);
+  });
+
+  it("rejects stale lease completion after reclaim", async () => {
+    const job = await jobs.enqueue({
+      tenantId,
+      jobType: "integration.stale",
+    });
+    const [first] = await jobs.claimPending(tenantId, 1);
+    const client = await pool.connect();
+    try {
+      await client.query(
+        "update durable_jobs set available_at = now() where id = $1",
+        [job.id],
+      );
+    } finally {
+      client.release();
+    }
+    const [second] = await jobs.claimPending(tenantId, 1);
+    assert.notEqual(first.leaseToken, second.leaseToken);
+    await assert.rejects(
+      jobs.complete(tenantId, job.id, first.leaseToken),
+      /DURABLE_JOB_NOT_COMPLETABLE/,
+    );
+    const completed = await jobs.complete(
+      tenantId,
+      job.id,
+      second.leaseToken,
+    );
+    assert.equal(completed.status, "completed");
   });
 }
