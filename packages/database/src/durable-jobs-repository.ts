@@ -69,7 +69,7 @@ export class DurableJobsRepository {
            select id, gen_random_uuid() as lease_token
            from durable_jobs
            where tenant_id = $1
-             and status = 'pending'
+             and status in ('pending', 'running')
              and available_at <= now()
            order by created_at asc
            for update skip locked
