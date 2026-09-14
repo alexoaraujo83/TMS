@@ -39,7 +39,8 @@ jobs:
       - run: npm install --global pnpm@11.24.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tms/database migrate
-      # format:check is mandatory before lint, typecheck, test and build.
+      - run: pnpm format:fix
+      - run: git diff -- packages/database/src/finance-repository.ts packages/database/src/index.ts
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
