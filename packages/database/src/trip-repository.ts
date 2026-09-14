@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
+import { assertComplianceRelease } from "./compliance-release.js";
 import { assertUuid } from "./query.js";
 import { withTransaction } from "./transaction.js";
 
@@ -73,6 +74,7 @@ export class TripRepository {
       if (freight.rows[0].status !== "assigned") {
         throw new Error("Freight must be assigned before trip creation");
       }
+      await assertComplianceRelease(client, tenantId, freightId, assignmentId);
 
       const existing = await client.query<{ id: string }>(
         `select id from trips where tenant_id = $1 and assignment_id = $2 limit 1`,
@@ -154,6 +156,15 @@ export class TripRepository {
       if (!allowed) {
         throw new Error(
           `Trip cannot transition from ${expectedStatus} to ${nextStatus}`,
+        );
+      }
+
+      if (nextStatus === "in_transit") {
+        await assertComplianceRelease(
+          client,
+          tenantId,
+          trip.freightId,
+          trip.assignmentId,
         );
       }
 
