@@ -6,14 +6,16 @@ export interface OutboxEvent {
   eventType: string;
   payload: Record<string, unknown>;
   attempts: number;
+  leaseToken: string;
 }
 
 export interface OutboxStore {
   claimPending(tenantId: string, limit: number): Promise<OutboxEvent[]>;
-  markPublished(tenantId: string, id: string): Promise<void>;
+  markPublished(tenantId: string, id: string, leaseToken: string): Promise<void>;
   markFailed(
     tenantId: string,
     id: string,
+    leaseToken: string,
     error: string,
     retryAt: Date,
   ): Promise<void>;
@@ -52,7 +54,7 @@ export class OutboxProcessor {
     for (const event of events) {
       try {
         await this.handler(event);
-        await this.store.markPublished(tenantId, event.id);
+        await this.store.markPublished(tenantId, event.id, event.leaseToken);
         published += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -60,6 +62,7 @@ export class OutboxProcessor {
         await this.store.markFailed(
           tenantId,
           event.id,
+          event.leaseToken,
           message.slice(0, 4000),
           retryAt,
         );
