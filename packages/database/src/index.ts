@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 25;
+export const DATABASE_SCHEMA_VERSION = 26;
 
 export interface TenantScopedRecord {
   id: string;
@@ -66,6 +66,12 @@ export {
   type FinancialEntryStatus,
   type FinancialEntryType,
 } from "./finance-repository.js";
+export {
+  OutboxRepository,
+  type EnqueueOutboxEventInput,
+  type OutboxEventRecord,
+  type OutboxEventStatus,
+} from "./outbox-repository.js";
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
