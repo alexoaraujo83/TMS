@@ -28,10 +28,32 @@ export interface DurableJobStore {
   ): Promise<DurableJob>;
 }
 
+export interface DurableJobTelemetryEvent {
+  event:
+    | "durable_job.started"
+    | "durable_job.completed"
+    | "durable_job.retry_scheduled"
+    | "durable_job.terminal_failed"
+    | "durable_job.finalization_error"
+    | "durable_job.batch_completed";
+  tenantId: string;
+  jobId?: string;
+  jobType?: string;
+  attempt?: number;
+  maxAttempts?: number;
+  durationMs?: number;
+  retryAt?: string;
+  error?: string;
+  claimed?: number;
+  completed?: number;
+  failed?: number;
+}
+
 export interface DurableJobProcessorOptions {
   baseDelayMs?: number;
   maxDelayMs?: number;
   now?: () => number;
+  onTelemetry?: (event: DurableJobTelemetryEvent) => void;
 }
 
 export interface DurableJobProcessResult {
@@ -55,6 +77,9 @@ export class DurableJobProcessor {
   private readonly now: () => number;
   private readonly baseDelayMs: number;
   private readonly maxDelayMs: number;
+  private readonly onTelemetry: (
+    event: DurableJobTelemetryEvent,
+  ) => void;
 
   constructor(
     private readonly store: DurableJobStore,
@@ -64,17 +89,29 @@ export class DurableJobProcessor {
     this.now = options.now ?? Date.now;
     this.baseDelayMs = options.baseDelayMs ?? 1000;
     this.maxDelayMs = options.maxDelayMs ?? 300000;
+    this.onTelemetry = options.onTelemetry ?? (() => undefined);
   }
 
   async process(
     tenantId: string,
     limit = 50,
   ): Promise<DurableJobProcessResult> {
+    const batchStartedAt = this.now();
     const jobs = await this.store.claimPending(tenantId, limit);
     let completed = 0;
     let failed = 0;
 
     for (const job of jobs) {
+      const jobStartedAt = this.now();
+      this.emitTelemetry({
+        event: "durable_job.started",
+        tenantId,
+        jobId: job.id,
+        jobType: job.jobType,
+        attempt: job.attempts,
+        maxAttempts: job.maxAttempts,
+      });
+
       try {
         const handler = this.handlers.get(job.jobType);
         if (!handler) {
@@ -83,6 +120,15 @@ export class DurableJobProcessor {
         await handler(job);
         await this.store.complete(tenantId, job.id, this.requireLease(job));
         completed += 1;
+        this.emitTelemetry({
+          event: "durable_job.completed",
+          tenantId,
+          jobId: job.id,
+          jobType: job.jobType,
+          attempt: job.attempts,
+          maxAttempts: job.maxAttempts,
+          durationMs: this.now() - jobStartedAt,
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const retryAt = new Date(
@@ -91,7 +137,7 @@ export class DurableJobProcessor {
         );
 
         try {
-          await this.store.fail(
+          const failedJob = await this.store.fail(
             tenantId,
             job.id,
             this.requireLease(job),
@@ -99,24 +145,54 @@ export class DurableJobProcessor {
             retryAt,
           );
           failed += 1;
+          const terminal = failedJob.status === "failed";
+          this.emitTelemetry({
+            event: terminal
+              ? "durable_job.terminal_failed"
+              : "durable_job.retry_scheduled",
+            tenantId,
+            jobId: job.id,
+            jobType: job.jobType,
+            attempt: job.attempts,
+            maxAttempts: job.maxAttempts,
+            durationMs: this.now() - jobStartedAt,
+            retryAt: terminal ? undefined : retryAt.toISOString(),
+            error: message.slice(0, 4000),
+          });
         } catch (finalizationError) {
-          console.error(
-            JSON.stringify({
-              event: "durable_job.finalization_error",
-              jobId: job.id,
-              jobType: job.jobType,
-              tenantId,
-              error:
-                finalizationError instanceof Error
-                  ? finalizationError.message
-                  : String(finalizationError),
-            }),
-          );
+          this.emitTelemetry({
+            event: "durable_job.finalization_error",
+            tenantId,
+            jobId: job.id,
+            jobType: job.jobType,
+            attempt: job.attempts,
+            maxAttempts: job.maxAttempts,
+            durationMs: this.now() - jobStartedAt,
+            error:
+              finalizationError instanceof Error
+                ? finalizationError.message.slice(0, 4000)
+                : String(finalizationError).slice(0, 4000),
+          });
         }
       }
     }
 
-    return { claimed: jobs.length, completed, failed };
+    const result = { claimed: jobs.length, completed, failed };
+    this.emitTelemetry({
+      event: "durable_job.batch_completed",
+      tenantId,
+      durationMs: this.now() - batchStartedAt,
+      ...result,
+    });
+    return result;
+  }
+
+  private emitTelemetry(event: DurableJobTelemetryEvent): void {
+    try {
+      this.onTelemetry(event);
+    } catch {
+      // Telemetry must never break job processing.
+    }
   }
 
   private requireLease(job: DurableJob): string {
