@@ -26,8 +26,11 @@ class MemoryStore implements OutboxStore {
     error: string;
     retryAt: Date;
   }> = [];
+  private readonly events: OutboxEvent[];
 
-  constructor(private readonly events: OutboxEvent[]) {}
+  constructor(events: OutboxEvent[]) {
+    this.events = events;
+  }
 
   async claimPending(_tenantId: string, limit: number): Promise<OutboxEvent[]> {
     return this.events.slice(0, limit);
