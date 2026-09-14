@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 23;
+export const DATABASE_SCHEMA_VERSION = 24;
 
 export interface TenantScopedRecord {
   id: string;
