@@ -127,9 +127,8 @@ if (!enabled) {
           [tenantId, freightId],
         )
       ).rows[0].id;
-      tripId = (
-        await trips.create(tenantId, freightId, assignmentId, audit)
-      ).id;
+      tripId = (await trips.create(tenantId, freightId, assignmentId, audit))
+        .id;
     } finally {
       client.release();
     }
