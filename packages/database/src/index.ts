@@ -1,4 +1,4 @@
-export const DATABASE_SCHEMA_VERSION = 26;
+export const DATABASE_SCHEMA_VERSION = 28;
 
 export interface TenantScopedRecord {
   id: string;
@@ -73,6 +73,12 @@ export {
   type OutboxEventStatus,
   type OutboxFailureOptions,
 } from "./outbox-repository.js";
+export {
+  DurableJobsRepository,
+  type DurableJobRecord,
+  type DurableJobStatus,
+  type EnqueueDurableJobInput,
+} from "./durable-jobs-repository.js";
 export { verifyTenantMembership } from "./membership-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
