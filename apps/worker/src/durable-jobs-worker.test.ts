@@ -4,6 +4,7 @@ import {
   DurableJobProcessor,
   type DurableJob,
   type DurableJobStore,
+  type DurableJobTelemetryEvent,
   retryDelayMs,
 } from "./durable-jobs-worker.js";
 
@@ -169,7 +170,7 @@ test("empty batches are a no-op", async () => {
 test("telemetry reports successful job and batch lifecycle", async () => {
   const current = job({ id: "telemetry-success" });
   const store = new FakeStore([current]);
-  const events: Array<Record<string, unknown>> = [];
+  const events: DurableJobTelemetryEvent[] = [];
   let clock = 10_000;
   const processor = new DurableJobProcessor(
     store,
@@ -201,7 +202,7 @@ test("telemetry reports successful job and batch lifecycle", async () => {
 test("telemetry distinguishes retry from terminal failure", async () => {
   const retryJob = job({ id: "retry", attempts: 1, maxAttempts: 3 });
   const terminalJob = job({ id: "terminal", attempts: 3, maxAttempts: 3 });
-  const events: Array<Record<string, unknown>> = [];
+  const events: DurableJobTelemetryEvent[] = [];
   const store = new FakeStore([retryJob, terminalJob]);
   const processor = new DurableJobProcessor(
     store,
@@ -238,7 +239,7 @@ test("telemetry distinguishes retry from terminal failure", async () => {
 
 test("telemetry finalization errors are isolated from the processor", async () => {
   const current = job({ id: "finalization-error" });
-  const events: Array<Record<string, unknown>> = [];
+  const events: DurableJobTelemetryEvent[] = [];
   const store: DurableJobStore = {
     async claimPending() {
       return [current];
