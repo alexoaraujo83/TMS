@@ -31,14 +31,19 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
 
     res.once("finish", () => {
       const durationMs = Math.max(0, this.now() - startedAt);
-      this.emit({
-        event: "api.request.completed",
-        requestId,
-        method: req.method,
-        path: req.path,
-        statusCode: res.statusCode,
-        durationMs,
-      });
+
+      try {
+        this.emit({
+          event: "api.request.completed",
+          requestId,
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          durationMs,
+        });
+      } catch {
+        // Telemetry must never affect the request lifecycle or process stability.
+      }
     });
 
     next();
