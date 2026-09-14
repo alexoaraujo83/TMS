@@ -1,3 +1,9 @@
+insert into permissions (code, description) values
+  ('finance:read', 'Read financial records'),
+  ('finance:create', 'Create financial records'),
+  ('finance:update', 'Update financial records')
+on conflict (code) do nothing;
+
 create table financial_entries (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) on delete cascade,
