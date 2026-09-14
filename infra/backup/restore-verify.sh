@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-required=(S3_ENDPOINT S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_REGION BACKUP_PASSPHRASE BACKUP_OBJECT RESTORE_DATABASE_URL)
+required=(S3_ENDPOINT S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY S3_REGION BACKUP_ENCRYPTION_KEY BACKUP_OBJECT RESTORE_DATABASE_URL)
 for name in "${required[@]}"; do
   if [[ -z "${!name:-}" ]]; then
     echo "missing required environment variable: ${name}" >&2
@@ -28,7 +28,7 @@ actual="$(sha256sum "$cipher" | awk '{print $1}')"
 
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
   -in "$cipher" -out "$plain" \
-  -pass env:BACKUP_PASSPHRASE
+  -pass env:BACKUP_ENCRYPTION_KEY
 
 pg_restore --dbname="$RESTORE_DATABASE_URL" --clean --if-exists --no-owner --no-privileges "$plain"
 
