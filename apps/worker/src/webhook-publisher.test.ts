@@ -11,7 +11,7 @@ const event = {
   payload: { reference: "ABC-123" },
 };
 
-test("posts JSON without altering the event payload", async () => {
+test("posts JSON with idempotency and no redirect", async () => {
   const calls: Array<[string, RequestInit | undefined]> = [];
   const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
     calls.push([String(url), init]);
@@ -26,10 +26,10 @@ test("posts JSON without altering the event payload", async () => {
   assert.equal(calls.length, 1);
   const request = calls[0]?.[1];
   assert.equal(request?.method, "POST");
-  assert.equal(
-    new Headers(request?.headers).get("content-type"),
-    "application/json",
-  );
+  assert.equal(request?.redirect, "error");
+  const headers = new Headers(request?.headers);
+  assert.equal(headers.get("content-type"), "application/json");
+  assert.equal(headers.get("idempotency-key"), event.id);
   assert.deepEqual(JSON.parse(request?.body as string), event);
 });
 
@@ -60,6 +60,27 @@ test("fails publication on a non-success HTTP response", async () => {
   });
 
   await assert.rejects(publisher.publish(event), /WEBHOOK_HTTP_503/);
+});
+
+test("normalizes request timeout failures", async () => {
+  const fetchImpl = async () => {
+    const error = new Error("aborted");
+    error.name = "AbortError";
+    throw error;
+  };
+  const publisher = new WebhookPublisher(["https://example.test/hook"], {
+    timeoutMs: 100,
+    fetchImpl,
+  });
+
+  await assert.rejects(publisher.publish(event), /WEBHOOK_TIMEOUT/);
+});
+
+test("rejects malformed webhook URLs", () => {
+  assert.throws(
+    () => new WebhookPublisher(["not-a-url"]),
+    /INVALID_WEBHOOK_URL/,
+  );
 });
 
 test("rejects unsupported URL protocols", () => {
