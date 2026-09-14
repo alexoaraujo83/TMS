@@ -191,6 +191,13 @@ if (!enabled) {
       outbox.markPublished(tenantId, event.id, firstLease),
       /OUTBOX_EVENT_NOT_PUBLISHABLE/,
     );
+    await assert.rejects(
+      outbox.markFailed(tenantId, event.id, firstLease, "stale", {
+        maxAttempts: 5,
+        retryAt: new Date(),
+      }),
+      /OUTBOX_EVENT_NOT_FAILABLE/,
+    );
 
     const published = await outbox.markPublished(
       tenantId,
