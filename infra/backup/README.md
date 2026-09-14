@@ -10,13 +10,13 @@ Stage 10.11 implementation for a scheduled Railway worker that creates an encryp
 
 Set these as Railway service secrets. Never commit values to GitHub:
 
-- `DATABASE_URL` — direct Neon PostgreSQL connection string for backups.
+- `NEON_DATABASE_URL` — direct Neon PostgreSQL connection string for backups.
 - `S3_ENDPOINT` — S3 endpoint for the selected provider.
 - `S3_BUCKET` — private backup bucket.
 - `S3_REGION` — provider region.
 - `S3_ACCESS_KEY_ID` — dedicated least-privilege application key.
 - `S3_SECRET_ACCESS_KEY` — secret component of the application key.
-- `BACKUP_PASSPHRASE` — dedicated backup encryption passphrase.
+- `BACKUP_ENCRYPTION_KEY` — dedicated backup encryption passphrase/key.
 - Optional `PGSSLMODE` — defaults to `require`.
 
 ## Schedule
