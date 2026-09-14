@@ -145,15 +145,25 @@ if (!enabled) {
     const [first] = await jobs.claimPending(tenantId, 1);
     const client = await pool.connect();
     try {
+      await client.query("begin");
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
       await client.query(
         "update durable_jobs set available_at = now() where id = $1",
         [job.id],
       );
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
     } finally {
       client.release();
     }
     const [second] = await jobs.claimPending(tenantId, 1);
     assert.notEqual(first.leaseToken, second.leaseToken);
+    assert.equal(second.attempts, 2);
     await assert.rejects(
       jobs.complete(tenantId, job.id, first.leaseToken),
       /DURABLE_JOB_NOT_COMPLETABLE/,
