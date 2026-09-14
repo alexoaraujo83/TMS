@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, RequestMethod } from "@nestjs/common";
 import { HealthController } from "./health.controller.js";
 import { RequestContextMiddleware } from "./common/request-context.middleware.js";
+import { RequestTelemetryMiddleware } from "./common/request-telemetry.middleware.js";
 import { DatabaseModule } from "./common/database.module.js";
 import { ComplianceModule } from "./modules/compliance/compliance.module.js";
 import { FinanceModule } from "./modules/finance/finance.module.js";
@@ -20,7 +21,7 @@ import { OperationsModule } from "./modules/operations/operations.module.js";
 export class AppModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
-      .apply(RequestContextMiddleware)
+      .apply(RequestContextMiddleware, RequestTelemetryMiddleware)
       .forRoutes({ path: "*", method: RequestMethod.ALL });
   }
 }

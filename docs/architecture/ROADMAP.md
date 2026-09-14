@@ -128,4 +128,12 @@
 - executable reliability/security unit coverage
 - document at-least-once delivery and consumer-side deduplication requirements
 
+### Production Hardening — API Request Observability
+
+- completion telemetry with request correlation
+- HTTP method, path, status and duration measurements
+- no request/response payload or credential logging
+- executable middleware coverage
+- documented telemetry contract
+
 No stage is considered production-ready merely because its UI exists. Completion requires end-to-end traceability and passing quality/security gates.
