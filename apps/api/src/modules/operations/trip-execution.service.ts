@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { TripExecutionRepository } from "@tms/database";
 import type { Pool } from "pg";
 import { DATABASE_POOL } from "../../common/database.provider.js";
