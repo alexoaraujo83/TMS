@@ -1,13 +1,15 @@
 name: Stage 5 format repair
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   format:
+    if: ${{ !contains(github.event.head_commit.message, 'style(stage5): apply Prettier formatting') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
