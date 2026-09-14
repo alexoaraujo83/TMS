@@ -92,7 +92,80 @@ if (!enabled) {
     assert.equal(published.status, "published");
     assert.ok(published.publishedAt instanceof Date);
 
-    await assert.rejects(outbox.markPublished(tenantId, event.id), /OUTBOX_EVENT_NOT_PUBLISHABLE/);
+    await assert.rejects(
+      outbox.markPublished(tenantId, event.id),
+      /OUTBOX_EVENT_NOT_PUBLISHABLE/,
+    );
+  });
+
+  it("claims pending events and increments attempts atomically", async () => {
+    const first = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.created",
+    });
+    const second = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.updated",
+    });
+
+    const claimed = await outbox.claimPending(tenantId, 2);
+    assert.deepEqual(
+      claimed.map((event) => event.id),
+      [first.id, second.id],
+    );
+    assert.deepEqual(
+      claimed.map((event) => event.attempts),
+      [1, 1],
+    );
+
+    assert.deepEqual(await outbox.claimPending(otherTenantId), []);
+    assert.deepEqual(await outbox.listPending(tenantId), [
+      {
+        ...claimed[0],
+        attempts: 1,
+      },
+      {
+        ...claimed[1],
+        attempts: 1,
+      },
+    ]);
+  });
+
+  it("retries failures and moves an exhausted event to failed", async () => {
+    const event = await outbox.enqueue({
+      tenantId,
+      aggregateType: "finance",
+      eventType: "financial_entry.created",
+    });
+
+    const claimed = await outbox.claimPending(tenantId, 1);
+    assert.equal(claimed[0]?.id, event.id);
+
+    const retryAt = new Date(Date.now() + 60_000);
+    const retry = await outbox.markFailed(tenantId, event.id, "temporary", {
+      maxAttempts: 2,
+      retryAt,
+    });
+    assert.equal(retry.status, "pending");
+    assert.equal(retry.lastError, "temporary");
+    assert.equal(retry.attempts, 1);
+
+    const claimedAgain = await outbox.claimPending(tenantId, 1);
+    assert.deepEqual(claimedAgain, []);
+
+    const immediateRetry = await outbox.markFailed(
+      tenantId,
+      event.id,
+      "temporary-2",
+      {
+        maxAttempts: 2,
+        retryAt: new Date(),
+      },
+    );
+    assert.equal(immediateRetry.status, "failed");
+    assert.equal(immediateRetry.attempts, 1);
   });
 
   it("isolates events by tenant", async () => {
