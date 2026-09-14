@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
+import { assertComplianceRelease } from "../src/compliance-release.js";
 
 const databaseUrl = process.env.DATABASE_URL;
 const enabled =
@@ -109,6 +110,38 @@ if (!enabled) {
           [tenantId, freightId],
         ),
       );
+      await client.query("rollback");
+    } finally {
+      client.release();
+    }
+  });
+
+  it("blocks release for pending compliance and releases after approval", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
+      await client.query(
+        `insert into compliance_checks (tenant_id, freight_id, check_type)
+         values ($1, $2, 'driver')`,
+        [tenantId, freightId],
+      );
+
+      await assert.rejects(
+        assertComplianceRelease(client, tenantId, freightId),
+        /Compliance release blocked: driver=pending/,
+      );
+
+      await client.query(
+        `update compliance_checks
+            set status = 'approved', checked_at = now()
+          where tenant_id = $1 and freight_id = $2 and check_type = 'driver'`,
+        [tenantId, freightId],
+      );
+      await assertComplianceRelease(client, tenantId, freightId);
       await client.query("rollback");
     } finally {
       client.release();
