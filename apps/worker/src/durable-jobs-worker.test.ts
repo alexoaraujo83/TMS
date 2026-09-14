@@ -4,6 +4,7 @@ import {
   DurableJobProcessor,
   type DurableJob,
   type DurableJobStore,
+  type DurableJobTelemetryEvent,
   retryDelayMs,
 } from "./durable-jobs-worker.js";
 
@@ -53,7 +54,16 @@ class FakeStore implements DurableJobStore {
     retryAt: Date,
   ): Promise<DurableJob> {
     this.failed.push([tenantId, id, leaseToken, error, retryAt]);
-    return job({ id, tenantId, leaseToken, status: "failed" });
+    const current = this.jobs.find((candidate) => candidate.id === id);
+    const terminal = current ? current.attempts >= current.maxAttempts : true;
+    return job({
+      id,
+      tenantId,
+      leaseToken,
+      status: terminal ? "failed" : "pending",
+      attempts: current?.attempts ?? 1,
+      maxAttempts: current?.maxAttempts ?? 1,
+    });
   }
 }
 
@@ -92,7 +102,7 @@ test("successful jobs complete with their lease token", async () => {
 });
 
 test("one failing job does not stop the batch", async () => {
-  const first = job({ id: "job-fails" });
+  const first = job({ id: "job-fails", maxAttempts: 5 });
   const second = job({ id: "job-succeeds" });
   const store = new FakeStore([first, second]);
   const processor = new DurableJobProcessor(
@@ -137,7 +147,14 @@ test("long non-Error failures are truncated before persistence", async () => {
   const store = new FakeStore([current]);
   const processor = new DurableJobProcessor(
     store,
-    new Map([["test.job", async () => { throw "x".repeat(5000); }]]),
+    new Map([
+      [
+        "test.job",
+        async () => {
+          throw "x".repeat(5000);
+        },
+      ],
+    ]),
   );
 
   await processor.process(current.tenantId, 50);
@@ -149,9 +166,130 @@ test("empty batches are a no-op", async () => {
   const store = new FakeStore([]);
   const processor = new DurableJobProcessor(store, new Map());
 
-  assert.deepEqual(await processor.process("00000000-0000-0000-0000-000000000001"), {
-    claimed: 0,
-    completed: 0,
-    failed: 0,
-  });
+  assert.deepEqual(
+    await processor.process("00000000-0000-0000-0000-000000000001"),
+    {
+      claimed: 0,
+      completed: 0,
+      failed: 0,
+    },
+  );
+});
+
+test("telemetry reports successful job and batch lifecycle", async () => {
+  const current = job({ id: "telemetry-success" });
+  const store = new FakeStore([current]);
+  const events: DurableJobTelemetryEvent[] = [];
+  let clock = 10_000;
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([["test.job", async () => undefined]]),
+    {
+      now: () => clock++,
+      onTelemetry: (event) => events.push(event),
+    },
+  );
+
+  await processor.process(current.tenantId, 10);
+
+  assert.deepEqual(
+    events.map((event) => event.event),
+    [
+      "durable_job.started",
+      "durable_job.completed",
+      "durable_job.batch_completed",
+    ],
+  );
+  assert.equal(events[1]?.jobId, current.id);
+  assert.equal(events[1]?.jobType, current.jobType);
+  assert.equal(events[1]?.attempt, current.attempts);
+  assert.equal(events[2]?.claimed, 1);
+  assert.equal(events[2]?.completed, 1);
+  assert.equal(events[2]?.failed, 0);
+});
+
+test("telemetry distinguishes retry from terminal failure", async () => {
+  const retryJob = job({ id: "retry", attempts: 1, maxAttempts: 3 });
+  const terminalJob = job({ id: "terminal", attempts: 3, maxAttempts: 3 });
+  const events: DurableJobTelemetryEvent[] = [];
+  const store = new FakeStore([retryJob, terminalJob]);
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([
+      [
+        "test.job",
+        async () => {
+          throw new Error("boom");
+        },
+      ],
+    ]),
+    {
+      now: () => 2_000_000,
+      onTelemetry: (event) => events.push(event),
+    },
+  );
+
+  await processor.process(retryJob.tenantId, 10);
+
+  assert.equal(
+    events.filter((event) => event.event === "durable_job.retry_scheduled").length,
+    1,
+  );
+  assert.equal(
+    events.filter((event) => event.event === "durable_job.terminal_failed").length,
+    1,
+  );
+  const retryEvent = events.find(
+    (event) => event.event === "durable_job.retry_scheduled",
+  );
+  assert.equal(retryEvent?.retryAt, new Date(2_001_000).toISOString());
+  assert.equal(retryEvent?.error, "boom");
+});
+
+test("telemetry finalization errors are isolated from the processor", async () => {
+  const current = job({ id: "finalization-error" });
+  const events: DurableJobTelemetryEvent[] = [];
+  const store: DurableJobStore = {
+    async claimPending() {
+      return [current];
+    },
+    async complete() {
+      throw new Error("complete failed");
+    },
+    async fail() {
+      throw new Error("fail failed");
+    },
+  };
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([["test.job", async () => undefined]]),
+    {
+      onTelemetry: (event) => events.push(event),
+    },
+  );
+
+  const result = await processor.process(current.tenantId, 10);
+
+  assert.deepEqual(result, { claimed: 1, completed: 0, failed: 0 });
+  assert.equal(events.at(-2)?.event, "durable_job.finalization_error");
+  assert.equal(events.at(-2)?.error, "fail failed");
+  assert.equal(events.at(-1)?.event, "durable_job.batch_completed");
+});
+
+test("telemetry failures never break job processing", async () => {
+  const current = job({ id: "telemetry-failure" });
+  const store = new FakeStore([current]);
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([["test.job", async () => undefined]]),
+    {
+      onTelemetry: () => {
+        throw new Error("telemetry unavailable");
+      },
+    },
+  );
+
+  const result = await processor.process(current.tenantId, 10);
+
+  assert.deepEqual(result, { claimed: 1, completed: 1, failed: 0 });
 });

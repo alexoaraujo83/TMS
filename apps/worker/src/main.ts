@@ -78,6 +78,9 @@ if (!databaseUrl || tenantIds.length === 0) {
         },
       ],
     ]),
+    {
+      onTelemetry: (event) => console.log(JSON.stringify(event)),
+    },
   );
 
   let shuttingDown = false;
