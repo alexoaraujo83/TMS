@@ -128,12 +128,34 @@
 - executable reliability/security unit coverage
 - document at-least-once delivery and consumer-side deduplication requirements
 
-### Production Hardening — API Request Observability
+### Stage 10.8 — API Readiness
+
+- keep `/health` as liveness-only
+- make `/ready` validate database connectivity
+- return service-unavailable when the database cannot be reached
+- executable controller coverage for healthy and unavailable database states
+
+### Stage 10.9 — API Request Observability
 
 - completion telemetry with request correlation
 - HTTP method, path, status and duration measurements
 - no request/response payload or credential logging
 - executable middleware coverage
 - documented telemetry contract
+
+### Stage 10.9a — API Telemetry Failure Isolation
+
+- isolate telemetry sink exceptions from the request lifecycle
+- preserve process stability when telemetry emission fails
+- executable failure-isolation coverage
+
+### Stage 10.10 — Backup and Restore Readiness
+
+- define an evidence-driven non-production restore drill
+- verify snapshot/recovery-point restoration into an isolated branch
+- validate restored schema and migration compatibility
+- measure and record tested RTO and RPO
+- preserve recovery evidence without exposing credentials
+- keep production readiness **NOT PROVEN** until a real restore drill succeeds
 
 No stage is considered production-ready merely because its UI exists. Completion requires end-to-end traceability and passing quality/security gates.
