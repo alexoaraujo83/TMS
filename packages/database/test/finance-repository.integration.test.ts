@@ -165,4 +165,32 @@ if (!enabled) {
       /FINANCIAL_ENTRY_NOT_SETTLEABLE/,
     );
   });
+
+  it("prevents mutation of a settled entry", async () => {
+    const entry = await finance.create({
+      tenantId,
+      freightId,
+      direction: "receivable",
+      entryType: "adjustment",
+      description: "Immutable settlement",
+      amountCents: 25000,
+      externalReference: `immutable-${tenantId}`,
+    });
+
+    await finance.settle(tenantId, entry.id);
+
+    const client = await pool.connect();
+    try {
+      await client.query("select set_config('app.tenant_id', $1, true)", [tenantId]);
+      await assert.rejects(
+        client.query(
+          "update financial_entries set amount_cents = $1 where tenant_id = $2 and id = $3",
+          [26000, tenantId, entry.id],
+        ),
+        /FINANCIAL_ENTRY_IMMUTABLE/,
+      );
+    } finally {
+      client.release();
+    }
+  });
 }
