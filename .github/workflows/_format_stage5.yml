@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24.20.0
+          package-manager-cache: false
       - run: npm install --global pnpm@11.24.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec prettier --write apps/api/src/modules/operations/operations.module.ts apps/api/src/modules/operations/trip-execution.controller.ts apps/api/src/modules/operations/trip-execution.dto.ts apps/api/src/modules/operations/trip-execution.service.ts packages/database/src/trip-execution-repository.ts packages/database/test/trip-execution.integration.test.ts
