@@ -13,6 +13,7 @@ export class PgDurableJobStore implements DurableJobStore {
            from durable_jobs
            where tenant_id = $1
              and status in ('pending', 'running')
+             and attempts < max_attempts
              and available_at <= now()
            order by created_at asc
            for update skip locked
