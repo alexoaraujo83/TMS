@@ -119,4 +119,13 @@
 - executable unit coverage
 - operational documentation
 
+### Stage 10.6 — Webhook Reliability and Security Hardening
+
+- stable `idempotency-key` derived from the immutable outbox event ID
+- reject redirects instead of following them automatically
+- normalize malformed URL and timeout failures
+- preserve existing outbox lease ownership, tenant isolation and retry semantics
+- executable reliability/security unit coverage
+- document at-least-once delivery and consumer-side deduplication requirements
+
 No stage is considered production-ready merely because its UI exists. Completion requires end-to-end traceability and passing quality/security gates.
