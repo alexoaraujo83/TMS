@@ -18,10 +18,18 @@ The worker POSTs JSON containing the outbox event identity, tenant, aggregate me
 
 When a secret is configured, the raw request body is signed with HMAC-SHA256 and sent in `x-tms-signature` as lowercase hexadecimal.
 
+The worker also sends `idempotency-key` equal to the immutable outbox event ID. Consumers should use this value to deduplicate retries because delivery is at-least-once.
+
+Redirects are rejected rather than followed automatically. This prevents a configured endpoint from silently changing its destination during delivery.
+
+Timeouts are normalized to `WEBHOOK_TIMEOUT`, malformed or unsupported endpoint URLs to `INVALID_WEBHOOK_URL`, and non-success HTTP responses to `WEBHOOK_HTTP_<status>` so operational telemetry and retry handling can distinguish failure classes.
+
 ## Operational guarantees
 
 - HTTP and HTTPS are the only accepted endpoint protocols.
 - Requests have an abort timeout.
+- Redirects are not followed.
+- Each request carries a stable idempotency key derived from the outbox event ID.
 - Multiple configured endpoints are processed sequentially; failure stops the current publication and delegates retry handling to the outbox processor.
 - Payloads are not logged by the webhook publisher.
 - Existing lease ownership and tenant scoping remain authoritative.

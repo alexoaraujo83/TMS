@@ -16,7 +16,12 @@ export class WebhookPublisher {
     options: WebhookPublisherOptions = {},
   ) {
     this.urls.forEach((url) => {
-      const parsed = new URL(url);
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        throw new Error("INVALID_WEBHOOK_URL");
+      }
       if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
         throw new Error("INVALID_WEBHOOK_URL");
       }
@@ -60,14 +65,21 @@ export class WebhookPublisher {
           method: "POST",
           headers: {
             "content-type": "application/json",
+            "idempotency-key": event.id,
             ...(signature ? { "x-tms-signature": signature } : {}),
           },
           body,
+          redirect: "error",
           signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`WEBHOOK_HTTP_${response.status}`);
         }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error("WEBHOOK_TIMEOUT");
+        }
+        throw error;
       } finally {
         clearTimeout(timer);
       }
