@@ -2,11 +2,7 @@ import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import type { KeyLike } from "jose";
-import {
-  LEGACY_NEXORA_TENANT_ID_CLAIM,
-  TMS_TENANT_ID_CLAIM,
-  verifyAccessToken,
-} from "../src/index.ts";
+import { TMS_TENANT_ID_CLAIM, verifyAccessToken } from "../src/index.ts";
 
 const ISSUER = "https://tenant.example.auth0.com";
 const AUDIENCE = "urn:tms:api:development";
@@ -20,7 +16,6 @@ async function signedToken(
     issuer?: string;
     audience?: string;
     tenantId?: string;
-    legacyTenantId?: string;
     rootTenantId?: string;
     algorithm?: "RS256" | "HS256";
     kid?: string;
@@ -30,9 +25,6 @@ async function signedToken(
   const payload: Record<string, unknown> = {};
   if (options.tenantId !== undefined) {
     payload[TMS_TENANT_ID_CLAIM] = options.tenantId;
-  }
-  if (options.legacyTenantId !== undefined) {
-    payload[LEGACY_NEXORA_TENANT_ID_CLAIM] = options.legacyTenantId;
   }
   if (options.rootTenantId !== undefined) {
     payload.tenantId = options.rootTenantId;
@@ -109,41 +101,6 @@ test("verifyAccessToken accepts the canonical TMS namespaced tenant claim", asyn
     });
 
     assert.equal(claims.tenantId, "tenant-a");
-  });
-});
-
-test("verifyAccessToken accepts the legacy Nexora tenant claim during migration", async () => {
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
-
-  await withJwks(publicKey, async () => {
-    const token = await signedToken(privateKey, {
-      legacyTenantId: "tenant-legacy",
-    });
-    const claims = await verifyAccessToken(token, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      jwksUrl: JWKS_URL,
-    });
-
-    assert.equal(claims.tenantId, "tenant-legacy");
-  });
-});
-
-test("verifyAccessToken prefers the canonical TMS tenant claim over the legacy claim", async () => {
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
-
-  await withJwks(publicKey, async () => {
-    const token = await signedToken(privateKey, {
-      tenantId: "tenant-tms",
-      legacyTenantId: "tenant-legacy",
-    });
-    const claims = await verifyAccessToken(token, {
-      issuer: ISSUER,
-      audience: AUDIENCE,
-      jwksUrl: JWKS_URL,
-    });
-
-    assert.equal(claims.tenantId, "tenant-tms");
   });
 });
 

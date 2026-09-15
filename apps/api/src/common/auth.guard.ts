@@ -49,17 +49,22 @@ export class AuthGuard implements CanActivate {
         audience,
         jwksUrl,
       });
-      const selectedTenantId =
-        headerValue(request, "x-tenant-id") ?? claims.tenantId;
 
-      if (!selectedTenantId) {
-        throw new UnauthorizedException("Tenant selection is required");
+      if (!claims.tenantId) {
+        throw new UnauthorizedException("Tenant claim is required");
+      }
+
+      const requestedTenantId = headerValue(request, "x-tenant-id");
+      if (requestedTenantId && requestedTenantId !== claims.tenantId) {
+        throw new ForbiddenException(
+          "Tenant header does not match the authenticated tenant claim",
+        );
       }
 
       const membership = await verifyTenantMembership(
         this.pool,
         claims.sub,
-        selectedTenantId,
+        claims.tenantId,
       );
       if (!membership?.active) {
         throw new ForbiddenException("Active tenant membership required");

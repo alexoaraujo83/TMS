@@ -19,7 +19,13 @@ export class HealthController {
   @Get("/ready")
   async ready() {
     try {
-      await this.pool.query("select 1");
+      const result = await this.pool.query<{ current_user: string }>(
+        "select current_user",
+      );
+
+      if (result.rows[0]?.current_user !== "tms_app") {
+        throw new Error("DATABASE_RUNTIME_ROLE_INVALID");
+      }
     } catch {
       throw new ServiceUnavailableException("DATABASE_UNAVAILABLE");
     }

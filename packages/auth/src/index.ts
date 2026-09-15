@@ -4,10 +4,6 @@ import type { TenantContext } from "@tms/tenancy";
 export const TMS_AUTH_CLAIMS_NAMESPACE = "https://tms.tms/claims";
 export const TMS_TENANT_ID_CLAIM = `${TMS_AUTH_CLAIMS_NAMESPACE}/tenant_id`;
 
-/** Temporary read compatibility for tokens issued before the TMS namespace migration. */
-export const LEGACY_NEXORA_AUTH_CLAIMS_NAMESPACE = "https://nexora.tms/claims";
-export const LEGACY_NEXORA_TENANT_ID_CLAIM = `${LEGACY_NEXORA_AUTH_CLAIMS_NAMESPACE}/tenant_id`;
-
 export interface AuthClaims {
   sub: string;
   tenantId?: string;
@@ -30,15 +26,9 @@ function normalizeIssuer(issuer: string): string {
 }
 
 function extractTenantId(payload: Record<string, unknown>): string | undefined {
-  if (typeof payload[TMS_TENANT_ID_CLAIM] === "string") {
-    return payload[TMS_TENANT_ID_CLAIM];
-  }
-
-  if (typeof payload[LEGACY_NEXORA_TENANT_ID_CLAIM] === "string") {
-    return payload[LEGACY_NEXORA_TENANT_ID_CLAIM];
-  }
-
-  return undefined;
+  return typeof payload[TMS_TENANT_ID_CLAIM] === "string"
+    ? payload[TMS_TENANT_ID_CLAIM]
+    : undefined;
 }
 
 export async function verifyAccessToken(

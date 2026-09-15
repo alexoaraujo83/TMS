@@ -3,16 +3,20 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { describe, it, before, after } from "node:test";
 
-const databaseUrl = process.env.DATABASE_URL;
+const adminDatabaseUrl = process.env.DATABASE_ADMIN_URL;
+const runtimeDatabaseUrl = process.env.DATABASE_URL;
 const runIntegration =
-  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
+  process.env.RUN_DB_INTEGRATION === "true" &&
+  Boolean(adminDatabaseUrl) &&
+  Boolean(runtimeDatabaseUrl);
 
 if (!runIntegration) {
   describe("database security integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_ADMIN_URL/DATABASE_URL are configured", () => {});
   });
 } else {
-  const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: adminDatabaseUrl });
+  const runtimePool = new Pool({ connectionString: runtimeDatabaseUrl });
   let tenantA: string;
   let tenantB: string;
   let userA: string;
@@ -24,13 +28,16 @@ if (!runIntegration) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: adminDatabaseUrl,
+      },
       stdio: "inherit",
     });
 
-    // Test data is provisioned before re-enabling RLS so the test can use the
-    // same non-superuser application role for the actual isolation assertions.
-    const client = await pool.connect();
+    // The admin connection is used only for fixture provisioning and cleanup.
+    // All isolation assertions run through the restricted runtime role.
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -99,7 +106,7 @@ if (!runIntegration) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -119,13 +126,14 @@ if (!runIntegration) {
       await client.query("commit");
     } finally {
       client.release();
-      await pool.end();
+      await runtimePool.end();
+      await adminPool.end();
     }
   });
 
   describe("tenant isolation and membership bootstrap", () => {
     it("isolates tenant-owned resources through RLS", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         await client.query("select set_config($1, $2, true)", [
@@ -145,7 +153,7 @@ if (!runIntegration) {
     });
 
     it("does not allow a forged tenant context to reveal another tenant resource", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         await client.query("select set_config($1, $2, true)", [
@@ -165,7 +173,7 @@ if (!runIntegration) {
     });
 
     it("rejects cross-tenant inserts through WITH CHECK", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         await client.query("select set_config($1, $2, true)", [
@@ -187,7 +195,7 @@ if (!runIntegration) {
     });
 
     it("rejects changing a row to another tenant through WITH CHECK", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         await client.query("select set_config($1, $2, true)", [
@@ -208,7 +216,7 @@ if (!runIntegration) {
     });
 
     it("cannot delete a row outside the active tenant", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         await client.query("select set_config($1, $2, true)", [
@@ -228,7 +236,7 @@ if (!runIntegration) {
     });
 
     it("denies tenant-owned rows when no tenant context is installed", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         const result = await client.query("select id from freights");
@@ -249,7 +257,7 @@ if (!runIntegration) {
     });
 
     it("switches tenant visibility only within the active transaction", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         await client.query("select set_config($1, $2, true)", [
@@ -277,7 +285,7 @@ if (!runIntegration) {
     });
 
     it("keeps the membership bootstrap function non-public and callable by the runtime role", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         const privileges = await client.query(
           `select has_function_privilege(current_user, 'public.check_tenant_membership(text, uuid)', 'execute') as executable,
@@ -309,7 +317,7 @@ if (!runIntegration) {
     });
 
     it("does not resolve an Auth0 subject from another tenant", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         const result = await client.query(
           `select user_id as "userId", tenant_id as "tenantId"
@@ -326,7 +334,7 @@ if (!runIntegration) {
     });
 
     it("keeps tenant context transaction-scoped", async () => {
-      const client = await pool.connect();
+      const client = await runtimePool.connect();
       try {
         await client.query("begin");
         await client.query("select set_config($1, $2, true)", [

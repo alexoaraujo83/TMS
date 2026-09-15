@@ -3,7 +3,11 @@ import test from "node:test";
 import { HealthController } from "../src/health.controller.js";
 
 const healthyPool = {
-  query: async () => ({ rows: [{ ok: 1 }] }),
+  query: async () => ({ rows: [{ current_user: "tms_app" }] }),
+};
+
+const wrongRolePool = {
+  query: async () => ({ rows: [{ current_user: "neondb_owner" }] }),
 };
 
 const failingPool = {
@@ -21,13 +25,19 @@ test("health reports process liveness without requiring the database", () => {
   });
 });
 
-test("ready reports database readiness when the database responds", async () => {
+test("ready reports database readiness when the restricted runtime role is active", async () => {
   const controller = new HealthController(healthyPool);
 
   assert.deepEqual(await controller.ready(), {
     status: "ready",
     service: "tms-api",
   });
+});
+
+test("ready rejects when the database runtime role is not restricted", async () => {
+  const controller = new HealthController(wrongRolePool);
+
+  await assert.rejects(controller.ready(), /DATABASE_UNAVAILABLE/);
 });
 
 test("ready rejects when the database is unavailable", async () => {
