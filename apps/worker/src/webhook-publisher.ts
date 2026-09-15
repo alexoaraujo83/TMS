@@ -8,7 +8,7 @@ export interface WebhookPublisherOptions {
 
 export class WebhookPublisher {
   private readonly timeoutMs: number;
-  private readonly secret?: string;
+  private readonly secret: string;
   private readonly fetchImpl: typeof fetch;
 
   constructor(
@@ -22,7 +22,7 @@ export class WebhookPublisher {
       } catch {
         throw new Error("INVALID_WEBHOOK_URL");
       }
-      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      if (parsed.protocol !== "https:") {
         throw new Error("INVALID_WEBHOOK_URL");
       }
     });
@@ -31,7 +31,12 @@ export class WebhookPublisher {
     if (!Number.isInteger(this.timeoutMs) || this.timeoutMs <= 0) {
       throw new Error("INVALID_WEBHOOK_TIMEOUT");
     }
-    this.secret = options.secret;
+
+    if (this.urls.length > 0 && !options.secret?.trim()) {
+      throw new Error("WEBHOOK_SECRET_REQUIRED");
+    }
+
+    this.secret = options.secret ?? "";
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
@@ -53,9 +58,7 @@ export class WebhookPublisher {
       eventType: event.eventType,
       payload: event.payload,
     });
-    const signature = this.secret
-      ? createHmac("sha256", this.secret).update(body).digest("hex")
-      : undefined;
+    const signature = createHmac("sha256", this.secret).update(body).digest("hex");
 
     for (const url of this.urls) {
       const controller = new AbortController();
@@ -66,7 +69,7 @@ export class WebhookPublisher {
           headers: {
             "content-type": "application/json",
             "idempotency-key": event.id,
-            ...(signature ? { "x-tms-signature": signature } : {}),
+            "x-tms-signature": signature,
           },
           body,
           redirect: "error",
