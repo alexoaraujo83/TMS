@@ -11,13 +11,14 @@ const event = {
   payload: { reference: "ABC-123" },
 };
 
-test("posts JSON with idempotency and no redirect", async () => {
+test("posts JSON with idempotency, signature, and no redirect", async () => {
   const calls: Array<[string, RequestInit | undefined]> = [];
   const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
     calls.push([String(url), init]);
     return new Response(null, { status: 204 });
   };
   const publisher = new WebhookPublisher(["https://example.test/hook"], {
+    secret: "test-secret",
     fetchImpl,
   });
 
@@ -30,6 +31,7 @@ test("posts JSON with idempotency and no redirect", async () => {
   const headers = new Headers(request?.headers);
   assert.equal(headers.get("content-type"), "application/json");
   assert.equal(headers.get("idempotency-key"), event.id);
+  assert.match(headers.get("x-tms-signature") ?? "", /^[a-f0-9]{64}$/);
   assert.deepEqual(JSON.parse(request?.body as string), event);
 });
 
@@ -53,9 +55,34 @@ test("adds a deterministic HMAC signature when configured", async () => {
   );
 });
 
+test("rejects HTTP webhook URLs", () => {
+  assert.throws(
+    () =>
+      new WebhookPublisher(["http://example.test/hook"], {
+        secret: "test-secret",
+      }),
+    /INVALID_WEBHOOK_URL/,
+  );
+});
+
+test("requires a non-empty HMAC secret when endpoints are configured", () => {
+  assert.throws(
+    () => new WebhookPublisher(["https://example.test/hook"]),
+    /WEBHOOK_SECRET_REQUIRED/,
+  );
+  assert.throws(
+    () =>
+      new WebhookPublisher(["https://example.test/hook"], {
+        secret: "   ",
+      }),
+    /WEBHOOK_SECRET_REQUIRED/,
+  );
+});
+
 test("fails publication on a non-success HTTP response", async () => {
   const fetchImpl = async () => new Response(null, { status: 503 });
   const publisher = new WebhookPublisher(["https://example.test/hook"], {
+    secret: "test-secret",
     fetchImpl,
   });
 
@@ -70,6 +97,7 @@ test("normalizes request timeout failures", async () => {
   };
   const publisher = new WebhookPublisher(["https://example.test/hook"], {
     timeoutMs: 100,
+    secret: "test-secret",
     fetchImpl,
   });
 
@@ -85,7 +113,10 @@ test("rejects malformed webhook URLs", () => {
 
 test("rejects unsupported URL protocols", () => {
   assert.throws(
-    () => new WebhookPublisher(["ftp://example.test/hook"]),
+    () =>
+      new WebhookPublisher(["ftp://example.test/hook"], {
+        secret: "test-secret",
+      }),
     /INVALID_WEBHOOK_URL/,
   );
 });
@@ -95,6 +126,7 @@ test("rejects a non-positive timeout", () => {
     () =>
       new WebhookPublisher(["https://example.test/hook"], {
         timeoutMs: 0,
+        secret: "test-secret",
       }),
     /INVALID_WEBHOOK_TIMEOUT/,
   );
