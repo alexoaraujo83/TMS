@@ -1,14 +1,30 @@
 -- Runtime database role hardening.
 -- The application must never connect with a role that has BYPASSRLS.
 -- Password provisioning is intentionally external to migrations.
-CREATE ROLE tms_app
-  LOGIN
-  NOSUPERUSER
-  NOCREATEDB
-  NOCREATEROLE
-  NOINHERIT
-  NOREPLICATION
-  NOBYPASSRLS;
+DO $$
+DECLARE
+  migration_role text := current_user;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tms_app') THEN
+    CREATE ROLE tms_app
+      LOGIN
+      NOSUPERUSER
+      NOCREATEDB
+      NOCREATEROLE
+      NOINHERIT
+      NOREPLICATION
+      NOBYPASSRLS;
+  END IF;
+
+  EXECUTE format(
+    'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tms_app',
+    migration_role
+  );
+  EXECUTE format(
+    'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO tms_app',
+    migration_role
+  );
+END $$;
 
 GRANT USAGE ON SCHEMA public TO tms_app;
 
@@ -23,12 +39,5 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tms_app;
 GRANT EXECUTE ON FUNCTION public.check_tenant_membership(text, uuid) TO tms_app;
 
--- Keep future application tables/sequences aligned with the runtime boundary
--- when migrations are executed by the canonical database owner.
-ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
-  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO tms_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
-  GRANT USAGE, SELECT ON SEQUENCES TO tms_app;
-
--- The migration role remains the only role responsible for schema changes.
+-- The runtime role cannot create schema objects or perform migrations.
 REVOKE CREATE ON SCHEMA public FROM tms_app;
