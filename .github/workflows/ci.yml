@@ -59,8 +59,12 @@ jobs:
           REVOKE ALL ON TABLE public.schema_migrations FROM tms_app;
           SQL
       - run: pnpm --filter @tms/database migrate
+      - name: Grant runtime function access
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "GRANT EXECUTE ON FUNCTION public.check_tenant_membership(text, uuid) TO tms_app"
       - name: Validate RLS with runtime role
         run: pnpm --filter @tms/database exec node --import tsx --test test/rls-runtime.integration.test.ts
+      - name: Validate IAM runtime resolver
+        run: pnpm --filter @tms/database exec node --import tsx --test test/iam-runtime.integration.test.ts
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
