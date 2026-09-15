@@ -31,6 +31,12 @@ Audit of the application, worker and integration-test database connection paths 
 - Production read-only validation now reports `tms_app` with `authentication_method=password` and the same restricted role attributes. The role has schema usage, freight SELECT/INSERT, and membership-function EXECUTE; it does not have INSERT privilege on `schema_migrations`.
 - No production credential is committed to source control.
 
+## Production runtime adoption evidence
+
+- Production Vercel deployment `dpl_3D9o6Ri3oGgveW6GG5Cf2ZwcF94Q` is `READY` and targets `main` at merge commit `ac0471e9887ee003f9d4c4030dac47fedaed61ca`.
+- The deployed `/ready` endpoint returned HTTP `200 OK` with `{"status":"ready","service":"tms-api"}` on 2026-09-15.
+- The readiness implementation explicitly queries `current_user` and rejects any runtime database identity other than `tms_app`; therefore a successful production readiness response is runtime evidence that the deployed API authenticated through the restricted `tms_app` role.
+
 ## Current state
 
 **Database role hardening: COMPROVADO.**
@@ -41,15 +47,17 @@ Audit of the application, worker and integration-test database connection paths 
 
 **Production credential availability: COMPROVADO — Neon management metadata reports password authentication for `tms_app`.**
 
-**Production runtime role adoption: PENDENTE DE EVIDÊNCIA.**
+**Production API runtime role adoption: COMPROVADO — production deployment readiness passed only with `current_user='tms_app'`.**
 
-The application and worker source code do not force `tms_app`; therefore the effective production runtime role is determined by the credential embedded in `DATABASE_URL`. The latest database activity sample observed only `neondb_owner` connections and did not observe an application connection as `tms_app`.
+**Worker production runtime role adoption: PENDENTE DE EVIDÊNCIA.**
 
-## Required next gate
+The worker has a separate `DATABASE_URL` path and must not be changed blindly because backup/restore services can legitimately require elevated database privileges. Its effective production role requires a dedicated runtime execution check before being classified.
 
-1. Update the API production `DATABASE_URL` through the platform secret-management path so it authenticates directly as `tms_app`.
-2. Determine whether the worker's `DATABASE_URL` is an operational application credential or a backup/restore administrative credential before changing it; backup and restore credentials must remain separate when elevated privileges are required.
-3. Prove an application connection with `current_user='tms_app'` and validate tenant A/B read, insert, update and delete isolation, missing-context denial, transaction-scoped context, connection-pool reuse, and membership-function execution against the restricted runtime path.
-4. Re-run deployment health checks and confirm the deployed API and worker remain healthy using the intended least-privilege role.
+## Residual gate
 
-Until these steps are evidenced, P0 database runtime isolation remains **not fully proven** even though the database role, credential availability and CI restricted-role test path are hardened and validated.
+1. Determine whether the worker's production `DATABASE_URL` is an application runtime credential or an administrative backup/restore credential.
+2. If it is an application runtime credential, prove that the worker connects as `tms_app` (or a separately approved least-privilege worker role) and validate its required operations.
+3. Preserve elevated backup/restore credentials separately where required; do not reuse the application runtime role for administrative recovery operations.
+4. Continue final P1 audit closure only after worker identity and operational-role separation are evidenced.
+
+Until the worker path is evidenced, P0 API database runtime isolation is fully proven, while the broader application/worker runtime-role gate remains **PARTIAL**.
