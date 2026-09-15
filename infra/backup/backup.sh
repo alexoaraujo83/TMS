@@ -21,6 +21,7 @@ trap 'rm -rf "$tmp_dir"' EXIT
 plain="$tmp_dir/tms-${run_id}.dump"
 cipher="$tmp_dir/tms-${run_id}.dump.enc"
 sha_file="$tmp_dir/tms-${run_id}.sha256"
+remote_sha_file="$tmp_dir/tms-${run_id}.remote.sha256"
 manifest="$tmp_dir/tms-${run_id}.json"
 
 start_epoch="$(date +%s)"
@@ -71,6 +72,13 @@ aws --endpoint-url "$S3_ENDPOINT" s3 cp "$manifest" "s3://${S3_BUCKET}/${manifes
 remote_size="$(aws --endpoint-url "$S3_ENDPOINT" s3api head-object --bucket "$S3_BUCKET" --key "$object" --query 'ContentLength' --output text)"
 if [[ "$remote_size" != "$size" ]]; then
   echo "size verification failed: local_size=${size} remote_size=${remote_size}" >&2
+  exit 1
+fi
+
+aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://${S3_BUCKET}/${checksum_object}" "$remote_sha_file" --only-show-errors
+remote_checksum="$(awk '{print $1}' "$remote_sha_file")"
+if [[ "$remote_checksum" != "$checksum" ]]; then
+  echo "checksum verification failed: local_checksum=${checksum} remote_checksum=${remote_checksum}" >&2
   exit 1
 fi
 
