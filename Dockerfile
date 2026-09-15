@@ -1,12 +1,16 @@
-FROM postgres:17-bookworm
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends awscli openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+FROM node:22-bookworm-slim
 
 WORKDIR /app
-COPY infra/backup/backup.sh /app/backup.sh
-COPY infra/backup/restore-verify.sh /app/restore-verify.sh
-RUN chmod 0755 /app/backup.sh /app/restore-verify.sh
 
-ENTRYPOINT ["/app/backup.sh"]
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/worker/package.json apps/worker/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY apps/worker apps/worker
+
+RUN pnpm --filter @tms/worker build
+
+CMD ["node", "apps/worker/dist/main.js"]
