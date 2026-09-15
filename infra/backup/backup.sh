@@ -28,6 +28,14 @@ echo "backup_start=${run_id}"
 
 pg_dump --dbname="$NEON_DATABASE_URL" --format=custom --compress=zstd:3 --file="$plain"
 
+postgres_version="$(psql "$NEON_DATABASE_URL" -Atqc 'select current_setting('"'"'server_version'"'"')')"
+public_table_count="$(psql "$NEON_DATABASE_URL" -Atqc "select count(*) from information_schema.tables where table_schema = 'public'")"
+migration_table="$(psql "$NEON_DATABASE_URL" -Atqc "select table_name from information_schema.tables where table_schema = 'public' and table_name in ('schema_migrations', 'drizzle_migrations') order by case table_name when 'schema_migrations' then 1 else 2 end limit 1")"
+migration_count=""
+if [[ -n "$migration_table" ]]; then
+  migration_count="$(psql "$NEON_DATABASE_URL" -Atqc "select count(*) from public.\"${migration_table}\"")"
+fi
+
 openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
   -in "$plain" -out "$cipher" \
   -pass env:BACKUP_ENCRYPTION_KEY
@@ -48,7 +56,11 @@ cat > "$manifest" <<EOF
   "sha256": "${checksum}",
   "bytes": ${size},
   "created_at": "${run_id}",
-  "pg_sslmode": "${PGSSLMODE}"
+  "pg_sslmode": "${PGSSLMODE}",
+  "postgres_version": "${postgres_version}",
+  "public_table_count": ${public_table_count},
+  "migration_table": "${migration_table}",
+  "migration_count": ${migration_count:-null}
 }
 EOF
 
@@ -69,4 +81,8 @@ echo "object=${object}"
 echo "bytes=${size}"
 echo "sha256=${checksum}"
 echo "duration_seconds=${duration}"
+echo "postgres_version=${postgres_version}"
+echo "public_table_count=${public_table_count}"
+echo "migration_table=${migration_table:-none}"
+echo "migration_count=${migration_count:-none}"
 echo "backup_status=verified"
