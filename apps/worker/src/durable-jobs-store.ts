@@ -15,6 +15,12 @@ export class PgDurableJobStore implements DurableJobStore {
              and status in ('pending', 'running')
              and attempts < max_attempts
              and available_at <= now()
+             and exists (
+               select 1
+               from public.tenants
+               where id = $1
+                 and status = 'active'
+             )
            order by created_at asc
            for update skip locked
            limit $2
