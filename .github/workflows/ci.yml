@@ -32,6 +32,7 @@ jobs:
           --health-retries=5
     env:
       DATABASE_URL: postgresql://tms:tms@localhost:5432/tms_dev
+      RUNTIME_DATABASE_URL: postgresql://tms_app:tms_app@localhost:5432/tms_dev
       RUN_DB_INTEGRATION: "true"
     steps:
       - uses: actions/checkout@v5
@@ -41,7 +42,25 @@ jobs:
           package-manager-cache: false
       - run: npm install --global pnpm@11.24.0
       - run: pnpm install --frozen-lockfile
+      - name: Create non-bypass runtime role
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tms_app') THEN
+              CREATE ROLE tms_app LOGIN PASSWORD 'tms_app' NOSUPERUSER NOBYPASSRLS;
+            ELSE
+              ALTER ROLE tms_app LOGIN PASSWORD 'tms_app' NOSUPERUSER NOBYPASSRLS;
+            END IF;
+          END
+          $$;
+          GRANT USAGE ON SCHEMA public TO tms_app;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tms_app;
+          REVOKE ALL ON TABLE public.schema_migrations FROM tms_app;
+          SQL
       - run: pnpm --filter @tms/database migrate
+      - name: Validate RLS with runtime role
+        run: pnpm --filter @tms/database exec node --import tsx --test test/rls-runtime.integration.test.ts
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
