@@ -6,6 +6,7 @@ import { PgOutboxStore } from "./outbox-store.js";
 import { WebhookPublisher } from "./webhook-publisher.js";
 import { normalizeDatabaseUrl } from "./database-url.js";
 import { parseTenantIds, positiveIntegerEnv } from "./config.js";
+import { assertConfiguredTenantsAreActive } from "./tenant-config.js";
 
 async function assertRuntimeRole(pool: Pool): Promise<void> {
   const result = await pool.query<{ current_user: string }>(
@@ -63,6 +64,17 @@ if (!databaseUrl) {
           role: "tms_app",
         }),
       );
+
+      await assertConfiguredTenantsAreActive(pool, tenantIds);
+      if (tenantIds.length > 0) {
+        console.log(
+          JSON.stringify({
+            service: "tms-worker",
+            event: "worker.tenants_verified",
+            configuredTenants: tenantIds.length,
+          }),
+        );
+      }
 
       if (tenantIds.length === 0) {
         console.log(
