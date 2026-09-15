@@ -18,17 +18,19 @@ Uma capacidade só deve ser marcada como concluída quando o comportamento real 
 
 ## 3. Estado conhecido
 
-A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. O banco está na versão 19. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria, Trip Operations e Compliance/GR.
+A fundação utiliza TypeScript, pnpm/Turborepo, Next.js, NestJS, Worker e PostgreSQL/Neon. A sequência de migrations chega a `0028_durable_jobs.sql`. A base implementada cobre tenancy, IAM, master data, freight, matching/assignment, auditoria, Trip Operations, Compliance/GR, outbox e durable jobs.
 
-IAM possui bootstrap de papéis canônicos por tenant (`admin` e `operator`), resolução de `role_id` em memberships e mapeamento inicial de permissões. O operador agora recebe também as permissões de Compliance/GR durante o provisionamento de novos tenants. A criação e resolução devem permanecer dentro de contexto tenant quando a operação exigir RLS.
+IAM possui bootstrap de papéis canônicos por tenant (`admin` e `operator`), resolução de `role_id` em memberships e mapeamento de permissões. O operador recebe também as permissões de Compliance/GR durante o provisionamento de novos tenants. A criação e resolução devem permanecer dentro de contexto tenant quando a operação exigir RLS.
 
 Assignment possui invariantes de ocupação e ciclo de vida: assignment ativo ocupa motorista/veículo, delivery completa o assignment, cancelamento cancela o assignment e a transação deve preservar o estado anterior quando a sincronização falhar.
 
 Trip Operations possui persistência tenant-scoped, RLS, vínculo obrigatório com freight/assignment, estados `planned`, `in_transit`, `delivered` e `cancelled`, transições protegidas por lock transacional e sincronização do freight e assignment no mesmo transaction boundary. A migration 0017 normaliza a correção da restrição aplicada ao banco para permitir cancelamento antes do início da viagem (`planned → cancelled`) sem `started_at`.
 
-Compliance/GR possui duas entidades tenant-scoped: `compliance_checks` para verificações de conformidade e risco, e `gr_requests` para o ciclo de Gerenciamento de Risco. Ambas possuem RLS/FORCE RLS, vínculo tenant-safe com freight/assignment, índices operacionais, estados controlados por CHECK constraints e `updated_at` autoritativo no banco. A migration 0018 cria a fundação e a 0019 mantém o bootstrap de IAM coerente para novos tenants. O application layer agora possui repositório transacional, regras explícitas de transição, auditoria e API NestJS protegida pelas permissões `compliance:read/create/update`.
+Compliance/GR possui entidades tenant-scoped para verificações de conformidade e solicitações de Gerenciamento de Risco. Ambas possuem RLS/FORCE RLS, vínculo tenant-safe com freight/assignment, índices operacionais, estados controlados por CHECK constraints e `updated_at` autoritativo no banco. O application layer possui repositório transacional, regras explícitas de transição, auditoria e API NestJS protegida pelas permissões `compliance:read/create/update`.
 
-O Worker permanece bootstrap/placeholder. Não assumir que processamento assíncrono, outbox, retries ou DLQ estejam implementados.
+O Worker possui processamento de outbox com claim concorrente, `FOR UPDATE SKIP LOCKED`, lease token, publicação/falha e retry com backoff exponencial limitado. O caminho de webhook possui timeout, rejeição de redirects, assinatura HMAC SHA-256 e metadado de idempotência por evento. Esses mecanismos devem continuar sendo validados por testes e evidência operacional antes de serem classificados como operação externa de produção plenamente comprovada.
+
+Backup/restore possui worker dedicado, dump PostgreSQL criptografado, checksum, manifesto e validação de checksum remoto. Um restore real isolado com `finalize: false` foi executado e validado sem substituir produção. A recuperação foi estruturalmente validada, mas RPO/RTO de negócio e política recorrente de recuperação continuam pendentes.
 
 ## 4. Ordem recomendada de trabalho
 
@@ -46,16 +48,17 @@ O Worker permanece bootstrap/placeholder. Não assumir que processamento assínc
 2. Fechar fluxos de freight: criação, consulta, matching, assignment e status.
 3. Expandir master data de carrier/driver/vehicle.
 4. Consolidar Trip Operations e seus estados operacionais.
-5. Implementar e validar Compliance/GR ponta a ponta, incluindo testes de aplicação/API.
+5. Consolidar Compliance/GR ponta a ponta, incluindo testes de aplicação/API.
 6. Implementar estados de loading, vazio, erro, sucesso, proibido e indisponível.
 7. Cobrir API e UI com testes de comportamento.
 
 ### P2 — Operação
 
 1. Observabilidade e correlação de requisições.
-2. Worker real e processamento assíncrono.
-3. Outbox/idempotência/retry quando o domínio exigir eventos.
+2. Fechar processamento assíncrono com evidência operacional.
+3. Outbox/idempotência/retry e webhook reliability quando o domínio exigir eventos.
 4. Runbooks de deploy, rollback, backup e recuperação.
+5. Definir e aprovar RPO/RTO e executar drill recorrente em ambiente isolado.
 
 ### P3 — Domínios futuros
 
@@ -133,7 +136,7 @@ QA deve receber: arquivos/módulos alterados, endpoints, permissões, migrations
 - validar lock transacional e rejeição de `expectedStatus` obsoleto;
 - validar API e mapeamento de erros 404/409.
 
-O teste `packages/database/test/compliance-gr.integration.test.ts` cobre as invariantes de status, timestamps e execução sob contexto tenant. O repositório e a API de Compliance/GR foram implementados; a próxima etapa é ampliar os testes de comportamento do application layer e fechar o gate completo antes de avançar para Matching avançado.
+O teste `packages/database/test/compliance-gr.integration.test.ts` cobre as invariantes de status, timestamps e execução sob contexto tenant. O repositório e a API de Compliance/GR foram implementados; a etapa de validação deve continuar com testes de comportamento do application layer e fechamento do gate correspondente.
 
 ### Cenários mínimos de IAM
 
@@ -161,7 +164,8 @@ Toda entrega que alterar infraestrutura ou persistência deve informar:
 - observabilidade;
 - estratégia de rollback;
 - impacto de dados;
-- compatibilidade entre versões.
+- compatibilidade entre versões;
+- evidência de backup/restore quando houver impacto de recuperação.
 
 ## 8. Design → Desenvolvimento
 
