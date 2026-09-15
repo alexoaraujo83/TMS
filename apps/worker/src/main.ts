@@ -4,6 +4,7 @@ import { PgDurableJobStore } from "./durable-jobs-store.js";
 import { OutboxProcessor } from "./outbox-worker.js";
 import { PgOutboxStore } from "./outbox-store.js";
 import { WebhookPublisher } from "./webhook-publisher.js";
+import { normalizeDatabaseUrl } from "./database-url.js";
 
 function positiveIntegerEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -15,12 +16,6 @@ function positiveIntegerEnv(name: string, fallback: number): number {
   }
 
   return value;
-}
-
-export function normalizeDatabaseUrl(databaseUrl: string): string {
-  const url = new URL(databaseUrl);
-  url.searchParams.set("sslmode", "verify-full");
-  return url.toString();
 }
 
 async function assertRuntimeRole(pool: Pool): Promise<void> {
