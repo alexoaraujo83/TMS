@@ -64,6 +64,7 @@ test("claimPending can reclaim an expired running lease", async () => {
       (query) =>
         /status in \('pending', 'running'\)/.test(query) &&
         /available_at <= now\(\)/.test(query) &&
+        /status = 'active'/.test(query) &&
         /for update skip locked/i.test(query),
     ),
   );
