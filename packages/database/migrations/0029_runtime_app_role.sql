@@ -1,28 +1,14 @@
 -- Runtime database role hardening.
 -- The application must never connect with a role that has BYPASSRLS.
 -- Password provisioning is intentionally external to migrations.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tms_app') THEN
-    CREATE ROLE tms_app
-      LOGIN
-      NOSUPERUSER
-      NOCREATEDB
-      NOCREATEROLE
-      NOINHERIT
-      NOREPLICATION
-      NOBYPASSRLS;
-  ELSE
-    ALTER ROLE tms_app
-      NOSUPERUSER
-      NOCREATEDB
-      NOCREATEROLE
-      NOINHERIT
-      NOREPLICATION
-      NOBYPASSRLS;
-  END IF;
-END
-$$;
+CREATE ROLE tms_app
+  LOGIN
+  NOSUPERUSER
+  NOCREATEDB
+  NOCREATEROLE
+  NOINHERIT
+  NOREPLICATION
+  NOBYPASSRLS;
 
 GRANT USAGE ON SCHEMA public TO tms_app;
 
