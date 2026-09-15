@@ -6,7 +6,7 @@ Audit of the application and worker database connection path after the runtime r
 
 ## Evidence
 
-- `packages/database/src/pool.ts` creates a PostgreSQL pool from `connectionString` and does not select a PostgreSQL role itself. fileciteturn149file0L2-L5
+- `packages/database/src/pool.ts` creates a PostgreSQL pool from `connectionString` and does not select a PostgreSQL role itself.
 - `apps/api/src/common/database.module.ts` supplies `process.env.DATABASE_URL` directly to that pool.
 - `apps/worker/src/main.ts` creates a PostgreSQL `Pool` directly from `process.env.DATABASE_URL`.
 - Tenant-aware repository transactions use `set_config('app.tenant_id', tenantId, true)` before tenant-owned queries.
