@@ -17,6 +17,12 @@ function positiveIntegerEnv(name: string, fallback: number): number {
   return value;
 }
 
+export function normalizeDatabaseUrl(databaseUrl: string): string {
+  const url = new URL(databaseUrl);
+  url.searchParams.set("sslmode", "verify-full");
+  return url.toString();
+}
+
 async function assertRuntimeRole(pool: Pool): Promise<void> {
   const result = await pool.query<{ current_user: string }>(
     "select current_user",
@@ -64,7 +70,7 @@ if (!databaseUrl) {
     }),
   );
 } else {
-  const pool = new Pool({ connectionString: databaseUrl });
+  const pool = new Pool({ connectionString: normalizeDatabaseUrl(databaseUrl) });
 
   const startup = async () => {
     try {
