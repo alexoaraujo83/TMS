@@ -67,14 +67,14 @@ test("uses DB membership instead of JWT permissions", async () => {
   const request = {
     headers: {
       authorization: `Bearer ${await token({ permissions: ["iam:manage"] })}`,
-      "x-tenant-id": TENANT_B,
+      "x-tenant-id": TENANT_A,
     },
   };
 
   const result = await guard([
     {
       userId: USER_ID,
-      tenantId: TENANT_B,
+      tenantId: TENANT_A,
       role: "operator",
       permissions: ["freight:read"],
       active: true,
@@ -85,17 +85,34 @@ test("uses DB membership instead of JWT permissions", async () => {
   assert.deepEqual(request.context, {
     requestId: "",
     userId: USER_ID,
-    tenantId: TENANT_B,
+    tenantId: TENANT_A,
     roles: ["operator"],
     permissions: ["freight:read"],
   });
+});
+
+test("rejects a tenant header that differs from the authenticated claim", async () => {
+  const request = {
+    headers: {
+      authorization: `Bearer ${await token()}`,
+      "x-tenant-id": TENANT_B,
+    },
+  };
+
+  await assert.rejects(
+    () => guard([]).canActivate(contextFor(request)),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message ===
+        "Tenant header does not match the authenticated tenant claim",
+  );
 });
 
 test("rejects a forged tenant without membership", async () => {
   const request = {
     headers: {
       authorization: `Bearer ${await token()}`,
-      "x-tenant-id": TENANT_B,
+      "x-tenant-id": TENANT_A,
     },
   };
 
@@ -175,8 +192,7 @@ test("rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
   );
 });
 
@@ -194,7 +210,6 @@ test("requires tenant selection without a tenant claim", async () => {
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
     (error: unknown) =>
-      error instanceof Error &&
-      error.message === "Tenant selection is required",
+      error instanceof Error && error.message === "Tenant claim is required",
   );
 });
