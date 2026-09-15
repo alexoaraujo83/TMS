@@ -19,6 +19,8 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 cipher="$tmp_dir/backup.dump.enc"
 plain="$tmp_dir/backup.dump"
+toc="$tmp_dir/restore.list"
+filtered_toc="$tmp_dir/restore.filtered.list"
 
 aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://${S3_BUCKET}/${BACKUP_OBJECT}" "$cipher" --only-show-errors
 
@@ -26,20 +28,43 @@ expected="$(aws --endpoint-url "$S3_ENDPOINT" s3api get-object --bucket "$S3_BUC
 actual="$(sha256sum "$cipher" | awk '{print $1}')"
 [[ "$actual" == "$expected" ]] || { echo "checksum mismatch" >&2; exit 1; }
 
+echo "restore_checksum=verified sha256=$actual"
+
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
   -in "$cipher" -out "$plain" \
   -pass env:BACKUP_ENCRYPTION_KEY
 
-pg_restore --dbname="$RESTORE_DATABASE_URL" --clean --if-exists --no-owner --no-privileges "$plain"
+echo "restore_decrypt=verified"
+
+# Neon-managed PostgREST objects are owned by the platform service role on the
+# restore branch. Exclude those TOC entries so --clean never attempts to drop
+# objects the restore role cannot own. Application/public objects remain in the
+# restore and are still validated below.
+pg_restore --list "$plain" > "$toc"
+grep -Ev '(^|[[:space:]])pgrst([[:space:]]|$)|(^|[[:space:]])pg_session_jwt([[:space:]]|$)' "$toc" > "$filtered_toc"
+
+pg_restore \
+  --dbname="$RESTORE_DATABASE_URL" \
+  --clean \
+  --if-exists \
+  --no-owner \
+  --no-privileges \
+  --exit-on-error \
+  --use-list="$filtered_toc" \
+  "$plain"
+
+echo "restore_pg_restore=verified"
 
 psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select current_database(), current_schema();"
-psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from information_schema.tables where table_schema not in ('pg_catalog','information_schema');"
+table_count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from information_schema.tables where table_schema not in ('pg_catalog','information_schema');")"
+echo "restore_public_table_count=$table_count"
 
 # Optional migration marker validation: set EXPECTED_MIGRATION_COUNT only after
 # the production migration inventory has been confirmed for the target restore.
 if [[ -n "${EXPECTED_MIGRATION_COUNT:-}" ]]; then
   count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from public.schema_migrations" 2>/dev/null || true)"
   [[ "$count" == "$EXPECTED_MIGRATION_COUNT" ]] || { echo "migration count mismatch: expected=${EXPECTED_MIGRATION_COUNT} actual=${count}" >&2; exit 1; }
+  echo "restore_migration_count=$count"
 fi
 
 echo "restore_status=verified"
