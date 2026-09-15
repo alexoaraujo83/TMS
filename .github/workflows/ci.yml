@@ -32,6 +32,7 @@ jobs:
           --health-retries=5
     env:
       DATABASE_ADMIN_URL: postgresql://tms:tms@localhost:5432/tms_dev
+      DATABASE_URL: postgresql://tms:tms@localhost:5432/tms_dev
       RUN_DB_INTEGRATION: "true"
     steps:
       - uses: actions/checkout@v5
