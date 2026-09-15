@@ -5,8 +5,8 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY backup.sh /app/backup.sh
-COPY restore-verify.sh /app/restore-verify.sh
+COPY infra/backup/backup.sh /app/backup.sh
+COPY infra/backup/restore-verify.sh /app/restore-verify.sh
 RUN chmod 0755 /app/backup.sh /app/restore-verify.sh
 
 ENTRYPOINT ["/app/backup.sh"]
