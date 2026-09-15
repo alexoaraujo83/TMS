@@ -6,18 +6,40 @@ export async function assertConfiguredTenantsAreActive(
 ): Promise<void> {
   if (tenantIds.length === 0) return;
 
-  const result = await pool.query<{ id: string }>(
-    `
-      select id::text as id
-      from public.tenants
-      where status = 'active'
-        and id = any($1::uuid[])
-    `,
-    [tenantIds],
-  );
+  const client = await pool.connect();
+  const invalidTenantIds: string[] = [];
 
-  const activeTenantIds = new Set(result.rows.map((row) => row.id));
-  const invalidTenantIds = tenantIds.filter((tenantId) => !activeTenantIds.has(tenantId));
+  try {
+    for (const tenantId of tenantIds) {
+      await client.query("begin");
+      try {
+        await client.query("select set_config($1, $2, true)", [
+          "app.tenant_id",
+          tenantId,
+        ]);
+        const result = await client.query<{ id: string }>(
+          `
+            select id::text as id
+            from public.tenants
+            where id = $1
+              and status = 'active'
+          `,
+          [tenantId],
+        );
+
+        if (!result.rows[0]) {
+          invalidTenantIds.push(tenantId);
+        }
+
+        await client.query("rollback");
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      }
+    }
+  } finally {
+    client.release();
+  }
 
   if (invalidTenantIds.length > 0) {
     throw new Error(
