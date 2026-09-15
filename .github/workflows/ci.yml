@@ -31,7 +31,7 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
-      DATABASE_URL: postgresql://tms:tms@localhost:5432/tms_dev
+      DATABASE_ADMIN_URL: postgresql://tms:tms@localhost:5432/tms_dev
       RUN_DB_INTEGRATION: "true"
     steps:
       - uses: actions/checkout@v5
@@ -42,6 +42,15 @@ jobs:
       - run: npm install --global pnpm@11.24.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tms/database migrate
+      - name: Provision CI runtime role credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" \
+            -v ON_ERROR_STOP=1 \
+            -c "ALTER ROLE tms_app PASSWORD '$runtime_password'"
+          printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
