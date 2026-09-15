@@ -1,4 +1,4 @@
-# ADR 0001 — New codebase using Nexora as reference
+# ADR 0001 — New TMS codebase
 
 ## Status
 
@@ -6,10 +6,10 @@ Accepted
 
 ## Decision
 
-The TMS is implemented as a new codebase. Nexora TMS is used as an architectural and audit reference only.
+The TMS is implemented as an independent canonical codebase. Architecture, security, tenancy, database, and operational decisions are validated against the requirements of this repository rather than inherited from another project.
 
-We may reuse validated concepts such as domain boundaries, tenant isolation, RLS, idempotency, auditability, transactional workflows and reconciliation patterns. We do not copy code or known P0/P1 weaknesses without independent validation.
+Validated engineering patterns may be adopted when they satisfy the TMS contracts, tests, security boundaries, and operational evidence requirements.
 
 ## Consequences
 
-The new repository can evolve its contracts and security model without inheriting accidental coupling or unsafe implementation details from the reference project.
+The repository remains independently evolvable and avoids historical coupling, legacy namespaces, and undocumented assumptions from external codebases.
