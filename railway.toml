@@ -1,0 +1,7 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "infra/backup/Dockerfile"
+
+[deploy]
+startCommand = "/app/backup.sh"
+restartPolicyType = "NEVER"
