@@ -16,7 +16,7 @@ Audit of the application, worker and integration-test database connection paths 
 
 ## CI execution evidence
 
-- GitHub Actions CI run `#650` (`35018205631`) for commit `d6c5a491e470d21874efc4905ad04f9c0ff23a23` completed successfully.
+- GitHub Actions CI run `#651` (`35018451926`) for commit `e7da9788358c064847cb84c6fcfc75f44d3ce247` completed successfully.
 - Database migration completed successfully before the restricted runtime credential was provisioned.
 - The CI runtime-role credential provisioning step completed successfully.
 - `pnpm format:fix`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` all completed successfully in the same run.
@@ -24,11 +24,12 @@ Audit of the application, worker and integration-test database connection paths 
 
 ## Credential provisioning evidence
 
-- The first Neon API role recreation path generated a login credential but produced a role with privileged role attributes, including RLS bypass; that state was not accepted for application runtime use.
-- The privileged recreation was removed.
+- An earlier Neon API role recreation path generated a login credential but produced a role with privileged role attributes, including RLS bypass; that state was not accepted for application runtime use.
+- The privileged recreation was removed, including the temporary `tms_app_runtime` role.
 - `tms_app` was recreated through the database migration path with explicit `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS` and the required grants.
 - Temporary-branch validation proved the recreated role had `rolsuper=false`, `rolcreaterole=false`, `rolcreatedb=false`, `rolcanlogin=true`, and `rolbypassrls=false` before applying the migration to production.
-- The Neon management API does not currently expose a compatible password-reset path for this migration-created role, and direct `ALTER ROLE ... PASSWORD` execution is blocked by the managed-role boundary. No production credential was committed to source control.
+- Production read-only validation now reports `tms_app` with `authentication_method=password` and the same restricted role attributes. The role has schema usage, freight SELECT/INSERT, and membership-function EXECUTE; it does not have INSERT privilege on `schema_migrations`.
+- No production credential is committed to source control.
 
 ## Current state
 
@@ -36,17 +37,19 @@ Audit of the application, worker and integration-test database connection paths 
 
 **CI restricted-role integration architecture: COMPROVADO.**
 
-**CI quality/test/build pipeline: COMPROVADO — Run #650 passed.**
+**CI quality/test/build pipeline: COMPROVADO — Run #651 passed.**
+
+**Production credential availability: COMPROVADO — Neon management metadata reports password authentication for `tms_app`.**
 
 **Production runtime role adoption: PENDENTE DE EVIDÊNCIA.**
 
-The application and worker source code do not force `tms_app`; therefore the effective production runtime role is determined by the credential embedded in `DATABASE_URL`. The production application connection has not yet been proven to authenticate directly as `tms_app`.
+The application and worker source code do not force `tms_app`; therefore the effective production runtime role is determined by the credential embedded in `DATABASE_URL`. The latest database activity sample observed only `neondb_owner` connections and did not observe an application connection as `tms_app`.
 
 ## Required next gate
 
-1. Obtain a supported production credential path for the hardened `tms_app` role without weakening its security attributes or committing secrets.
-2. Update API and worker production `DATABASE_URL` values to use `tms_app` through the platform's secret-management path.
-3. Prove tenant A/B read, insert, update and delete isolation, missing-context denial, transaction-scoped context, connection-pool reuse, and membership-function execution against the production runtime path.
-4. Re-run deployment health checks and confirm the deployed API and worker remain healthy using the restricted role.
+1. Update the API production `DATABASE_URL` through the platform secret-management path so it authenticates directly as `tms_app`.
+2. Determine whether the worker's `DATABASE_URL` is an operational application credential or a backup/restore administrative credential before changing it; backup and restore credentials must remain separate when elevated privileges are required.
+3. Prove an application connection with `current_user='tms_app'` and validate tenant A/B read, insert, update and delete isolation, missing-context denial, transaction-scoped context, connection-pool reuse, and membership-function execution against the restricted runtime path.
+4. Re-run deployment health checks and confirm the deployed API and worker remain healthy using the intended least-privilege role.
 
-Until these steps are evidenced, P0 database runtime isolation remains **not fully proven** even though the database role and CI restricted-role test path are hardened and validated.
+Until these steps are evidenced, P0 database runtime isolation remains **not fully proven** even though the database role, credential availability and CI restricted-role test path are hardened and validated.
