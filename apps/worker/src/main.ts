@@ -5,18 +5,7 @@ import { OutboxProcessor } from "./outbox-worker.js";
 import { PgOutboxStore } from "./outbox-store.js";
 import { WebhookPublisher } from "./webhook-publisher.js";
 import { normalizeDatabaseUrl } from "./database-url.js";
-
-function positiveIntegerEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
-
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`INVALID_WORKER_CONFIG:${name}`);
-  }
-
-  return value;
-}
+import { parseTenantIds, positiveIntegerEnv } from "./config.js";
 
 async function assertRuntimeRole(pool: Pool): Promise<void> {
   const result = await pool.query<{ current_user: string }>(
@@ -29,10 +18,7 @@ async function assertRuntimeRole(pool: Pool): Promise<void> {
 }
 
 const databaseUrl = process.env.DATABASE_URL;
-const tenantIds = (process.env.OUTBOX_TENANT_IDS ?? "")
-  .split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
+const tenantIds = parseTenantIds(process.env.OUTBOX_TENANT_IDS);
 const webhookUrls = (process.env.OUTBOX_WEBHOOK_URLS ?? "")
   .split(",")
   .map((value) => value.trim())
