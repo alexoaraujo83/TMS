@@ -43,6 +43,7 @@ test("claimPending uses tenant context and row locking for concurrent workers", 
   assert.equal(events[0]?.leaseToken, "lease-1");
   assert.ok(queries.some((query) => /for update skip locked/i.test(query)));
   assert.ok(queries.some((query) => /status = 'pending'/.test(query)));
+  assert.ok(queries.some((query) => /status = 'active'/.test(query)));
   assert.deepEqual(values[1], ["app.tenant_id", "tenant-1"]);
 });
 
