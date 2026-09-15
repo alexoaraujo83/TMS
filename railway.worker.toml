@@ -1,0 +1,9 @@
+[build]
+builder = "NIXPACKS"
+buildCommand = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @tms/worker build"
+
+[deploy]
+startCommand = "node apps/worker/dist/main.js"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+sleepApplication = false
