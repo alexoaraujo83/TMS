@@ -45,7 +45,25 @@ The canonical architecture also defines Platform, IAM, Master Data, Freight, Mat
 - `pg` 8.23.0
 - `jose` 6.2.10
 
-The root quality chain is formatting check, lint, typecheck, tests and build. CI uses the frozen pnpm lockfile and validates the same quality chain.
+### Mandatory quality chain
+
+The repository standard is:
+
+```text
+pnpm format:fix
+        ↓
+pnpm format:check
+        ↓
+pnpm lint
+        ↓
+pnpm typecheck
+        ↓
+pnpm test
+        ↓
+pnpm build
+```
+
+`pnpm format:fix` is mandatory before `pnpm format:check`; it is the repair step for formatting drift. The root `pnpm check` script enforces the complete sequence, and CI executes the same ordered steps after the database migration. The latest validated CI run completed all quality steps successfully.
 
 ## 4. Implemented API surface
 
