@@ -17,6 +17,16 @@ function positiveIntegerEnv(name: string, fallback: number): number {
   return value;
 }
 
+async function assertRuntimeRole(pool: Pool): Promise<void> {
+  const result = await pool.query<{ current_user: string }>(
+    "select current_user",
+  );
+
+  if (result.rows[0]?.current_user !== "tms_app") {
+    throw new Error("DATABASE_RUNTIME_ROLE_INVALID");
+  }
+}
+
 const databaseUrl = process.env.DATABASE_URL;
 const tenantIds = (process.env.OUTBOX_TENANT_IDS ?? "")
   .split(",")
@@ -194,5 +204,27 @@ if (!databaseUrl || tenantIds.length === 0) {
   process.once("SIGINT", () => void shutdown("SIGINT"));
   process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
-  void run();
+  void (async () => {
+    try {
+      await assertRuntimeRole(pool);
+      console.log(
+        JSON.stringify({
+          service: "tms-worker",
+          event: "database.runtime_role_verified",
+          role: "tms_app",
+        }),
+      );
+      await run();
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          service: "tms-worker",
+          event: "worker.startup_failed",
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      await pool.end();
+      process.exitCode = 1;
+    }
+  })();
 }
