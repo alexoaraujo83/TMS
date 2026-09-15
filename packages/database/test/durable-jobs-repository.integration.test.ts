@@ -95,11 +95,7 @@ if (!enabled) {
       jobs.complete(tenantId, job.id, randomUUID()),
       /DURABLE_JOB_NOT_COMPLETABLE/,
     );
-    const completed = await jobs.complete(
-      tenantId,
-      job.id,
-      claimed.leaseToken,
-    );
+    const completed = await jobs.complete(tenantId, job.id, claimed.leaseToken);
     assert.equal(completed.status, "completed");
     assert.equal(completed.leaseToken, null);
     assert.ok(completed.completedAt);
@@ -168,11 +164,7 @@ if (!enabled) {
       jobs.complete(tenantId, job.id, first.leaseToken),
       /DURABLE_JOB_NOT_COMPLETABLE/,
     );
-    const completed = await jobs.complete(
-      tenantId,
-      job.id,
-      second.leaseToken,
-    );
+    const completed = await jobs.complete(tenantId, job.id, second.leaseToken);
     assert.equal(completed.status, "completed");
   });
 }

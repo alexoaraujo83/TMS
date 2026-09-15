@@ -15,9 +15,10 @@ import type {
   FinancialDirection,
 } from "@tms/database";
 
-export class CreateFinancialEntryDto
-  implements Omit<CreateFinancialEntryInput, "tenantId" | "dueAt">
-{
+export class CreateFinancialEntryDto implements Omit<
+  CreateFinancialEntryInput,
+  "tenantId" | "dueAt"
+> {
   @IsUUID()
   freightId!: string;
 

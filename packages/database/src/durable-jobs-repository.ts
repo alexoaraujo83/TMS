@@ -1,10 +1,6 @@
 import { withTenantContext } from "./tenant-transaction.js";
 
-export type DurableJobStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "failed";
+export type DurableJobStatus = "pending" | "running" | "completed" | "failed";
 
 export interface DurableJobRecord {
   id: string;

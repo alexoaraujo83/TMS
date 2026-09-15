@@ -29,7 +29,9 @@ if (!enabled) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      await client.query("alter table outbox_events disable row level security");
+      await client.query(
+        "alter table outbox_events disable row level security",
+      );
       await client.query("alter table tenants disable row level security");
       for (const [id, suffix] of [
         [tenantId, "outbox-a"],
@@ -53,7 +55,9 @@ if (!enabled) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      await client.query("alter table outbox_events disable row level security");
+      await client.query(
+        "alter table outbox_events disable row level security",
+      );
       await client.query("alter table tenants disable row level security");
       await client.query(
         "delete from outbox_events where tenant_id in ($1, $2)",
@@ -133,7 +137,10 @@ if (!enabled) {
       claimed.every((event) => event.availableAt.getTime() > Date.now()),
       true,
     );
-    assert.equal(claimed.every((event) => Boolean(event.leaseToken)), true);
+    assert.equal(
+      claimed.every((event) => Boolean(event.leaseToken)),
+      true,
+    );
     assert.deepEqual(await outbox.listPending(tenantId), []);
   });
 

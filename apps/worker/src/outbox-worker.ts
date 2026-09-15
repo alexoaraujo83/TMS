@@ -11,7 +11,11 @@ export interface OutboxEvent {
 
 export interface OutboxStore {
   claimPending(tenantId: string, limit: number): Promise<OutboxEvent[]>;
-  markPublished(tenantId: string, id: string, leaseToken: string): Promise<void>;
+  markPublished(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+  ): Promise<void>;
   markFailed(
     tenantId: string,
     id: string,
@@ -43,10 +47,7 @@ export class OutboxProcessor {
     private readonly handler: EventHandler,
   ) {}
 
-  async process(
-    tenantId: string,
-    limit = 50,
-  ): Promise<ProcessResult> {
+  async process(tenantId: string, limit = 50): Promise<ProcessResult> {
     const events = await this.store.claimPending(tenantId, limit);
     let published = 0;
     let failed = 0;

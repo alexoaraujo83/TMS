@@ -67,13 +67,15 @@ if (!enabled) {
     const client = await pool.connect();
     try {
       await client.query("begin");
-      await client.query("alter table financial_entries disable row level security");
+      await client.query(
+        "alter table financial_entries disable row level security",
+      );
       await client.query("alter table freights disable row level security");
       await client.query("alter table tenants disable row level security");
-      await client.query("delete from financial_entries where tenant_id in ($1, $2)", [
-        tenantId,
-        otherTenantId,
-      ]);
+      await client.query(
+        "delete from financial_entries where tenant_id in ($1, $2)",
+        [tenantId, otherTenantId],
+      );
       await client.query("delete from freights where id in ($1, $2)", [
         freightId,
         otherFreightId,
@@ -181,7 +183,9 @@ if (!enabled) {
 
     const client = await pool.connect();
     try {
-      await client.query("select set_config('app.tenant_id', $1, true)", [tenantId]);
+      await client.query("select set_config('app.tenant_id', $1, true)", [
+        tenantId,
+      ]);
       await assert.rejects(
         client.query(
           "update financial_entries set amount_cents = $1 where tenant_id = $2 and id = $3",

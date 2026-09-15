@@ -18,7 +18,11 @@ export type DurableJobHandler = (job: DurableJob) => Promise<void>;
 
 export interface DurableJobStore {
   claimPending(tenantId: string, limit: number): Promise<DurableJob[]>;
-  complete(tenantId: string, id: string, leaseToken: string): Promise<DurableJob>;
+  complete(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+  ): Promise<DurableJob>;
   fail(
     tenantId: string,
     id: string,
@@ -67,19 +71,14 @@ export function retryDelayMs(
   baseDelayMs = 1000,
   maxDelayMs = 300000,
 ): number {
-  return Math.min(
-    maxDelayMs,
-    baseDelayMs * 2 ** Math.max(0, attempts - 1),
-  );
+  return Math.min(maxDelayMs, baseDelayMs * 2 ** Math.max(0, attempts - 1));
 }
 
 export class DurableJobProcessor {
   private readonly now: () => number;
   private readonly baseDelayMs: number;
   private readonly maxDelayMs: number;
-  private readonly onTelemetry: (
-    event: DurableJobTelemetryEvent,
-  ) => void;
+  private readonly onTelemetry: (event: DurableJobTelemetryEvent) => void;
 
   constructor(
     private readonly store: DurableJobStore,

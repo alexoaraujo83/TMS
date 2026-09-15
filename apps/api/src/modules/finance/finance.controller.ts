@@ -14,7 +14,10 @@ import { CurrentUser } from "../../common/current-user.decorator.js";
 import { PermissionGuard } from "../../common/permission.guard.js";
 import { RequirePermission } from "../../common/permission.decorator.js";
 import type { RequestContext } from "../../common/request-context.js";
-import { CreateFinancialEntryDto, ListFinancialEntriesQueryDto } from "./finance.dto.js";
+import {
+  CreateFinancialEntryDto,
+  ListFinancialEntriesQueryDto,
+} from "./finance.dto.js";
 import { FinanceService } from "./finance.service.js";
 
 @Controller("finance")

@@ -3,12 +3,7 @@ import { withTenantContext } from "./tenant-transaction.js";
 export type FinancialDirection = "receivable" | "payable";
 export type FinancialEntryStatus = "pending" | "settled" | "cancelled";
 export type FinancialEntryType =
-  | "freight"
-  | "carrier"
-  | "driver"
-  | "fee"
-  | "commission"
-  | "adjustment";
+  "freight" | "carrier" | "driver" | "fee" | "commission" | "adjustment";
 
 export interface FinancialEntryRecord {
   id: string;
@@ -48,7 +43,9 @@ export interface CreateFinancialEntryInput {
 export class FinanceRepository {
   constructor(private readonly pool: any) {}
 
-  async create(input: CreateFinancialEntryInput): Promise<FinancialEntryRecord> {
+  async create(
+    input: CreateFinancialEntryInput,
+  ): Promise<FinancialEntryRecord> {
     return withTenantContext(this.pool, input.tenantId, async (client: any) => {
       const result = await client.query(
         `insert into financial_entries

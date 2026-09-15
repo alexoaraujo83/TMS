@@ -138,7 +138,10 @@ test("unknown job types are failed and do not abort later jobs", async () => {
   const result = await processor.process(unknown.tenantId, 50);
 
   assert.deepEqual(result, { claimed: 2, completed: 1, failed: 1 });
-  assert.equal(store.failed[0]?.[3], "DURABLE_JOB_HANDLER_NOT_FOUND:missing.job");
+  assert.equal(
+    store.failed[0]?.[3],
+    "DURABLE_JOB_HANDLER_NOT_FOUND:missing.job",
+  );
   assert.equal(store.completed[0]?.[1], known.id);
 });
 
@@ -232,11 +235,13 @@ test("telemetry distinguishes retry from terminal failure", async () => {
   await processor.process(retryJob.tenantId, 10);
 
   assert.equal(
-    events.filter((event) => event.event === "durable_job.retry_scheduled").length,
+    events.filter((event) => event.event === "durable_job.retry_scheduled")
+      .length,
     1,
   );
   assert.equal(
-    events.filter((event) => event.event === "durable_job.terminal_failed").length,
+    events.filter((event) => event.event === "durable_job.terminal_failed")
+      .length,
     1,
   );
   const retryEvent = events.find(

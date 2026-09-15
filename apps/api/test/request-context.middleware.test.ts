@@ -49,7 +49,10 @@ test("generates a UUID when request id is missing", () => {
   middleware.use(req as never, res as never, () => undefined);
 
   const requestId = req.headers["x-request-id"];
-  assert.match(requestId ?? "", /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(
+    requestId ?? "",
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  );
   assert.equal(res.headers.get("X-Request-Id"), requestId);
 });
 

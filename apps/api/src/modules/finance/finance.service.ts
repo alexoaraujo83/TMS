@@ -1,5 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { FinanceRepository, type CreateFinancialEntryInput } from "@tms/database";
+import {
+  FinanceRepository,
+  type CreateFinancialEntryInput,
+} from "@tms/database";
 import type { Pool } from "pg";
 import { DATABASE_POOL } from "../../common/database.provider.js";
 import type { RequestContext } from "../../common/request-context.js";

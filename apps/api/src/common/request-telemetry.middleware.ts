@@ -21,7 +21,8 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
   private readonly now: () => number;
 
   constructor(options: RequestTelemetryMiddlewareOptions = {}) {
-    this.emit = options.emit ?? ((event) => console.info(JSON.stringify(event)));
+    this.emit =
+      options.emit ?? ((event) => console.info(JSON.stringify(event)));
     this.now = options.now ?? Date.now;
   }
 

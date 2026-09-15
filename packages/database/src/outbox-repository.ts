@@ -58,7 +58,10 @@ export class OutboxRepository {
     });
   }
 
-  async listPending(tenantId: string, limit = 50): Promise<OutboxEventRecord[]> {
+  async listPending(
+    tenantId: string,
+    limit = 50,
+  ): Promise<OutboxEventRecord[]> {
     return withTenantContext(this.pool, tenantId, async (client: any) => {
       const result = await client.query(
         `select id, tenant_id, aggregate_type, aggregate_id, event_type, payload,
@@ -74,7 +77,10 @@ export class OutboxRepository {
     });
   }
 
-  async claimPending(tenantId: string, limit = 50): Promise<OutboxEventRecord[]> {
+  async claimPending(
+    tenantId: string,
+    limit = 50,
+  ): Promise<OutboxEventRecord[]> {
     const client = await this.pool.connect();
     try {
       await client.query("begin");

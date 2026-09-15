@@ -4,10 +4,7 @@ import type { OutboxEvent, OutboxStore } from "./outbox-worker.js";
 export class PgOutboxStore implements OutboxStore {
   constructor(private readonly pool: Pool) {}
 
-  async claimPending(
-    tenantId: string,
-    limit: number,
-  ): Promise<OutboxEvent[]> {
+  async claimPending(tenantId: string, limit: number): Promise<OutboxEvent[]> {
     const client = await this.pool.connect();
     try {
       await client.query("begin");
