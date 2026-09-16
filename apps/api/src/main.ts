@@ -5,12 +5,14 @@ import { HttpExceptionFilter } from "./common/http-exception.filter.js";
 import { parseCorsOrigins } from "./common/cors.js";
 import { AppModule } from "./app.module.js";
 
+type CorsOriginCallback = (error: Error | null, allowed?: boolean) => void;
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const corsOrigins = parseCorsOrigins(process.env.CORS_ALLOWED_ORIGINS);
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (origin: string | undefined, callback: CorsOriginCallback) => {
       if (origin === undefined || corsOrigins.includes(origin)) {
         callback(null, true);
         return;
