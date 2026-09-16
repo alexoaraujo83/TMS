@@ -52,6 +52,16 @@ if (!enabled) {
         "insert into tenant_memberships (user_id, tenant_id, role) values ($1, $2, 'operator')",
         [userId, tenantId],
       );
+      for (const table of [
+        "role_permissions",
+        "roles",
+        "tenant_memberships",
+        "users",
+        "tenants",
+      ]) {
+        await client.query(`alter table ${table} enable row level security`);
+        await client.query(`alter table ${table} force row level security`);
+      }
       await client.query("commit");
     } catch (error) {
       await client.query("rollback");
