@@ -1,6 +1,6 @@
 # TMS
 
-Novo TMS/SaaS construído do zero, independente do Nexora TMS e usando-o apenas como referência técnica, arquitetural e de auditoria.
+Novo TMS/SaaS construído do zero, com código-base, banco de dados, ambientes e ciclo de release próprios.
 
 ## Current foundation
 
@@ -23,7 +23,7 @@ See:
 
 ## Environments
 
-The dedicated Neon project is `tms`, with independent `main`, `development` and `staging` branches. Application deployment configuration is intentionally kept separate from Nexora.
+The dedicated PostgreSQL/Neon infrastructure uses independent `main`, `development` and `staging` environments. Application deployment configuration is maintained independently from external projects.
 
 ## Development principle
 
@@ -33,6 +33,6 @@ The implementation follows:
 
 No capability is considered complete only because a screen or endpoint exists; tenant isolation, authorization, persistence, tests and operational behavior must also be covered.
 
-## Reference
+## Release quality
 
-Nexora TMS is reference material only. The new TMS has its own codebase, database, environments and release lifecycle.
+Production promotion requires measured evidence for database integrity, tenant isolation, authorization, application behavior, worker execution, backup/restore, observability and deployment health.
