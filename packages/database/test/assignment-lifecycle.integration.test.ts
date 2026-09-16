@@ -8,6 +8,7 @@ import { PostgresFreightRepository } from "../src/freight-repository.js";
 import { VehicleRepository } from "../src/operational-repositories.js";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const enabled =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -17,6 +18,7 @@ if (!enabled) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const freightRepository = new PostgresFreightRepository(pool);
   const assignmentRepository = new AssignmentRepository(pool);
   const vehicleRepository = new VehicleRepository(pool);
@@ -71,7 +73,7 @@ if (!enabled) {
       env: process.env,
       stdio: "inherit",
     });
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -127,7 +129,7 @@ if (!enabled) {
       client.release();
     }
 
-    const enableClient = await pool.connect();
+    const enableClient = await adminPool.connect();
     try {
       await enableClient.query("begin");
       for (const table of [
@@ -165,7 +167,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -209,6 +211,7 @@ if (!enabled) {
       await client.query("commit");
     } finally {
       client.release();
+      await adminPool.end();
       await pool.end();
     }
   });
