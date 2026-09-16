@@ -18,7 +18,7 @@ Audit the durable-job lease lifecycle after the lease-heartbeat hardening merged
 
 The worker now has a non-noop `external.webhook` Durable Job handler. The handler validates a typed webhook payload and delegates to the existing HTTPS-only `WebhookPublisher`.
 
-The durable job ID is passed as the outbound event ID, which becomes the deterministic `Idempotency-Key` header. This means a retry/reclaim of the same durable job reuses the same external idempotency key rather than generating a new key.
+The durable job ID is passed as the outbound event ID, which becomes the deterministic `Idempotency-Key` header. A retry or reclaim of the same durable job therefore reuses the same external idempotency key rather than generating a new key.
 
 The publisher also requires an HMAC secret when endpoints are configured, signs the exact JSON body, rejects non-HTTPS endpoints, disables redirects, and treats non-success responses/timeouts as failures.
 
