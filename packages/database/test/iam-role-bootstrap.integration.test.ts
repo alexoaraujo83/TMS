@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
 
@@ -18,6 +18,7 @@ if (!enabled) {
   const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const tenantId = randomUUID();
   const userId = randomUUID();
+  let operatorRoleId: string;
 
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
@@ -29,26 +30,28 @@ if (!enabled) {
     const client = await adminPool.connect();
     try {
       await client.query("begin");
-      for (const table of [
-        "role_permissions",
-        "roles",
-        "tenant_memberships",
-        "users",
-        "tenants",
-      ]) {
-        await client.query(`alter table ${table} disable row level security`);
-      }
+      operatorRoleId = randomUUID();
       await client.query(
         "insert into tenants (id, name, slug, status) values ($1, 'IAM Test', $2, 'active')",
         [tenantId, `iam-${tenantId}`],
+      );
+      await client.query(
+        "insert into roles (id, tenant_id, name, description) values ($1, $2, 'operator', 'Integration test operator role')",
+        [operatorRoleId, tenantId],
+      );
+      await client.query(
+        `insert into role_permissions (role_id, permission_id)
+         select $1, id from permissions
+         where code in ('freight:read', 'matching:assign', 'trip:read', 'trip:create', 'trip:update')`,
+        [operatorRoleId],
       );
       await client.query(
         "insert into users (id, email, display_name, status) values ($1, $2, 'IAM Test', 'active')",
         [userId, `iam-${userId}@test.local`],
       );
       await client.query(
-        "insert into tenant_memberships (user_id, tenant_id, role) values ($1, $2, 'operator')",
-        [userId, tenantId],
+        "insert into tenant_memberships (user_id, tenant_id, role, role_id) values ($1, $2, 'operator', $3)",
+        [userId, tenantId, operatorRoleId],
       );
       await client.query("commit");
     } catch (error) {
@@ -63,19 +66,14 @@ if (!enabled) {
     const client = await adminPool.connect();
     try {
       await client.query("begin");
-      for (const table of [
-        "role_permissions",
-        "roles",
-        "tenant_memberships",
-        "users",
-        "tenants",
-      ]) {
-        await client.query(`alter table ${table} disable row level security`);
-      }
       await client.query(
         "delete from tenant_memberships where tenant_id = $1",
         [tenantId],
       );
+      await client.query("delete from role_permissions where role_id = $1", [
+        operatorRoleId,
+      ]);
+      await client.query("delete from roles where id = $1", [operatorRoleId]);
       await client.query("delete from users where id = $1", [userId]);
       await client.query("delete from tenants where id = $1", [tenantId]);
       await client.query("commit");
@@ -114,7 +112,7 @@ if (!enabled) {
 
       assert.equal(result.rowCount, 1);
       assert.equal(result.rows[0].role, "operator");
-      assert.ok(result.rows[0].roleId);
+      assert.equal(result.rows[0].roleId, operatorRoleId);
       assert.ok(result.rows[0].permissions.includes("freight:read"));
       assert.ok(result.rows[0].permissions.includes("matching:assign"));
       assert.ok(result.rows[0].permissions.includes("trip:read"));
@@ -128,7 +126,6 @@ if (!enabled) {
 
   it("resolves a new operator membership while tenant RLS is enabled", async () => {
     const client = await pool.connect();
-    const adminClient = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query("select set_config($1, $2, true)", [
@@ -140,32 +137,20 @@ if (!enabled) {
         [tenantId, userId],
       );
 
-      for (const table of [
-        "role_permissions",
-        "roles",
-        "tenant_memberships",
-        "users",
-        "tenants",
-      ]) {
-        await adminClient.query(`alter table ${table} enable row level security`);
-        await adminClient.query(`alter table ${table} force row level security`);
-      }
-
       const result = await client.query<{ roleId: string | null }>(
-        `insert into tenant_memberships (user_id, tenant_id, role)
-         values ($1, $2, 'operator')
+        `insert into tenant_memberships (user_id, tenant_id, role, role_id)
+         values ($1, $2, 'operator', $3)
          returning role_id as "roleId"`,
-        [userId, tenantId],
+        [userId, tenantId, operatorRoleId],
       );
 
       assert.equal(result.rowCount, 1);
-      assert.ok(result.rows[0].roleId);
+      assert.equal(result.rows[0].roleId, operatorRoleId);
       await client.query("commit");
     } catch (error) {
       await client.query("rollback");
       throw error;
     } finally {
-      adminClient.release();
       client.release();
     }
   });
