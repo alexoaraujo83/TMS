@@ -7,6 +7,7 @@ import { AssignmentRepository } from "../src/assignment-repository.js";
 import { MatchingCandidateRepository } from "../src/matching-candidate-repository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const enabled =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -17,6 +18,7 @@ if (!enabled) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const assignments = new AssignmentRepository(pool);
   const candidates = new MatchingCandidateRepository(pool);
   const tenantId = randomUUID();
@@ -75,7 +77,7 @@ if (!enabled) {
       env: process.env,
       stdio: "inherit",
     });
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of tables) {
@@ -186,7 +188,7 @@ if (!enabled) {
       client.release();
     }
 
-    const enableClient = await pool.connect();
+    const enableClient = await adminPool.connect();
     try {
       await enableClient.query("begin");
       for (const table of tables) {
@@ -204,7 +206,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of tables) {
@@ -250,6 +252,7 @@ if (!enabled) {
     } finally {
       client.release();
       await pool.end();
+      await adminPool.end();
     }
   });
 
