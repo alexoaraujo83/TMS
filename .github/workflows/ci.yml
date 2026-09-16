@@ -59,7 +59,16 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -c "CREATE ROLE tms_ci_admin LOGIN SUPERUSER PASSWORD '$admin_password'"
           printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
+          printf 'RUNTIME_DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'DATABASE_ADMIN_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
+      - name: Validate runtime role attributes
+        run: |
+          psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select rolname, rolsuper, rolbypassrls, rolcanlogin from pg_roles where rolname = 'tms_app'"
+          psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select has_function_privilege('tms_app', 'public.check_tenant_membership(text, uuid)', 'execute') as runtime_can_execute, has_function_privilege('public', 'public.check_tenant_membership(text, uuid)', 'execute') as public_can_execute"
+      - name: Validate RLS with non-bypass runtime role
+        run: pnpm --filter @tms/database exec node --import tsx --test test/rls-runtime.integration.test.ts
+      - name: Validate IAM runtime resolver
+        run: pnpm --filter @tms/database exec node --import tsx --test test/iam-runtime.integration.test.ts
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
