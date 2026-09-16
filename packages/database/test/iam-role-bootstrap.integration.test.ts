@@ -4,16 +4,20 @@ import { execFileSync } from "node:child_process";
 import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+const adminDatabaseUrl = process.env.DATABASE_ADMIN_URL;
+const runtimeDatabaseUrl = process.env.DATABASE_URL;
 const enabled =
-  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
+  process.env.RUN_DB_INTEGRATION === "true" &&
+  Boolean(adminDatabaseUrl) &&
+  Boolean(runtimeDatabaseUrl);
 
 if (!enabled) {
   describe("IAM role bootstrap integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it("is disabled unless RUN_DB_INTEGRATION=true and admin/runtime database URLs are configured", () => {});
   });
 } else {
-  const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: adminDatabaseUrl });
+  const runtimePool = new Pool({ connectionString: runtimeDatabaseUrl });
   const tenantId = randomUUID();
   const userId = randomUUID();
 
@@ -24,7 +28,7 @@ if (!enabled) {
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -58,7 +62,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -79,12 +83,13 @@ if (!enabled) {
       await client.query("commit");
     } finally {
       client.release();
-      await pool.end();
+      await runtimePool.end();
+      await adminPool.end();
     }
   });
 
   it("resolves operator membership to a canonical role with operational and trip permissions", async () => {
-    const client = await pool.connect();
+    const client = await runtimePool.connect();
     try {
       await client.query("begin");
       await client.query("select set_config($1, $2, true)", [
@@ -124,18 +129,13 @@ if (!enabled) {
   });
 
   it("resolves a new operator membership while tenant RLS is enabled", async () => {
-    const client = await pool.connect();
+    const adminClient = await adminPool.connect();
     try {
-      await client.query("begin");
-      await client.query("select set_config($1, $2, true)", [
-        "app.tenant_id",
-        tenantId,
-      ]);
-      await client.query(
+      await adminClient.query("begin");
+      await adminClient.query(
         "delete from tenant_memberships where tenant_id = $1 and user_id = $2",
         [tenantId, userId],
       );
-
       for (const table of [
         "role_permissions",
         "roles",
@@ -143,9 +143,24 @@ if (!enabled) {
         "users",
         "tenants",
       ]) {
-        await client.query(`alter table ${table} enable row level security`);
-        await client.query(`alter table ${table} force row level security`);
+        await adminClient.query(`alter table ${table} enable row level security`);
+        await adminClient.query(`alter table ${table} force row level security`);
       }
+      await adminClient.query("commit");
+    } catch (error) {
+      await adminClient.query("rollback");
+      throw error;
+    } finally {
+      adminClient.release();
+    }
+
+    const client = await runtimePool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
 
       const result = await client.query<{ roleId: string | null }>(
         `insert into tenant_memberships (user_id, tenant_id, role)
