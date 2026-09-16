@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { OutboxRepository } from "../src/outbox-repository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const enabled =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -15,6 +16,7 @@ if (!enabled) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const outbox = new OutboxRepository(pool);
   const tenantId = randomUUID();
   const otherTenantId = randomUUID();
@@ -26,7 +28,7 @@ if (!enabled) {
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query(
@@ -52,7 +54,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query(
@@ -71,6 +73,7 @@ if (!enabled) {
     } finally {
       client.release();
       await pool.end();
+      await adminPool.end();
     }
   });
 
