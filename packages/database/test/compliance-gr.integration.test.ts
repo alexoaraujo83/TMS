@@ -5,16 +5,20 @@ import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
 import { assertComplianceRelease } from "../src/compliance-release.js";
 
-const databaseUrl = process.env.DATABASE_URL;
+const adminDatabaseUrl = process.env.DATABASE_ADMIN_URL;
+const runtimeDatabaseUrl = process.env.DATABASE_URL;
 const enabled =
-  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
+  process.env.RUN_DB_INTEGRATION === "true" &&
+  Boolean(adminDatabaseUrl) &&
+  Boolean(runtimeDatabaseUrl);
 
 if (!enabled) {
   describe("Compliance and GR integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it("is disabled unless RUN_DB_INTEGRATION=true and both database URLs are configured", () => {});
   });
 } else {
-  const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: adminDatabaseUrl });
+  const pool = new Pool({ connectionString: runtimeDatabaseUrl });
   const tenantId = randomUUID();
   const freightId = randomUUID();
 
@@ -25,14 +29,14 @@ if (!enabled) {
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of ["freights", "tenants"]) {
         await client.query(`alter table ${table} disable row level security`);
       }
       await client.query(
-        "insert into tenants (id, name, slug, status) values ($1, 'Compliance Test', $2, 'active')",
+        "insert into tenants (id, name, slug, status) values ($1::uuid, 'Compliance Test', $2::text, 'active')",
         [tenantId, `compliance-${tenantId}`],
       );
       await client.query(
@@ -40,7 +44,7 @@ if (!enabled) {
           id, tenant_id, lifecycle, freight_type, origin, destination,
           cargo_description, quantity, weight_kg, volume_m3, linear_meters,
           company_price, driver_price
-        ) values ($1, $2, 'draft', 'dedicated', 'Origin', 'Destination',
+        ) values ($1::uuid, $2::uuid, 'draft', 'dedicated', 'Origin', 'Destination',
           'Compliance fixture', 1, 100, 1, 1, 100, 80)`,
         [freightId, tenantId],
       );
@@ -51,10 +55,12 @@ if (!enabled) {
     } finally {
       client.release();
     }
+
+    await enableRls(adminPool);
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -65,18 +71,20 @@ if (!enabled) {
       ]) {
         await client.query(`alter table ${table} disable row level security`);
       }
-      await client.query("delete from compliance_checks where tenant_id = $1", [
+      await client.query("delete from compliance_checks where tenant_id = $1::uuid", [
         tenantId,
       ]);
-      await client.query("delete from gr_requests where tenant_id = $1", [
+      await client.query("delete from gr_requests where tenant_id = $1::uuid", [
         tenantId,
       ]);
-      await client.query("delete from freights where id = $1", [freightId]);
-      await client.query("delete from tenants where id = $1", [tenantId]);
+      await client.query("delete from freights where id = $1::uuid", [freightId]);
+      await client.query("delete from tenants where id = $1::uuid", [tenantId]);
       await client.query("commit");
     } finally {
       client.release();
+      await enableRls(adminPool);
       await pool.end();
+      await adminPool.end();
     }
   });
 
@@ -88,16 +96,9 @@ if (!enabled) {
         "app.tenant_id",
         tenantId,
       ]);
-      await client.query(
-        "alter table compliance_checks enable row level security",
-      );
-      await client.query(
-        "alter table compliance_checks force row level security",
-      );
-
       const pending = await client.query(
         `insert into compliance_checks (tenant_id, freight_id, check_type)
-         values ($1, $2, 'gr') returning status`,
+         values ($1::uuid, $2::uuid, 'gr') returning status`,
         [tenantId, freightId],
       );
       assert.equal(pending.rows[0].status, "pending");
@@ -106,7 +107,7 @@ if (!enabled) {
         client.query(
           `insert into compliance_checks
              (tenant_id, freight_id, check_type, status)
-           values ($1, $2, 'gr', 'approved')`,
+           values ($1::uuid, $2::uuid, 'gr', 'approved')`,
           [tenantId, freightId],
         ),
       );
@@ -126,7 +127,7 @@ if (!enabled) {
       ]);
       await client.query(
         `insert into compliance_checks (tenant_id, freight_id, check_type)
-         values ($1, $2, 'driver')`,
+         values ($1::uuid, $2::uuid, 'driver')`,
         [tenantId, freightId],
       );
 
@@ -138,7 +139,7 @@ if (!enabled) {
       await client.query(
         `update compliance_checks
             set status = 'approved', checked_at = now()
-          where tenant_id = $1 and freight_id = $2 and check_type = 'driver'`,
+          where tenant_id = $1::uuid and freight_id = $2::uuid and check_type = 'driver'`,
         [tenantId, freightId],
       );
       await assertComplianceRelease(client, tenantId, freightId);
@@ -158,7 +159,7 @@ if (!enabled) {
       ]);
       const result = await client.query(
         `insert into gr_requests (tenant_id, freight_id, status, submitted_at)
-         values ($1, $2, 'submitted', now()) returning status`,
+         values ($1::uuid, $2::uuid, 'submitted', now()) returning status`,
         [tenantId, freightId],
       );
       assert.equal(result.rows[0].status, "submitted");
@@ -167,4 +168,21 @@ if (!enabled) {
       client.release();
     }
   });
+}
+
+async function enableRls(pool: Pool): Promise<void> {
+  const client = await pool.connect();
+  try {
+    for (const table of [
+      "compliance_checks",
+      "gr_requests",
+      "freights",
+      "tenants",
+    ]) {
+      await client.query(`alter table ${table} enable row level security`);
+      await client.query(`alter table ${table} force row level security`);
+    }
+  } finally {
+    client.release();
+  }
 }
