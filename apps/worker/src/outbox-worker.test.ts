@@ -28,6 +28,7 @@ class MemoryStore implements OutboxStore {
     error: string;
     retryAt: Date;
   }> = [];
+  readonly renewed: Array<{ id: string; leaseToken: string; leaseMs: number }> = [];
   private readonly events: OutboxEvent[];
   private failPublish = false;
 
@@ -41,6 +42,15 @@ class MemoryStore implements OutboxStore {
 
   async claimPending(_tenantId: string, limit: number): Promise<OutboxEvent[]> {
     return this.events.slice(0, limit);
+  }
+
+  async renewLease(
+    _tenantId: string,
+    id: string,
+    leaseToken: string,
+    leaseMs = 300000,
+  ): Promise<void> {
+    this.renewed.push({ id, leaseToken, leaseMs });
   }
 
   async markPublished(
@@ -123,6 +133,20 @@ test("processor does not clear a completed handler's lease when acknowledgement 
   assert.equal(handled, 1);
   assert.equal(store.published.length, 0);
   assert.equal(store.failed.length, 0);
+});
+
+test("processor renews the claimed lease before a long batch can outlive it", async () => {
+  const store = new MemoryStore([event("1")]);
+  const processor = new OutboxProcessor(store, async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1700));
+  });
+
+  const result = await processor.process("tenant-1", 1);
+
+  assert.deepEqual(result, { claimed: 1, published: 1, failed: 0 });
+  assert.deepEqual(store.renewed, [
+    { id: "1", leaseToken: "lease-1", leaseMs: 300000 },
+  ]);
 });
 
 test("processor truncates non-Error failure messages before persisting", async () => {
