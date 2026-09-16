@@ -84,7 +84,7 @@ export class OutboxProcessor {
     let published = 0;
     let failed = 0;
     const states = events.map<LeaseState>((event) => ({ event, lost: false, done: false }));
-    let pendingRenewal: Promise<void> | undefined;
+    const pendingRenewals = new Set<Promise<void>>();
 
     const renewActiveLeases = async (): Promise<void> => {
       await Promise.all(
@@ -105,22 +105,23 @@ export class OutboxProcessor {
       );
     };
 
+    const awaitPendingRenewals = async (): Promise<void> => {
+      if (pendingRenewals.size === 0) return;
+      await Promise.allSettled([...pendingRenewals]);
+    };
+
     const heartbeat = setInterval(() => {
       const renewal = renewActiveLeases();
-      pendingRenewal = renewal;
+      pendingRenewals.add(renewal);
       void renewal.then(
-        () => {
-          if (pendingRenewal === renewal) pendingRenewal = undefined;
-        },
-        () => {
-          if (pendingRenewal === renewal) pendingRenewal = undefined;
-        },
+        () => pendingRenewals.delete(renewal),
+        () => pendingRenewals.delete(renewal),
       );
     }, this.heartbeatMs);
 
     try {
       for (const state of states) {
-        if (pendingRenewal) await pendingRenewal;
+        await awaitPendingRenewals();
 
         const { event } = state;
         if (state.lost) {
@@ -132,7 +133,7 @@ export class OutboxProcessor {
         try {
           await this.handler(event);
         } catch (error) {
-          if (pendingRenewal) await pendingRenewal;
+          await awaitPendingRenewals();
           const message = error instanceof Error ? error.message : String(error);
           const retryAt = new Date(Date.now() + retryDelayMs(event.attempts));
           if (!state.lost) {
@@ -149,7 +150,7 @@ export class OutboxProcessor {
           continue;
         }
 
-        if (pendingRenewal) await pendingRenewal;
+        await awaitPendingRenewals();
         if (state.lost) {
           failed += 1;
           state.done = true;
@@ -172,7 +173,7 @@ export class OutboxProcessor {
       }
     } finally {
       clearInterval(heartbeat);
-      if (pendingRenewal) await pendingRenewal;
+      await awaitPendingRenewals();
     }
 
     return { claimed: events.length, published, failed };
