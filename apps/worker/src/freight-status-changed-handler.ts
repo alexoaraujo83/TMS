@@ -83,10 +83,7 @@ function parsePayload(job: DurableJob): FreightStatusChangedPayload {
 export function createFreightStatusChangedHandler(pool: Pool): DurableJobHandler {
   return async (job) => {
     const payload = parsePayload(job);
-    const allowed = TRANSITIONS[payload.expectedStatus].includes(
-      payload.nextStatus,
-    );
-    if (!allowed) {
+    if (!TRANSITIONS[payload.expectedStatus].includes(payload.nextStatus)) {
       throw new Error(
         `DURABLE_JOB_FREIGHT_TRANSITION_INVALID:${payload.expectedStatus}->${payload.nextStatus}`,
       );
@@ -119,6 +116,74 @@ export function createFreightStatusChangedHandler(pool: Pool): DurableJobHandler
         );
       }
 
+      if (
+        payload.nextStatus === "delivered" ||
+        payload.nextStatus === "cancelled"
+      ) {
+        const assignment = await client.query<{
+          id: string;
+          status: "active";
+        }>(
+          `select id, status
+             from freight_assignments
+            where tenant_id = $1
+              and freight_id = $2
+              and status = 'active'
+            for update`,
+          [job.tenantId, payload.freightId],
+        );
+
+        if (payload.nextStatus === "delivered" && !assignment.rows[0]) {
+          throw new Error(
+            "Freight cannot be delivered without an active assignment",
+          );
+        }
+
+        const activeAssignment = assignment.rows[0];
+        if (activeAssignment) {
+          const assignmentNextStatus =
+            payload.nextStatus === "delivered" ? "completed" : "cancelled";
+          const timestampColumn =
+            assignmentNextStatus === "completed"
+              ? "completed_at"
+              : "cancelled_at";
+
+          await client.query(
+            `update freight_assignments
+                set status = $3, ${timestampColumn} = now(), updated_at = now()
+              where tenant_id = $1 and id = $2 and status = 'active'`,
+            [job.tenantId, activeAssignment.id, assignmentNextStatus],
+          );
+
+          await client.query(
+            `insert into audit_events (
+               tenant_id, actor_user_id, action, entity_type, entity_id,
+               request_id, before_state, after_state, metadata
+             ) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)`,
+            [
+              job.tenantId,
+              payload.actorUserId ?? null,
+              assignmentNextStatus === "completed"
+                ? "freight.assignment_completed"
+                : "freight.assignment_cancelled",
+              "freight_assignment",
+              activeAssignment.id,
+              payload.requestId ?? null,
+              JSON.stringify({ status: "active", freightId: payload.freightId }),
+              JSON.stringify({
+                status: assignmentNextStatus,
+                freightId: payload.freightId,
+              }),
+              JSON.stringify({
+                durableJobId: job.id,
+                eventId: payload.eventId ?? null,
+                handler: "freight.status.changed",
+              }),
+            ],
+          );
+        }
+      }
+
       const updated = await client.query<{ id: string }>(
         `update freights
             set status = $3, updated_at = now()
@@ -137,15 +202,8 @@ export function createFreightStatusChangedHandler(pool: Pool): DurableJobHandler
 
       await client.query(
         `insert into audit_events (
-           tenant_id,
-           actor_user_id,
-           action,
-           entity_type,
-           entity_id,
-           request_id,
-           before_state,
-           after_state,
-           metadata
+           tenant_id, actor_user_id, action, entity_type, entity_id,
+           request_id, before_state, after_state, metadata
          ) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)`,
         [
           job.tenantId,
