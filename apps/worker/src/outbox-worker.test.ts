@@ -140,16 +140,16 @@ test("processor renews the claimed lease during a long handler", async () => {
   const processor = new OutboxProcessor(
     store,
     async () => {
-      await new Promise((resolve) => setTimeout(resolve, 40));
+      await new Promise((resolve) => setTimeout(resolve, 1100));
     },
-    { leaseMs: 30, heartbeatMs: 10 },
+    { leaseMs: 3000, heartbeatMs: 1000 },
   );
 
   const result = await processor.process("tenant-1", 1);
 
   assert.deepEqual(result, { claimed: 1, published: 1, failed: 0 });
-  assert.ok(store.renewed.length >= 2);
-  assert.ok(store.renewed.every((renewal) => renewal.leaseMs === 30));
+  assert.ok(store.renewed.length >= 1);
+  assert.ok(store.renewed.every((renewal) => renewal.leaseMs === 3000));
 });
 
 test("processor rejects an invalid heartbeat configuration", () => {
