@@ -11,11 +11,7 @@ export interface OutboxEvent {
 
 export interface OutboxStore {
   claimPending(tenantId: string, limit: number): Promise<OutboxEvent[]>;
-  markPublished(
-    tenantId: string,
-    id: string,
-    leaseToken: string,
-  ): Promise<void>;
+  markPublished(tenantId: string, id: string, leaseToken: string): Promise<void>;
   markFailed(
     tenantId: string,
     id: string,
@@ -55,8 +51,6 @@ export class OutboxProcessor {
     for (const event of events) {
       try {
         await this.handler(event);
-        await this.store.markPublished(tenantId, event.id, event.leaseToken);
-        published += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const retryAt = new Date(Date.now() + retryDelayMs(event.attempts));
@@ -67,6 +61,20 @@ export class OutboxProcessor {
           message.slice(0, 4000),
           retryAt,
         );
+        failed += 1;
+        continue;
+      }
+
+      try {
+        await this.store.markPublished(tenantId, event.id, event.leaseToken);
+        published += 1;
+      } catch {
+        // The handler has already completed its side effect. Do not clear the
+        // lease or schedule an immediate retry: doing so can turn an
+        // acknowledgement failure into an avoidable duplicate side effect.
+        // The existing lease remains fenced until it expires, after which a
+        // later claim may replay the event. Handlers therefore remain required
+        // to be idempotent using event.id as their durable idempotency key.
         failed += 1;
       }
     }
