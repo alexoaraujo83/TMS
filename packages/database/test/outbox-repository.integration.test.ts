@@ -147,6 +147,40 @@ if (!enabled) {
     assert.deepEqual(await outbox.listPending(tenantId), []);
   });
 
+  it("does not claim pending events for an inactive tenant", async () => {
+    const event = await outbox.enqueue({
+      tenantId,
+      aggregateType: "freight",
+      eventType: "freight.created",
+    });
+
+    const client = await adminPool.connect();
+    try {
+      await client.query("update tenants set status = 'suspended' where id = $1", [
+        tenantId,
+      ]);
+    } finally {
+      client.release();
+    }
+
+    try {
+      assert.deepEqual(await outbox.claimPending(tenantId, 1), []);
+    } finally {
+      const restoreClient = await adminPool.connect();
+      try {
+        await restoreClient.query(
+          "update tenants set status = 'active' where id = $1",
+          [tenantId],
+        );
+      } finally {
+        restoreClient.release();
+      }
+    }
+
+    const claimed = await outbox.claimPending(tenantId, 1);
+    assert.equal(claimed[0]?.id, event.id);
+  });
+
   it("uses skip-locked claims to avoid duplicate concurrent work", async () => {
     const first = await outbox.enqueue({
       tenantId,

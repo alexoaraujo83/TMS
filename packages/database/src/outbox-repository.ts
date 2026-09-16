@@ -95,6 +95,12 @@ export class OutboxRepository {
            where tenant_id = $1
              and status = 'pending'
              and available_at <= now()
+             and exists (
+               select 1
+               from public.tenants
+               where id = $1
+                 and status = 'active'
+             )
            order by created_at asc
            for update skip locked
            limit $2
