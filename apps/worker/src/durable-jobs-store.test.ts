@@ -31,6 +31,14 @@ test("claimPending can reclaim an expired running lease", async () => {
   assert.ok(queries.some((query) => /status in \('pending', 'running'\)/.test(query) && /available_at <= now\(\)/.test(query) && /status = 'active'/.test(query) && /for update skip locked/i.test(query)));
 });
 
+test("renewLease rejects a non-positive or non-finite lease duration", async () => {
+  const { pool, queries } = createPool({ rows: [] }); const store = new PgDurableJobStore(pool);
+  await assert.rejects(() => store.renewLease("tenant", "job", "lease", 0), { message: "DURABLE_JOB_LEASE_INVALID" });
+  await assert.rejects(() => store.renewLease("tenant", "job", "lease", -1), { message: "DURABLE_JOB_LEASE_INVALID" });
+  await assert.rejects(() => store.renewLease("tenant", "job", "lease", Number.NaN), { message: "DURABLE_JOB_LEASE_INVALID" });
+  assert.equal(queries.length, 0);
+});
+
 test("renewLease requires the current lease token and extends availability", async () => {
   const row = { id: "job-1", tenant_id: "00000000-0000-0000-0000-000000000001", job_type: "system.noop", payload: {}, status: "running", attempts: 2, max_attempts: 5, available_at: new Date(), lease_token: "lease-1", last_error: null, completed_at: null, created_at: new Date(), updated_at: new Date() };
   const { pool, queries, values } = createPool({ rows: [row] }); const store = new PgDurableJobStore(pool);
