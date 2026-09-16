@@ -5,15 +5,19 @@ import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
 import { FinanceRepository } from "../src/finance-repository.js";
 
+const adminDatabaseUrl = process.env.DATABASE_ADMIN_URL;
 const databaseUrl = process.env.DATABASE_URL;
 const enabled =
-  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
+  process.env.RUN_DB_INTEGRATION === "true" &&
+  Boolean(adminDatabaseUrl) &&
+  Boolean(databaseUrl);
 
 if (!enabled) {
   describe("Finance repository integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it("is disabled unless RUN_DB_INTEGRATION=true and both database URLs are configured", () => {});
   });
 } else {
+  const adminPool = new Pool({ connectionString: adminDatabaseUrl });
   const pool = new Pool({ connectionString: databaseUrl });
   const finance = new FinanceRepository(pool);
   const tenantId = randomUUID();
@@ -28,7 +32,7 @@ if (!enabled) {
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of ["financial_entries", "freights", "tenants"]) {
@@ -39,19 +43,20 @@ if (!enabled) {
         [otherTenantId, "finance-b"],
       ]) {
         await client.query(
-          "insert into tenants (id, name, slug, status) values ($1, $2, $3, 'active')",
+          "insert into tenants (id, name, slug, status) values ($1::uuid, $2::text, $3::text, 'active')",
           [id, `Finance Test ${suffix}`, `${suffix}-${id}`],
         );
       }
       await client.query(
         `insert into freights (
-          id, tenant_id, lifecycle, freight_type, origin, destination,
-          cargo_description, quantity, weight_kg, volume_m3, linear_meters,
-          company_price, driver_price
-        ) values ($1, $2, 'draft', 'dedicated', 'Origin', 'Destination',
-          'Finance fixture', 1, 100, 1, 1, 100, 80),
-        ($3, $4, 'draft', 'dedicated', 'Origin B', 'Destination B',
-          'Finance fixture B', 1, 100, 1, 1, 100, 80)`,
+          id, tenant_id, status, freight_type, origin_city, origin_state,
+          destination_city, destination_state, cargo_description, quantity,
+          weight_kg, volume_m3, linear_meters, customer_price_cents,
+          driver_price_cents
+        ) values ($1::uuid, $2::uuid, 'draft', 'dedicated', 'Origin', 'SP',
+          'Destination', 'SP', 'Finance fixture', 1, 100, 1, 1, 10000, 8000),
+        ($3::uuid, $4::uuid, 'draft', 'dedicated', 'Origin B', 'SP',
+          'Destination B', 'SP', 'Finance fixture B', 1, 100, 1, 1, 10000, 8000)`,
         [freightId, tenantId, otherFreightId, otherTenantId],
       );
       await client.query("commit");
@@ -64,7 +69,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query(
@@ -73,20 +78,21 @@ if (!enabled) {
       await client.query("alter table freights disable row level security");
       await client.query("alter table tenants disable row level security");
       await client.query(
-        "delete from financial_entries where tenant_id in ($1, $2)",
+        "delete from financial_entries where tenant_id in ($1::uuid, $2::uuid)",
         [tenantId, otherTenantId],
       );
-      await client.query("delete from freights where id in ($1, $2)", [
+      await client.query("delete from freights where id in ($1::uuid, $2::uuid)", [
         freightId,
         otherFreightId,
       ]);
-      await client.query("delete from tenants where id in ($1, $2)", [
+      await client.query("delete from tenants where id in ($1::uuid, $2::uuid)", [
         tenantId,
         otherTenantId,
       ]);
       await client.query("commit");
     } finally {
       client.release();
+      await adminPool.end();
       await pool.end();
     }
   });
