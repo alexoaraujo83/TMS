@@ -69,6 +69,8 @@ jobs:
         run: pnpm --filter @tms/database exec node --import tsx --test test/rls-runtime.integration.test.ts
       - name: Validate IAM runtime resolver
         run: pnpm --filter @tms/database exec node --import tsx --test test/iam-runtime.integration.test.ts
+      - name: Validate worker Durable Jobs PostgreSQL integration
+        run: pnpm --filter @tms/worker exec tsx --test src/durable-jobs.integration.test.ts
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
