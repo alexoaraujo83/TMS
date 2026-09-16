@@ -9,19 +9,19 @@ export class PgDurableJobStore implements DurableJobStore {
     return withTenantTransaction(this.pool, tenantId, async (client) => {
       const result = await client.query(
         `with claimed as (
-           select id, gen_random_uuid() as lease_token
-           from durable_jobs
-           where tenant_id = $1
-             and status in ('pending', 'running')
-             and attempts < max_attempts
-             and available_at <= now()
+           select jobs.id, gen_random_uuid() as lease_token
+           from durable_jobs as jobs
+           where jobs.tenant_id = $1
+             and jobs.status in ('pending', 'running')
+             and jobs.attempts < jobs.max_attempts
+             and jobs.available_at <= now()
              and exists (
                select 1
-               from public.tenants
-               where id = $1
-                 and status = 'active'
+               from public.tenants as tenant
+               where tenant.id = $1
+                 and tenant.status = 'active'
              )
-           order by created_at asc
+           order by jobs.created_at asc
            for update skip locked
            limit $2
          )
@@ -33,19 +33,34 @@ export class PgDurableJobStore implements DurableJobStore {
              updated_at = now()
          from claimed
          where job.id = claimed.id
-         returning id, tenant_id, job_type, payload, status, attempts, max_attempts,
-           available_at, lease_token, last_error, completed_at, created_at, updated_at`,
+         returning job.id, job.tenant_id, job.job_type, job.payload, job.status, job.attempts, job.max_attempts,
+           job.available_at, job.lease_token, job.last_error, job.completed_at, job.created_at, job.updated_at`,
         [tenantId, limit],
       );
       return result.rows.map(mapJob);
     });
   }
 
-  async complete(
-    tenantId: string,
-    id: string,
-    leaseToken: string,
-  ): Promise<DurableJob> {
+  async renewLease(tenantId: string, id: string, leaseToken: string, leaseMs = 300_000): Promise<DurableJob> {
+    return withTenantTransaction(this.pool, tenantId, async (client) => {
+      const result = await client.query(
+        `update durable_jobs
+         set available_at = now() + ($4 * interval '1 millisecond'),
+             updated_at = now()
+         where tenant_id = $1
+           and id = $2
+           and status = 'running'
+           and lease_token = $3
+         returning id, tenant_id, job_type, payload, status, attempts, max_attempts,
+           available_at, lease_token, last_error, completed_at, created_at, updated_at`,
+        [tenantId, id, leaseToken, leaseMs],
+      );
+      if (!result.rows[0]) throw new Error("DURABLE_JOB_LEASE_RENEWAL_FAILED");
+      return mapJob(result.rows[0]);
+    });
+  }
+
+  async complete(tenantId: string, id: string, leaseToken: string): Promise<DurableJob> {
     return this.updateWithLease(
       tenantId,
       id,
@@ -57,13 +72,7 @@ export class PgDurableJobStore implements DurableJobStore {
     );
   }
 
-  async fail(
-    tenantId: string,
-    id: string,
-    leaseToken: string,
-    error: string,
-    retryAt: Date,
-  ): Promise<DurableJob> {
+  async fail(tenantId: string, id: string, leaseToken: string, error: string, retryAt: Date): Promise<DurableJob> {
     return this.updateWithLease(
       tenantId,
       id,
