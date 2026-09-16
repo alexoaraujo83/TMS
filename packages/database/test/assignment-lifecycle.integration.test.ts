@@ -7,15 +7,19 @@ import { AssignmentRepository } from "../src/assignment-repository.js";
 import { PostgresFreightRepository } from "../src/freight-repository.js";
 import { VehicleRepository } from "../src/operational-repositories.js";
 
+const adminDatabaseUrl = process.env.DATABASE_ADMIN_URL;
 const databaseUrl = process.env.DATABASE_URL;
 const enabled =
-  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
+  process.env.RUN_DB_INTEGRATION === "true" &&
+  Boolean(adminDatabaseUrl) &&
+  Boolean(databaseUrl);
 
 if (!enabled) {
   describe("assignment lifecycle integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it("is disabled unless RUN_DB_INTEGRATION=true and database roles are configured", () => {});
   });
 } else {
+  const adminPool = new Pool({ connectionString: adminDatabaseUrl });
   const pool = new Pool({ connectionString: databaseUrl });
   const freightRepository = new PostgresFreightRepository(pool);
   const assignmentRepository = new AssignmentRepository(pool);
@@ -71,7 +75,7 @@ if (!enabled) {
       env: process.env,
       stdio: "inherit",
     });
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -127,7 +131,7 @@ if (!enabled) {
       client.release();
     }
 
-    const enableClient = await pool.connect();
+    const enableClient = await adminPool.connect();
     try {
       await enableClient.query("begin");
       for (const table of [
@@ -165,7 +169,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -209,6 +213,7 @@ if (!enabled) {
       await client.query("commit");
     } finally {
       client.release();
+      await adminPool.end();
       await pool.end();
     }
   });
