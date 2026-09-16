@@ -51,6 +51,12 @@ export function retryDelayMs(
 const DEFAULT_LEASE_MS = 5 * 60 * 1000;
 const MIN_HEARTBEAT_MS = 1000;
 
+interface LeaseState {
+  event: OutboxEvent;
+  lost: boolean;
+  done: boolean;
+}
+
 export class OutboxProcessor {
   private readonly leaseMs: number;
   private readonly heartbeatMs: number;
@@ -77,54 +83,96 @@ export class OutboxProcessor {
     const events = await this.store.claimPending(tenantId, limit);
     let published = 0;
     let failed = 0;
+    const states = events.map<LeaseState>((event) => ({ event, lost: false, done: false }));
+    let pendingRenewal: Promise<void> | undefined;
 
-    for (const event of events) {
-      let leaseLost = false;
-      const heartbeat = setInterval(() => {
-        void this.store
-          .renewLease(tenantId, event.id, event.leaseToken, this.leaseMs)
-          .catch(() => {
-            leaseLost = true;
-          });
-      }, this.heartbeatMs);
+    const renewActiveLeases = async (): Promise<void> => {
+      await Promise.all(
+        states
+          .filter((state) => !state.done && !state.lost)
+          .map(async (state) => {
+            try {
+              await this.store.renewLease(
+                tenantId,
+                state.event.id,
+                state.event.leaseToken,
+                this.leaseMs,
+              );
+            } catch {
+              state.lost = true;
+            }
+          }),
+      );
+    };
 
-      try {
-        await this.handler(event);
-      } catch (error) {
-        clearInterval(heartbeat);
-        const message = error instanceof Error ? error.message : String(error);
-        const retryAt = new Date(Date.now() + retryDelayMs(event.attempts));
-        if (!leaseLost) {
-          await this.store.markFailed(
-            tenantId,
-            event.id,
-            event.leaseToken,
-            message.slice(0, 4000),
-            retryAt,
-          );
+    const heartbeat = setInterval(() => {
+      const renewal = renewActiveLeases();
+      pendingRenewal = renewal;
+      void renewal.then(
+        () => {
+          if (pendingRenewal === renewal) pendingRenewal = undefined;
+        },
+        () => {
+          if (pendingRenewal === renewal) pendingRenewal = undefined;
+        },
+      );
+    }, this.heartbeatMs);
+
+    try {
+      for (const state of states) {
+        if (pendingRenewal) await pendingRenewal;
+
+        const { event } = state;
+        if (state.lost) {
+          failed += 1;
+          state.done = true;
+          continue;
         }
-        failed += 1;
-        continue;
-      }
 
+        try {
+          await this.handler(event);
+        } catch (error) {
+          if (pendingRenewal) await pendingRenewal;
+          const message = error instanceof Error ? error.message : String(error);
+          const retryAt = new Date(Date.now() + retryDelayMs(event.attempts));
+          if (!state.lost) {
+            await this.store.markFailed(
+              tenantId,
+              event.id,
+              event.leaseToken,
+              message.slice(0, 4000),
+              retryAt,
+            );
+          }
+          failed += 1;
+          state.done = true;
+          continue;
+        }
+
+        if (pendingRenewal) await pendingRenewal;
+        if (state.lost) {
+          failed += 1;
+          state.done = true;
+          continue;
+        }
+
+        try {
+          await this.store.markPublished(tenantId, event.id, event.leaseToken);
+          published += 1;
+        } catch {
+          // The handler has already completed its side effect. Do not clear the
+          // lease or schedule an immediate retry: doing so can turn an
+          // acknowledgement failure into an avoidable duplicate side effect.
+          // The existing lease remains fenced until it expires, after which a
+          // later claim may replay the event. Handlers therefore remain required
+          // to be idempotent using event.id as their durable idempotency key.
+          failed += 1;
+        }
+        state.done = true;
+      }
+    } finally {
       clearInterval(heartbeat);
-      if (leaseLost) {
-        failed += 1;
-        continue;
-      }
-
-      try {
-        await this.store.markPublished(tenantId, event.id, event.leaseToken);
-        published += 1;
-      } catch {
-        // The handler has already completed its side effect. Do not clear the
-        // lease or schedule an immediate retry: doing so can turn an
-        // acknowledgement failure into an avoidable duplicate side effect.
-        // The existing lease remains fenced until it expires, after which a
-        // later claim may replay the event. Handlers therefore remain required
-        // to be idempotent using event.id as their durable idempotency key.
-        failed += 1;
-      }
+      if (pendingRenewal) await pendingRenewal;
     }
 
     return { claimed: events.length, published, failed };
