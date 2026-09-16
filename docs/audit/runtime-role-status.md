@@ -61,3 +61,7 @@ The worker has a separate `DATABASE_URL` path and must not be changed blindly be
 4. Continue final P1 audit closure only after worker identity and operational-role separation are evidenced.
 
 Until the worker path is evidenced, P0 API database runtime isolation is fully proven, while the broader application/worker runtime-role gate remains **PARTIAL**.
+
+## CI validation branch
+
+This branch exists only to execute GitHub Actions against the current `main` state after the database integration-test concurrency and CI administrative-role corrections.
