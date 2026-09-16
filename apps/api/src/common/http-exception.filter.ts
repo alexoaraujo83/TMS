@@ -12,6 +12,18 @@ interface ErrorResponse {
   requestId?: string;
 }
 
+export function normalizeHttpExceptionMessage(payload: unknown): string {
+  if (typeof payload === "string") return payload;
+  if (typeof payload !== "object" || payload === null) return "Request failed";
+
+  const message = (payload as { message?: unknown }).message;
+  if (typeof message === "string") return message;
+  if (Array.isArray(message)) {
+    return message.map((item) => String(item)).join("; ");
+  }
+  return "Request failed";
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -23,13 +35,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const payload =
       exception instanceof HttpException ? exception.getResponse() : undefined;
     const message =
-      typeof payload === "string"
-        ? payload
-        : typeof payload === "object" &&
-            payload !== null &&
-            "message" in payload
-          ? String((payload as { message: unknown }).message)
-          : "Internal server error";
+      status >= 500 && payload === undefined
+        ? "Internal server error"
+        : normalizeHttpExceptionMessage(payload);
     const body: ErrorResponse = {
       code: status >= 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR",
       message,
