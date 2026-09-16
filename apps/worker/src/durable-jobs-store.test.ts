@@ -70,6 +70,44 @@ test("claimPending can reclaim an expired running lease", async () => {
   );
 });
 
+test("renewLease requires the current lease token and extends availability", async () => {
+  const row = {
+    id: "job-1",
+    tenant_id: "00000000-0000-0000-0000-000000000001",
+    job_type: "system.noop",
+    payload: {},
+    status: "running",
+    attempts: 2,
+    max_attempts: 5,
+    available_at: new Date(),
+    lease_token: "lease-1",
+    last_error: null,
+    completed_at: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+  const { pool, queries, values } = createPool({ rows: [row] });
+  const store = new PgDurableJobStore(pool);
+  await store.renewLease(
+    "00000000-0000-0000-0000-000000000001",
+    "job-1",
+    "lease-1",
+    300_000,
+  );
+
+  const updateIndex = queries.findIndex((query) => /^update durable_jobs/.test(query));
+  assert.ok(updateIndex >= 0);
+  assert.match(queries[updateIndex] ?? "", /available_at = now\(\) \+ \(\$4 \* interval/);
+  assert.match(queries[updateIndex] ?? "", /status = 'running'/);
+  assert.match(queries[updateIndex] ?? "", /lease_token = \$3/);
+  assert.deepEqual(values[updateIndex], [
+    "00000000-0000-0000-0000-000000000001",
+    "job-1",
+    "lease-1",
+    300_000,
+  ]);
+});
+
 test("complete requires the current lease token", async () => {
   const row = {
     id: "job-1",
