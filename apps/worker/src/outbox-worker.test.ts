@@ -135,20 +135,23 @@ test("processor does not clear a completed handler's lease when acknowledgement 
   assert.equal(store.failed.length, 0);
 });
 
-test("processor renews the claimed lease during a long handler", async () => {
-  const store = new MemoryStore([event("1")]);
+test("processor renews all claimed leases while processing a long sequential batch", async () => {
+  const store = new MemoryStore([event("1"), event("2")]);
   const processor = new OutboxProcessor(
     store,
-    async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1100));
+    async (outboxEvent) => {
+      if (outboxEvent.id === "1") {
+        await new Promise((resolve) => setTimeout(resolve, 1100));
+      }
     },
     { leaseMs: 3000, heartbeatMs: 1000 },
   );
 
-  const result = await processor.process("tenant-1", 1);
+  const result = await processor.process("tenant-1", 2);
 
-  assert.deepEqual(result, { claimed: 1, published: 1, failed: 0 });
-  assert.ok(store.renewed.length >= 1);
+  assert.deepEqual(result, { claimed: 2, published: 2, failed: 0 });
+  assert.ok(store.renewed.some((renewal) => renewal.id === "1"));
+  assert.ok(store.renewed.some((renewal) => renewal.id === "2"));
   assert.ok(store.renewed.every((renewal) => renewal.leaseMs === 3000));
 });
 
