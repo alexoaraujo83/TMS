@@ -9,7 +9,7 @@ Browser
           -> NestJS API
               -> PostgreSQL / Neon
 
-Worker -> PostgreSQL / future outbox/integration adapters
+Worker -> PostgreSQL -> Outbox / Durable Jobs -> integration side effects
 ```
 
 The intended hosting baseline is Vercel for Web, Railway for API/Worker and Neon PostgreSQL. The exact deployment wiring must be kept in platform configuration rather than committed secrets.
@@ -70,7 +70,13 @@ No external freight marketplace, carrier API, tracking provider, fiscal provider
 
 ## 6. Events and asynchronous processing
 
-The architecture requires committed transaction -> outbox -> worker claim -> idempotent handler -> external side effect -> completion/failure -> audit. The current worker is only a bootstrap loop and does not yet implement this pipeline. Future handlers must define event name, payload schema, tenant scope, idempotency key, retry policy, timeout, dead-letter behavior and audit record.
+The current baseline contains a transactional outbox processor and durable-job persistence/claiming paths. Outbox events are persisted transactionally and claimed with tenant-aware leasing/fencing. Durable jobs likewise use tenant-aware claiming, and recent hardening aligns claims with active tenant lifecycle. Worker lease renewal/acknowledgement behavior is protected by fencing and regression coverage.
+
+The operational model is:
+
+`committed transaction -> outbox/durable job -> worker claim -> idempotent handler -> external side effect -> completion/failure -> audit`
+
+This does **not** imply that every future external integration is implemented. Receiver-side deduplication, complete replay tooling and business-specific handlers must be independently exercised and evidenced before being described as production-ready.
 
 ## 7. Deployment procedure
 
@@ -80,8 +86,9 @@ The architecture requires committed transaction -> outbox -> worker claim -> ide
 4. Apply database migrations in the target environment.
 5. Verify application health.
 6. Verify tenant isolation and authorization smoke tests.
-7. Promote Web/API/Worker according to environment policy.
-8. Record release commit and migration version.
+7. Verify worker/outbox/durable-job health where applicable.
+8. Promote Web/API/Worker according to environment policy.
+9. Record release commit and migration version.
 
 Never deploy a populated `.env` file or production credentials through Git.
 
