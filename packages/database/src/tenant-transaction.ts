@@ -1,19 +1,10 @@
-export interface TransactionClient {
-  query<T>(sql: string, params?: readonly unknown[]): Promise<readonly T[]>;
-}
+import type { Pool, PoolClient } from "pg";
+import { withTransaction } from "./transaction.js";
 
 export async function withTenantContext<T>(
-  client: TransactionClient,
+  pool: Pool,
   tenantId: string,
-  work: (client: TransactionClient) => Promise<T>,
+  work: (client: PoolClient) => Promise<T>,
 ): Promise<T> {
-  if (!tenantId || !/^[0-9a-fA-F-]{36}$/.test(tenantId)) {
-    throw new Error("Invalid tenant identifier");
-  }
-
-  await client.query("select set_config($1, $2, true)", [
-    "app.tenant_id",
-    tenantId,
-  ]);
-  return work(client);
+  return withTransaction(pool, { tenantId }, work);
 }
