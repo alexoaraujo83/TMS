@@ -1,99 +1,173 @@
 # TMS — Database Documentation
 
-## Engine and access
+## 1. Database role in the system
 
-PostgreSQL is the transactional source of truth. The project uses `pg`, a dedicated database package, versioned SQL migrations and tenant-aware transactions. The database package exports pool/transaction helpers, tenant context support and repositories for freight, carriers, drivers, vehicles, assignments and audit.
+PostgreSQL is the transactional source of truth. The repository uses the `pg` driver, versioned forward-only SQL migrations, tenant-aware transactions and repositories. The database boundary is responsible for persistence, constraints, RLS, lifecycle invariants, audit persistence and durable asynchronous state.
 
-Current schema version: **12**.
+The canonical database is independent from the reference Nexora project. No Nexora operational database is reused.
 
-## Entity catalogue
+## 2. Current schema state
 
-| Table                 | Key fields                                                                                                        | Relationships                           | Main constraints/indexes                                                           |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------- |
-| `tenants`             | id, name, slug, status, timestamps                                                                                | root tenant                             | PK id; unique slug; status CHECK; RLS                                              |
-| `users`               | id, email, display_name, status, timestamps                                                                       | memberships                             | PK id; unique email; status CHECK; RLS                                             |
-| `tenant_memberships`  | tenant_id, user_id, role, role_id, created_at                                                                     | tenant ↔ user ↔ role                    | composite PK; user/role indexes; RLS                                               |
-| `roles`               | id, tenant_id, name, description, created_at                                                                      | tenant; role_permissions                | unique tenant/name; RLS                                                            |
-| `permissions`         | id, code, description                                                                                             | role_permissions                        | unique code                                                                        |
-| `role_permissions`    | role_id, permission_id                                                                                            | role ↔ permission                       | composite PK; permission index; RLS                                                |
-| `carriers`            | id, tenant_id, legal_name, document_number, status, timestamps                                                    | tenant                                  | unique tenant/document; tenant/status index; RLS                                   |
-| `drivers`             | id, tenant_id, carrier_id, name, document_number, phone, rntrc, antt_status, status, timestamps                   | tenant; optional carrier                | unique tenant/document; unique tenant/RNTRC; composite same-tenant carrier FK; RLS |
-| `vehicles`            | id, tenant_id, driver_id, plate, vehicle_type, body_type, capacity_kg, free_meters, status, timestamps            | tenant; optional driver                 | unique tenant/plate; composite same-tenant driver FK; tenant/status index; RLS     |
-| `freights`            | id, tenant_id, status, freight_type, route, cargo, dimensions, prices, windows, requirements, timestamps          | tenant                                  | status/type/currency CHECKs; tenant/status and route indexes; RLS                  |
-| `audit_events`        | id, tenant_id, actor_user_id, action, entity_type/id, request_id, before_state, after_state, metadata, created_at | tenant; optional actor                  | tenant/time and entity/time indexes; RLS with USING/WITH CHECK                     |
-| `freight_assignments` | id, tenant_id, freight_id, driver_id, vehicle_id, status, lifecycle timestamps                                    | freight + driver + vehicle, same tenant | composite FKs; lifecycle CHECK; partial unique active indexes; RLS                 |
+The repository currently contains **29 ordered migrations**, from `0001_foundation.sql` through `0029_runtime_app_role.sql`. CI proves that the complete migration chain applies to a fresh PostgreSQL 17 database before the quality chain proceeds.
 
-## Freight fields
+The migration sequence is:
 
-`freights` currently stores:
+| Migration | Capability |
+|---|---|
+| 0001 | Foundation: tenants, users, memberships and initial tenant security |
+| 0002 | Freight operations: carriers, drivers, vehicles and freights |
+| 0003 | IAM: roles, permissions and role mappings |
+| 0004 | IAM bootstrap |
+| 0005 | RLS hardening |
+| 0006 | Authoritative membership/permission resolution |
+| 0007 | Freight matching requirements |
+| 0008 | Audit events |
+| 0009 | Membership bootstrap grant |
+| 0010 | Same-tenant master-data relationship hardening |
+| 0011 | Matching assignments and assignment permissions |
+| 0012 | Database-authoritative `updated_at` triggers |
+| 0013 | Trip operations |
+| 0014 | Trip permissions |
+| 0015 | Trip cancellation invariants |
+| 0016 | IAM role bootstrap |
+| 0017 | Trip cancelled-constraint correction |
+| 0018 | Compliance and GR foundation |
+| 0019 | IAM operator/compliance permissions |
+| 0020 | Auth0 subject identity and authoritative membership lookup |
+| 0021 | Canonical schema reconciliation |
+| 0022 | Trip execution: occurrences and POD |
+| 0023 | Finance foundation |
+| 0024 | Finance permissions |
+| 0025 | Financial-entry immutability and lifecycle rules |
+| 0026 | Outbox foundation |
+| 0027 | Outbox lease tokens |
+| 0028 | Durable Jobs |
+| 0029 | Non-superuser/non-`BYPASSRLS` runtime role `tms_app` |
 
-- `status`: draft/open/matching/negotiating/assigned/in_transit/delivered/cancelled
-- `freight_type`: dedicated/shared/complement/urgent
-- origin/destination city and state
-- cargo description
-- quantity and weight
-- optional volume and linear meters
-- optional customer and driver prices in cents
-- fixed currency `BRL`
-- collection and delivery time windows
-- matching requirements: vehicle types, body types, minimum free meters and minimum capacity
+## 3. Core entity catalogue
 
-## IAM fields
+| Area | Tables / persisted aggregates | Isolation / integrity |
+|---|---|---|
+| Platform | `tenants` | tenant root, unique slug, status checks, RLS |
+| IAM | `users`, `tenant_memberships`, `roles`, `permissions`, `role_permissions` | membership/role relationships, RLS on tenant-owned records |
+| Master Data | `carriers`, `drivers`, `vehicles` | same-tenant composite FKs, unique tenant/document/RNTRC/plate constraints, RLS |
+| Freight | `freights`, `freight_assignments` | lifecycle checks, tenant composite FKs, active-assignment uniqueness, RLS |
+| Trip Operations | `trips`, `trip_occurrences`, `trip_pods` | tenant composite FKs, lifecycle/timestamp checks, RLS |
+| Compliance | `compliance_checks`, `gr_requests` | tenant composite FKs, status/timestamp invariants, RLS |
+| Finance | `financial_entries` | tenant composite FKs, amount/currency checks, external-reference uniqueness, immutability trigger, RLS |
+| Reliability | `outbox_events`, `durable_jobs` | tenant isolation, indexes for claim/lease processing, RLS |
+| Audit | `audit_events` | tenant-scoped immutable operational/security history, RLS |
+| Migration metadata | `schema_migrations` | migration bookkeeping; not application business data |
 
-Permissions currently seeded include freight CRUD, driver read/create/update, vehicle read/create/update, carrier read/create/update, `iam:manage`, and matching read/assign permissions.
+## 4. Freight lifecycle
 
-The authoritative membership lookup combines the membership's legacy `role` text with `role_id`/role-permission mappings and reports effective permission codes plus active state.
+`freights.status` is constrained to:
 
-## Tenant isolation
+`draft -> open -> matching -> negotiating -> assigned -> in_transit -> delivered`
 
-Tenant-scoped tables carry `tenant_id`. RLS is enabled and forced on critical tables. Policies compare `tenant_id` with `current_setting('app.tenant_id', true)`. The application database layer exposes `tenantSessionSql()` and tenant transaction helpers.
+with cancellation available at the explicitly supported lifecycle states. The application and database enforce the permitted transitions; worker handlers must use the same domain invariants rather than introducing a parallel lifecycle.
 
-Relationship hardening is explicit: drivers may reference only a carrier in the same tenant and vehicles may reference only a driver in the same tenant. Freight assignments similarly use composite `(tenant_id, id)` references for freight, driver and vehicle.
+Freight records include tenant ownership, route, cargo, quantity/weight, optional volume and linear meters, prices in cents, BRL currency, collection/delivery windows and matching requirements such as vehicle/body types, minimum free meters and minimum capacity.
 
-## Assignment invariants
+## 5. Assignment invariants
 
-An assignment is:
+`freight_assignments` uses tenant-scoped composite foreign keys for freight, driver and vehicle. At most one active assignment is allowed per freight, driver and vehicle within a tenant.
 
-- `active`: `completed_at` and `cancelled_at` must be null;
-- `completed`: `completed_at` must be set and `cancelled_at` null;
-- `cancelled`: `cancelled_at` must be set and `completed_at` null.
+Lifecycle invariants are:
 
-Partial unique indexes enforce at most one active assignment per tenant/freight, tenant/driver and tenant/vehicle.
+- `active`: `completed_at` and `cancelled_at` are null;
+- `completed`: `completed_at` is set and `cancelled_at` is null;
+- `cancelled`: `cancelled_at` is set and `completed_at` is null.
 
-Matching must also treat an active assignment as resource occupancy. Candidate discovery therefore excludes any driver or vehicle already referenced by an `active` freight assignment, even if the vehicle master-data status remains `available`. This prevents the matching list from offering a resource that cannot be assigned atomically.
+Matching treats an active assignment as resource occupancy. Candidate discovery therefore cannot offer an already-occupied driver or vehicle merely because its master-data status says `available`.
 
-Assignment is valid from both `matching` and `negotiating` freight states because the domain lifecycle explicitly permits `negotiating -> assigned`. The assignment transaction locks the freight, driver and vehicle rows, rejects active occupancy, creates the assignment and moves the freight to `assigned` atomically.
+Freight terminal transitions are synchronized with assignment state in the same transaction:
 
-Freight terminal lifecycle is synchronized with assignment lifecycle in the same database transaction:
+- `delivered` requires an active assignment and completes it;
+- `cancelled` cancels any active assignment;
+- assignment audit events are written in the same transaction;
+- a synchronization failure rolls back the complete status transition.
 
-- moving a freight to `delivered` requires an active assignment and atomically marks that assignment `completed` with `completed_at`;
-- moving a freight to `cancelled` atomically marks any active assignment `cancelled` with `cancelled_at`;
-- assignment audit events are emitted in the same transaction as the freight status change;
-- if assignment synchronization fails, the entire freight status transaction rolls back.
+## 6. Trip execution
 
-This prevents delivered/cancelled freights from leaving an active assignment that would permanently block matching for the driver or vehicle.
+`trips` belong to a tenant and reference freight and assignment through composite tenant-scoped foreign keys. Trip lifecycle is constrained to `planned`, `in_transit`, `delivered` and `cancelled`, with timestamp checks matching the lifecycle state.
 
-## Timestamp integrity
+`trip_occurrences` records operational exceptions such as delay, accident, breakdown, cargo damage, refusal and address issue, with severity and occurrence timestamp.
 
-All mutable tables with an `updated_at` column are protected by the database trigger `public.set_updated_at()`. Migration 0012 installs triggers on `tenants`, `users`, `carriers`, `drivers`, `vehicles`, `freights` and `freight_assignments`, so `updated_at` advances on every row update regardless of which repository or SQL path performed the mutation. This makes the timestamp authoritative at the database boundary instead of depending on individual application code paths.
+`trip_pods` records proof-of-delivery metadata and is unique per tenant/trip.
 
-## Migration history
+## 7. Compliance and GR
 
-1. Foundation: tenants, users, memberships and initial RLS.
-2. Freight operations: carriers, drivers, vehicles and freights.
-3. IAM: roles, permissions and role mappings.
-4. Membership bootstrap function.
-5. RLS hardening for tenants/users.
-6. Authoritative membership/permission resolution.
-7. Freight matching requirements.
-8. Audit events.
-9. Runtime bootstrap grant for membership verification.
-10. Same-tenant master-data relationship hardening.
-11. Freight assignments and matching permissions.
-12. Database-authoritative `updated_at` triggers.
+`compliance_checks` tracks compliance/risk checks with `pending`, `approved`, `rejected` and `expired` states. `gr_requests` tracks GR requests through `pending`, `submitted`, `approved`, `rejected`, `expired` and `cancelled` states, with timestamp constraints tied to each state.
 
-Migrations are forward-only by default. Production schema changes should use expand/contract when old and new application versions need compatibility.
+Both domains use tenant-scoped composite relationships to freight and assignment and are protected by RLS.
 
-## Backup and recovery requirement
+## 8. Finance
 
-Neon/PostgreSQL backup policy must be configured and tested independently of application code. A production release is not considered hardened until a restore drill demonstrates that migrations, application configuration and tenant data can be recovered to a known-good state.
+`financial_entries` stores tenant-scoped receivable/payable entries related to freight and optionally assignment/trip. Amounts are integer cents and currency is constrained to an uppercase three-character value, currently defaulting to `BRL`.
+
+Financial status is `pending`, `settled` or `cancelled`. External references are unique within a tenant. After an entry leaves `pending`, the database trigger prevents mutation of material financial fields. Valid lifecycle transitions require `settled_at` for settlement and forbid it for cancellation.
+
+Finance is therefore not treated as an ordinary mutable CRUD table; the database itself protects financial immutability rules.
+
+## 9. Outbox and Durable Jobs
+
+`outbox_events` persists asynchronous events with tenant, aggregate, event type, payload, status, attempts, availability and publication timestamps. Lease tokens prevent stale workers from finalizing a newer claim.
+
+`durable_jobs` persists asynchronous work with tenant, job type, JSON payload, status, retry counters, availability, lease token, last error and completion timestamp. Pending and running indexes support efficient claim/reclaim operations.
+
+The intended asynchronous boundary is:
+
+`committed transaction -> outbox -> worker claim -> idempotent handler -> external side effect -> completion/failure -> audit`
+
+Long-running Durable Jobs require lease heartbeat/renewal. The current hardening work is tracked separately until CI and integration evidence prove the behavior end-to-end.
+
+## 10. Tenant isolation and RLS
+
+Tenant-scoped tables carry `tenant_id`. Critical tables enable and force RLS. Policies compare the row tenant with the transaction-local `app.tenant_id` setting.
+
+The application database layer exposes tenant-aware transaction helpers so the tenant context is established inside the transaction rather than relying on a global connection setting.
+
+Relationship hardening is explicit: drivers can reference only same-tenant carriers; vehicles only same-tenant drivers; assignments only same-tenant freight/driver/vehicle; trips only same-tenant freight/assignment; compliance and finance records only same-tenant parent records.
+
+## 11. Runtime database role
+
+Migration `0029_runtime_app_role.sql` defines the intended application runtime role as `tms_app` with:
+
+- `LOGIN`;
+- `NOSUPERUSER`;
+- `NOCREATEDB`;
+- `NOCREATEROLE`;
+- `NOINHERIT`;
+- `NOREPLICATION`;
+- `NOBYPASSRLS`;
+- no schema `CREATE` privilege;
+- application DML privileges on business tables;
+- no write privileges on `permissions` or `schema_migrations`;
+- execution privilege on `check_tenant_membership(text, uuid)`.
+
+The password is deliberately provisioned outside migrations. CI provisions an ephemeral runtime credential and runs the quality chain against the runtime role.
+
+## 12. IAM database boundary
+
+The authoritative membership resolver is based on the authenticated identity subject and tenant. Membership status and effective permissions are resolved from PostgreSQL rather than trusting client-provided roles.
+
+The Auth0 subject is mapped to the local user identity. Tenant membership, active state and effective permissions remain TMS/PostgreSQL authority.
+
+## 13. Timestamp integrity
+
+Mutable tables with `updated_at` use database triggers. This makes timestamp maintenance authoritative at the database boundary rather than dependent on individual repository code paths.
+
+## 14. Migration and release policy
+
+Migrations are forward-only by default. Production schema changes should use expand/contract when multiple application versions may coexist during deployment.
+
+A migration is not considered operationally proven because its file exists. CI must apply the migration chain to a real PostgreSQL instance. Production promotion additionally requires the relevant security, application, worker, backup/restore and deployment evidence.
+
+## 15. Recovery requirements
+
+The external PostgreSQL backup worker is the current backup mechanism. The intended chain is:
+
+`PostgreSQL/Neon -> scheduled backup worker -> compressed/encrypted dump -> S3-compatible storage -> checksum/manifest verification -> retention -> isolated restore drill`.
+
+A real backup and isolated restore have been proven according to the open DR issues, but recurring schedule/retention/on-call/RPO/RTO evidence remains an operational gate rather than a schema feature.
