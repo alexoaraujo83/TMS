@@ -26,8 +26,8 @@ if (!runIntegration) {
       await client.query("begin");
       await client.query(
         `insert into tenants (id, name, slug, status)
-         values ($1, 'RLS Runtime A', $1, 'active'), ($2, 'RLS Runtime B', $2, 'active')`,
-        [tenantA, tenantB],
+         values ($1, 'RLS Runtime A', $3, 'active'), ($2, 'RLS Runtime B', $4, 'active')`,
+        [tenantA, tenantB, `rls-runtime-${tenantA}`, `rls-runtime-${tenantB}`],
       );
       await client.query(
         `insert into freights
