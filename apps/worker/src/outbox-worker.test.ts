@@ -135,18 +135,29 @@ test("processor does not clear a completed handler's lease when acknowledgement 
   assert.equal(store.failed.length, 0);
 });
 
-test("processor renews the claimed lease before a long batch can outlive it", async () => {
+test("processor renews the claimed lease during a long handler", async () => {
   const store = new MemoryStore([event("1")]);
-  const processor = new OutboxProcessor(store, async () => {
-    await new Promise((resolve) => setTimeout(resolve, 1700));
-  });
+  const processor = new OutboxProcessor(
+    store,
+    async () => {
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    },
+    { leaseMs: 30, heartbeatMs: 10 },
+  );
 
   const result = await processor.process("tenant-1", 1);
 
   assert.deepEqual(result, { claimed: 1, published: 1, failed: 0 });
-  assert.deepEqual(store.renewed, [
-    { id: "1", leaseToken: "lease-1", leaseMs: 300000 },
-  ]);
+  assert.ok(store.renewed.length >= 2);
+  assert.ok(store.renewed.every((renewal) => renewal.leaseMs === 30));
+});
+
+test("processor rejects an invalid heartbeat configuration", () => {
+  const store = new MemoryStore([]);
+  assert.throws(
+    () => new OutboxProcessor(store, async () => undefined, { leaseMs: 10, heartbeatMs: 10 }),
+    /OUTBOX_HEARTBEAT_INVALID/,
+  );
 });
 
 test("processor truncates non-Error failure messages before persisting", async () => {
