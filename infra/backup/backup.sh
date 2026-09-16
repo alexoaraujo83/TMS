@@ -115,10 +115,16 @@ while IFS= read -r run_prefix; do
   delete_json="$tmp_dir/${run_id_candidate}.delete.json"
   awk 'BEGIN { printf "{\"Objects\":[" } { if (n++) printf ","; printf "{\"Key\":\"%s\"}", $0 } END { printf "],\"Quiet\":true}" }' "$run_objects_file" > "$delete_json"
 
-  aws --endpoint-url "$S3_ENDPOINT" s3api delete-objects \
+  delete_response="$(aws --endpoint-url "$S3_ENDPOINT" s3api delete-objects \
     --bucket "$S3_BUCKET" \
     --delete "file://${delete_json}" \
-    --only-show-errors
+    --query 'Errors' \
+    --output json \
+    --only-show-errors)"
+  if [[ "$delete_response" != "[]" && "$delete_response" != "null" ]]; then
+    echo "retention deletion reported object errors for run ${run_id_candidate}: ${delete_response}" >&2
+    exit 1
+  fi
 
   deleted_runs=$((deleted_runs + 1))
   deleted_objects=$((deleted_objects + object_count))
