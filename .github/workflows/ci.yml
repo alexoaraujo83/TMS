@@ -64,6 +64,7 @@ jobs:
           REVOKE ALL ON TABLE public.schema_migrations FROM tms_app;
           GRANT EXECUTE ON FUNCTION public.check_tenant_membership(text, uuid) TO tms_app;
           SQL
+          printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'RUNTIME_DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
       - name: Validate runtime role attributes
         run: |
