@@ -9,12 +9,12 @@ Reconcile the canonical `main` database with Neon `development` and `staging`, a
 ### Canonical Neon main
 
 - Project: `shiny-hall-34679912`
-- Branch: `main` (`br-lingering-shadow-act0vvi9`)
+- Branch: `main` (`br-lingering-shadow-act0vvi`)
 - Database: `neondb`
 - Runtime SQL executed against the branch on 2026-09-16.
 - Role used by the diagnostic: `neondb_owner`.
-- `public.schema_migrations`: 29 rows.
-- Latest recorded migration: `0029_runtime_app_role.sql`.
+- **Historical snapshot:** `public.schema_migrations` contained 29 rows at the time this diagnostic was captured.
+- **Repository canonical baseline:** 31 migrations, through `0031_finance_relationship_invariants.sql`.
 - Public table count: 21.
 
 ### Neon development
@@ -37,7 +37,9 @@ Reconcile the canonical `main` database with Neon `development` and `staging`, a
 
 ## Interpretation
 
-`main` is the only branch currently demonstrated to contain the canonical migration ledger through `0029_runtime_app_role.sql`. `development` and `staging` are materially divergent and cannot be treated as synchronized application environments.
+The runtime database evidence in this document is a **point-in-time snapshot** and must not be used as the current repository schema version. The canonical repository migration ledger now contains 31 migrations, through `0031_finance_relationship_invariants.sql`. The captured Neon `main` state had only 29 recorded migrations, so the environment remains **DRIFTED / REQUIRES RUNTIME REVALIDATION** until migrations `0030` and `0031` are demonstrated in the target database.
+
+`development` and `staging` remain materially divergent and cannot be treated as synchronized application environments.
 
 The divergence is not repaired automatically in this audit because migrating or resetting those branches without first proving their consumers and intended lifecycle could destroy useful test data or break an active environment.
 
@@ -61,7 +63,8 @@ The latest listed production deployment is `READY` and was built from `main` at 
 
 ## Decision
 
-- Canonical application/database baseline: `main` + Neon `main`.
+- Canonical application/database baseline: `main` + repository migration ledger at 31 migrations.
+- Neon `main`: **DRIFTED / REQUIRES RUNTIME REVALIDATION**; captured evidence is historical at 29 migrations.
 - `development`: DRIFTED / REQUIRES ENVIRONMENT OWNERSHIP MAPPING.
 - `staging`: DRIFTED / REQUIRES ENVIRONMENT OWNERSHIP MAPPING.
 - Railway production worker: VERIFIED against GitHub `main`.
@@ -72,9 +75,9 @@ The latest listed production deployment is `READY` and was built from `main` at 
 ## Required next actions
 
 1. Identify whether `development` and `staging` are still consumed by any service or are historical branches.
-2. If they are active, define a controlled migration path from the canonical migration ledger; do not copy schema manually.
-3. If they are historical, preserve evidence and obtain explicit approval before deletion.
-4. Reconcile repository documentation that still states migration `0028_durable_jobs.sql` as the latest migration; canonical main is now at `0029_runtime_app_role.sql`.
+2. Revalidate Neon `main` after migrations `0030` and `0031` are applied; record the live migration ledger and checksums.
+3. If development/staging are active, define a controlled migration path from the canonical migration ledger; do not copy schema manually.
+4. If they are historical, preserve evidence and obtain explicit approval before deletion.
 5. Verify database connection targets for every active application environment without exposing credentials.
 6. After any environment synchronization, execute migration + RLS + IAM + application integration tests and record runtime evidence.
 
