@@ -24,17 +24,25 @@ Relevant variables currently declared in `.env.example`:
 - `APP_URL`
 - `API_URL`
 - `DATABASE_URL`
-- `REDIS_URL`
-- `JWT_ISSUER`
-- `JWT_AUDIENCE`
-- `JWT_SECRET`
+- `DATABASE_DIRECT_URL`
+- `AUTH0_DOMAIN`
+- `AUTH0_CLIENT_ID`
+- `AUTH0_CLIENT_SECRET`
+- `AUTH0_AUDIENCE`
+- `AUTH0_ISSUER_BASE_URL`
+- `AUTH0_JWKS_URL`
+- `TENANT_HEADER`
+- `WORKER_ENABLED`
+- `WORKER_CONCURRENCY`
 - `LOG_LEVEL`
 
-The example file is documentation only; it is not automatically loaded by the API. Secrets must come from the runtime secret store.
+The example file is documentation only; it is not automatically loaded by the API. Secrets must come from the runtime secret store. Auth0 audiences are environment-specific: development, staging and production use distinct audience values as documented in `.env.example`.
 
 ## 3. Authentication and authorization
 
-JWT configuration exists through issuer, audience and secret settings. The API uses an authentication guard, current-user context, tenant guard and permission guard. Endpoint permissions are declared at the controller boundary with `RequirePermission`.
+Authentication uses Auth0/OIDC bearer tokens. The API validates the token issuer, audience and signing keys through the configured Auth0 settings. The authenticated token must provide the tenant claim required by the API; when `TENANT_HEADER` is supplied, it cannot override a different authenticated tenant. The authentication layer also verifies active tenant membership before constructing the request context.
+
+The API uses an authentication guard, current-request context and permission guard. Endpoint permissions are declared at the controller boundary with `RequirePermission`.
 
 Authorization is tenant-aware and must remain enforced in application code plus database isolation. Never trust a tenant ID supplied by the browser without validating membership and establishing the server-side tenant context.
 
@@ -62,7 +70,7 @@ Role: intended API/worker runtime. Application startup must honor the injected `
 
 ### Redis
 
-`REDIS_URL` exists in the environment contract, but no production Redis-backed queue implementation is claimed by this baseline. Treat Redis as reserved infrastructure until a concrete adapter is implemented and tested.
+No Redis variable is currently declared in `.env.example`, and no production Redis-backed queue implementation is claimed by this baseline. Treat Redis as outside the current runtime contract until a concrete adapter is implemented, configured and tested.
 
 ### Business integrations
 
