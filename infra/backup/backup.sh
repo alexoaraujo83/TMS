@@ -92,36 +92,42 @@ fi
 cutoff_epoch="$(( $(date -u +%s) - retention_days * 86400 ))"
 deleted_runs=0
 deleted_objects=0
-while IFS=$'\t' read -r key last_modified; do
-  [[ -z "$key" ]] && continue
-  [[ "$key" == tms/postgres/${run_id}/* ]] && continue
-  object_epoch="$(date -u -d "$last_modified" +%s 2>/dev/null || true)"
-  [[ -z "$object_epoch" ]] && continue
-  if (( object_epoch < cutoff_epoch )); then
-    run_prefix="${key#tms/postgres/}"
-    run_id_candidate="${run_prefix%%/*}"
-    if [[ ! "$run_id_candidate" =~ ^[0-9]{8}T[0-9]{6}Z$ ]]; then
-      continue
-    fi
-    if aws --endpoint-url "$S3_ENDPOINT" s3api delete-objects \
-      --bucket "$S3_BUCKET" \
-      --delete "$(printf '{"Objects":[{"Key":"%s"}],"Quiet":true}' "$key")" \
-      --only-show-errors; then
-      deleted_objects=$((deleted_objects + 1))
-    else
-      echo "retention deletion failed for object=${key}" >&2
-      exit 1
-    fi
-  fi
+while IFS= read -r run_prefix; do
+  [[ -z "$run_prefix" ]] && continue
+  run_id_candidate="${run_prefix#tms/postgres/}"
+  run_id_candidate="${run_id_candidate%/}"
+  [[ "$run_id_candidate" == "$run_id" ]] && continue
+  [[ "$run_id_candidate" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || continue
+  run_epoch="$(date -u -d "$run_id_candidate" +%s 2>/dev/null || true)"
+  [[ -n "$run_epoch" ]] || continue
+  (( run_epoch < cutoff_epoch )) || continue
+
+  run_objects_file="$tmp_dir/${run_id_candidate}.objects"
+  aws --endpoint-url "$S3_ENDPOINT" s3api list-objects-v2 \
+    --bucket "$S3_BUCKET" \
+    --prefix "${run_prefix}" \
+    --query 'Contents[].Key' \
+    --output text | tr '\t' '\n' | sed '/^None$/d;/^$/d' > "$run_objects_file"
+
+  object_count="$(wc -l < "$run_objects_file")"
+  (( object_count > 0 )) || continue
+
+  delete_json="$tmp_dir/${run_id_candidate}.delete.json"
+  awk 'BEGIN { printf "{\"Objects\":[" } { if (n++) printf ","; printf "{\"Key\":\"%s\"}", $0 } END { printf "],\"Quiet\":true}" }' "$run_objects_file" > "$delete_json"
+
+  aws --endpoint-url "$S3_ENDPOINT" s3api delete-objects \
+    --bucket "$S3_BUCKET" \
+    --delete "file://${delete_json}" \
+    --only-show-errors
+
+  deleted_runs=$((deleted_runs + 1))
+  deleted_objects=$((deleted_objects + object_count))
 done < <(aws --endpoint-url "$S3_ENDPOINT" s3api list-objects-v2 \
   --bucket "$S3_BUCKET" \
   --prefix "tms/postgres/" \
-  --query 'Contents[].[Key,LastModified]' \
-  --output text)
-
-if (( deleted_objects > 0 )); then
-  deleted_runs="$(printf '%s\n' "$deleted_objects" | awk '{print int($1/3)}')"
-fi
+  --delimiter '/' \
+  --query 'CommonPrefixes[].Prefix' \
+  --output text | tr '\t' '\n' | sed '/^None$/d;/^$/d')
 
 end_epoch="$(date +%s)"
 duration="$((end_epoch - start_epoch))"
