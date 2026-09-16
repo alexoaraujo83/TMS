@@ -41,11 +41,12 @@ if (!enabled) {
       );
       await client.query(
         `insert into freights (
-          id, tenant_id, lifecycle, freight_type, origin, destination,
-          cargo_description, quantity, weight_kg, volume_m3, linear_meters,
-          company_price, driver_price
-        ) values ($1::uuid, $2::uuid, 'draft', 'dedicated', 'Origin', 'Destination',
-          'Compliance fixture', 1, 100, 1, 1, 100, 80)`,
+          id, tenant_id, status, freight_type, origin_city, origin_state,
+          destination_city, destination_state, cargo_description, quantity,
+          weight_kg, volume_m3, linear_meters, customer_price_cents,
+          driver_price_cents
+        ) values ($1::uuid, $2::uuid, 'draft', 'dedicated', 'Origin', 'SP',
+          'Destination', 'SP', 'Compliance fixture', 1, 100, 1, 1, 10000, 8000)`,
         [freightId, tenantId],
       );
       await client.query("commit");
