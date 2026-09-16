@@ -7,6 +7,7 @@ import { WebhookPublisher } from "./webhook-publisher.js";
 import { normalizeDatabaseUrl } from "./database-url.js";
 import { parseTenantIds, positiveIntegerEnv } from "./config.js";
 import { assertConfiguredTenantsAreActive } from "./tenant-config.js";
+import { createFreightStatusChangedHandler } from "./freight-status-changed-handler.js";
 
 async function assertRuntimeRole(pool: Pool): Promise<void> {
   const result = await pool.query<{ current_user: string }>(
@@ -124,6 +125,10 @@ if (!databaseUrl) {
                 }),
               );
             },
+          ],
+          [
+            "freight.status.changed",
+            createFreightStatusChangedHandler(pool),
           ],
         ]),
         {
