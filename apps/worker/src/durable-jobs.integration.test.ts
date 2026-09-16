@@ -5,10 +5,15 @@ import { createDurableWebhookHandler } from "./durable-job-handlers.js";
 import { PgDurableJobStore } from "./durable-jobs-store.js";
 import { WebhookPublisher } from "./webhook-publisher.js";
 
-const adminUrl = process.env.DATABASE_ADMIN_URL;
-const runtimeUrl = process.env.DATABASE_URL ?? process.env.RUNTIME_DATABASE_URL;
+const integrationEnabled = process.env.RUN_DB_INTEGRATION === "true";
 
-test("durable job real PostgreSQL path claims, publishes and finalizes", { skip: !adminUrl || !runtimeUrl }, async (t) => {
+test("durable job real PostgreSQL path claims, publishes and finalizes", { skip: !integrationEnabled }, async (t) => {
+  const adminUrl = process.env.DATABASE_ADMIN_URL;
+  const runtimeUrl = process.env.DATABASE_URL ?? process.env.RUNTIME_DATABASE_URL;
+
+  assert.ok(adminUrl, "DATABASE_ADMIN_URL must be configured when RUN_DB_INTEGRATION=true");
+  assert.ok(runtimeUrl, "DATABASE_URL or RUNTIME_DATABASE_URL must be configured when RUN_DB_INTEGRATION=true");
+
   const admin = new Pool({ connectionString: adminUrl });
   const runtime = new Pool({ connectionString: runtimeUrl });
   const tenantId = crypto.randomUUID();
