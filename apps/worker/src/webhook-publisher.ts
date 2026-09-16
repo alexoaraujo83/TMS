@@ -48,7 +48,9 @@ export class WebhookPublisher {
     eventType: string;
     payload: Record<string, unknown>;
   }): Promise<void> {
-    if (this.urls.length === 0) return;
+    if (this.urls.length === 0) {
+      throw new Error("WEBHOOK_ENDPOINTS_REQUIRED");
+    }
 
     const body = JSON.stringify({
       id: event.id,
