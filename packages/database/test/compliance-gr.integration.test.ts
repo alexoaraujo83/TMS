@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { assertComplianceRelease } from "../src/compliance-release.js";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const enabled =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -15,6 +16,7 @@ if (!enabled) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const tenantId = randomUUID();
   const freightId = randomUUID();
 
@@ -25,7 +27,7 @@ if (!enabled) {
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of ["freights", "tenants"]) {
@@ -54,7 +56,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -77,23 +79,21 @@ if (!enabled) {
     } finally {
       client.release();
       await pool.end();
+      await adminPool.end();
     }
   });
 
   it("enforces tenant isolation and compliance status invariants", async () => {
     const client = await pool.connect();
+    const adminClient = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query("select set_config($1, $2, true)", [
         "app.tenant_id",
         tenantId,
       ]);
-      await client.query(
-        "alter table compliance_checks enable row level security",
-      );
-      await client.query(
-        "alter table compliance_checks force row level security",
-      );
+      await adminClient.query("alter table compliance_checks enable row level security");
+      await adminClient.query("alter table compliance_checks force row level security");
 
       const pending = await client.query(
         `insert into compliance_checks (tenant_id, freight_id, check_type)
@@ -112,6 +112,7 @@ if (!enabled) {
       );
       await client.query("rollback");
     } finally {
+      adminClient.release();
       client.release();
     }
   });
