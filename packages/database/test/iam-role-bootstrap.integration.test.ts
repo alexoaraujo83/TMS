@@ -5,6 +5,7 @@ import { after, before, describe, it } from "node:test";
 import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const enabled =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -14,6 +15,7 @@ if (!enabled) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const tenantId = randomUUID();
   const userId = randomUUID();
 
@@ -24,7 +26,7 @@ if (!enabled) {
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -58,7 +60,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -80,6 +82,7 @@ if (!enabled) {
     } finally {
       client.release();
       await pool.end();
+      await adminPool.end();
     }
   });
 
@@ -125,6 +128,7 @@ if (!enabled) {
 
   it("resolves a new operator membership while tenant RLS is enabled", async () => {
     const client = await pool.connect();
+    const adminClient = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query("select set_config($1, $2, true)", [
@@ -143,8 +147,8 @@ if (!enabled) {
         "users",
         "tenants",
       ]) {
-        await client.query(`alter table ${table} enable row level security`);
-        await client.query(`alter table ${table} force row level security`);
+        await adminClient.query(`alter table ${table} enable row level security`);
+        await adminClient.query(`alter table ${table} force row level security`);
       }
 
       const result = await client.query<{ roleId: string | null }>(
@@ -161,6 +165,7 @@ if (!enabled) {
       await client.query("rollback");
       throw error;
     } finally {
+      adminClient.release();
       client.release();
     }
   });
