@@ -2,29 +2,36 @@
 
 | Area | Progress | Status |
 |---|---:|---|
-| Documentation | 70% | IN PROGRESS |
+| Documentation | 78% | RECONCILED BASELINE; VALIDATION PENDING |
 | Architecture | 75% | ADVANCED |
-| Database / migrations | 75% | ADVANCED |
-| Security / IAM / RLS | 80% | ADVANCED |
-| Backend / API | 78% | ADVANCED |
+| Database / migrations | 78% | ADVANCED; ENVIRONMENT DRIFT REMAINS |
+| Security / IAM / RLS | 84% | ADVANCED |
+| Backend / API | 82% | ADVANCED; RUNTIME SMOKE VALIDATION PENDING |
 | Worker / Outbox / Durable Jobs | 72% | VALIDATION |
 | Frontend / Web | 30% | FOUNDATION |
-| Frontend documentation | 25% | INSUFFICIENT |
-| Integrations | 65% | IN PROGRESS |
-| Operations / runbooks | 65% | IN PROGRESS |
+| Frontend documentation | 35% | BASELINE ESTABLISHED |
+| Integrations | 68% | IN PROGRESS |
+| Operations / runbooks | 68% | IN PROGRESS |
 | Backup / DR | 75% | ADVANCED; production DR not proven |
-| CI/CD / release | 80% | ADVANCED |
+| CI/CD / release | 82% | ADVANCED |
 | Environments | 55% | RECONCILIATION REQUIRED |
 | ADR / governance | 45% | PARTIAL |
-| Overall TMS audit | ~69% | IN PROGRESS |
+| Overall TMS audit | ~72% | IN PROGRESS |
 
 ## Current workstream
 
-Documentation, code, database and environment evidence are being reconciled before additional feature implementation is prioritized.
+The audit is reconciling implementation, database evidence, environment contracts and documentation before additional product-feature expansion is prioritized. The current main database baseline is migration `0029_runtime_app_role.sql`; older restore-drill evidence is explicitly treated as historical evidence rather than current-main state.
+
+## Completed in this pass
+
+- Reconciled `docs/PROJECT-DOCUMENTATION.md` with the current main migration baseline (`0029_runtime_app_role.sql`, 29 migrations, 21 public tables).
+- Reconciled `docs/INTEGRATIONS-OPERATIONS.md` with the actual `.env.example` Auth0/OIDC contract, including `DATABASE_DIRECT_URL`, Auth0 variables, tenant header and worker settings.
+- Confirmed CI workflow executes `pnpm format:fix` before `pnpm format:check`, followed by lint, typecheck, test and build.
+- Retained explicit limitations for runtime smoke evidence, environment drift and production DR readiness.
 
 ## Confirmed documentation correction
 
-`docs/INTEGRATIONS-OPERATIONS.md` was corrected because its Worker section described an obsolete bootstrap-only state. It now reflects the implemented transactional outbox and durable-job foundation while retaining explicit production-readiness limitations.
+`docs/INTEGRATIONS-OPERATIONS.md` no longer describes JWT secret/Redis settings as the current environment contract. It now documents the Auth0/OIDC bearer-token flow and the variables actually declared by `.env.example`.
 
 ## Frontend conclusion
 
@@ -32,9 +39,10 @@ The frontend is currently foundation-level in the inspected main branch. Backend
 
 ## Next gates
 
-1. API route/permission/documentation reconciliation.
-2. Database schema/migration/documentation reconciliation across main, development and staging.
-3. Environment reconciliation across Neon, Railway and Vercel.
+1. Execute/verify current CI after the documentation corrections.
+2. Complete API route/permission/runtime smoke reconciliation.
+3. Compare main, development and staging schema/roles and map environment consumption before any migration or cleanup.
 4. Complete frontend route/component/API/auth audit.
-5. Execute the documented validation procedures.
-6. Correct remaining inconsistencies and record evidence.
+5. Validate worker/outbox/durable-job runtime behavior and operational health.
+6. Reconcile Railway/Vercel/Neon environment contracts and deployment evidence.
+7. Correct remaining inconsistencies and record executable evidence.
