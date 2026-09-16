@@ -30,11 +30,22 @@ function job(overrides: Partial<DurableJob> = {}): DurableJob {
 class FakeStore implements DurableJobStore {
   completed: Array<[string, string, string]> = [];
   failed: Array<[string, string, string, string, Date]> = [];
+  renewed: Array<[string, string, string, number | undefined]> = [];
 
   constructor(private readonly jobs: DurableJob[]) {}
 
   async claimPending(): Promise<DurableJob[]> {
     return this.jobs;
+  }
+
+  async renewLease(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+    leaseMs?: number,
+  ): Promise<DurableJob> {
+    this.renewed.push([tenantId, id, leaseToken, leaseMs]);
+    return job({ id, tenantId, leaseToken, status: "running" });
   }
 
   async complete(
@@ -101,6 +112,82 @@ test("successful jobs complete with their lease token", async () => {
   ]);
 });
 
+test("lease heartbeat renews before finalization", async () => {
+  const current = job({ id: "heartbeat" });
+  const store = new FakeStore([current]);
+  let heartbeat: (() => void) | undefined;
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([
+      [
+        "test.job",
+        async () => {
+          heartbeat?.();
+          await Promise.resolve();
+        },
+      ],
+    ]),
+    {
+      leaseMs: 300_000,
+      heartbeatMs: 100_000,
+      setInterval: (callback) => {
+        heartbeat = callback;
+        return 1 as unknown as ReturnType<typeof setInterval>;
+      },
+      clearInterval: () => undefined,
+    },
+  );
+
+  const result = await processor.process(current.tenantId, 1);
+
+  assert.deepEqual(result, { claimed: 1, completed: 1, failed: 0 });
+  assert.deepEqual(store.renewed, [
+    [current.tenantId, current.id, current.leaseToken!, 300_000],
+  ]);
+});
+
+test("heartbeat loss fails closed and never finalizes the job", async () => {
+  const current = job({ id: "lease-lost" });
+  const events: DurableJobTelemetryEvent[] = [];
+  const store = new FakeStore([current]);
+  store.renewLease = async () => {
+    throw new Error("renewal unavailable");
+  };
+  let heartbeat: (() => void) | undefined;
+  const processor = new DurableJobProcessor(
+    store,
+    new Map([
+      [
+        "test.job",
+        async () => {
+          heartbeat?.();
+          await Promise.resolve();
+        },
+      ],
+    ]),
+    {
+      leaseMs: 300_000,
+      heartbeatMs: 100_000,
+      setInterval: (callback) => {
+        heartbeat = callback;
+        return 1 as unknown as ReturnType<typeof setInterval>;
+      },
+      clearInterval: () => undefined,
+      onTelemetry: (event) => events.push(event),
+    },
+  );
+
+  const result = await processor.process(current.tenantId, 1);
+
+  assert.deepEqual(result, { claimed: 1, completed: 0, failed: 0 });
+  assert.equal(store.completed.length, 0);
+  assert.equal(store.failed.length, 0);
+  assert.equal(
+    events.filter((event) => event.event === "durable_job.lease_lost").length,
+    1,
+  );
+});
+
 test("one failing job does not stop the batch", async () => {
   const first = job({ id: "job-fails", maxAttempts: 5 });
   const second = job({ id: "job-succeeds" });
@@ -114,7 +201,7 @@ test("one failing job does not stop the batch", async () => {
           if (current.id === first.id) throw new Error("handler failed");
         },
       ],
-    ]),
+    ),
     { now: () => 1_000_000 },
   );
 
@@ -225,7 +312,7 @@ test("telemetry distinguishes retry from terminal failure", async () => {
           throw new Error("boom");
         },
       ],
-    ]),
+    ),
     {
       now: () => 2_000_000,
       onTelemetry: (event) => events.push(event),
@@ -257,6 +344,9 @@ test("telemetry finalization errors are isolated from the processor", async () =
   const store: DurableJobStore = {
     async claimPending() {
       return [current];
+    },
+    async renewLease() {
+      return current;
     },
     async complete() {
       throw new Error("complete failed");
