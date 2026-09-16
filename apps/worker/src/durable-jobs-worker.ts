@@ -67,8 +67,11 @@ export interface DurableJobProcessorOptions {
   leaseMs?: number;
   heartbeatMs?: number;
   now?: () => number;
-  setInterval?: typeof setInterval;
-  clearInterval?: typeof clearInterval;
+  setInterval?: (
+    callback: () => void,
+    delay: number,
+  ) => ReturnType<typeof setInterval>;
+  clearInterval?: (timer: ReturnType<typeof setInterval>) => void;
   onTelemetry?: (event: DurableJobTelemetryEvent) => void;
 }
 
@@ -92,8 +95,8 @@ export class DurableJobProcessor {
   private readonly maxDelayMs: number;
   private readonly leaseMs: number;
   private readonly heartbeatMs: number;
-  private readonly setIntervalFn: typeof setInterval;
-  private readonly clearIntervalFn: typeof clearInterval;
+  private readonly setIntervalFn: NonNullable<DurableJobProcessorOptions["setInterval"]>;
+  private readonly clearIntervalFn: NonNullable<DurableJobProcessorOptions["clearInterval"]>;
   private readonly onTelemetry: (event: DurableJobTelemetryEvent) => void;
 
   constructor(
@@ -252,10 +255,7 @@ export class DurableJobProcessor {
           maxAttempts: job.maxAttempts,
         });
       } catch (error) {
-        leaseError =
-          error instanceof Error
-            ? error
-            : new Error(String(error));
+        leaseError = error instanceof Error ? error : new Error(String(error));
       }
     };
 
