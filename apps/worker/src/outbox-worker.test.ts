@@ -29,9 +29,14 @@ class MemoryStore implements OutboxStore {
     retryAt: Date;
   }> = [];
   private readonly events: OutboxEvent[];
+  private failPublish = false;
 
   constructor(events: OutboxEvent[]) {
     this.events = events;
+  }
+
+  setPublishFailure(enabled: boolean): void {
+    this.failPublish = enabled;
   }
 
   async claimPending(_tenantId: string, limit: number): Promise<OutboxEvent[]> {
@@ -43,6 +48,7 @@ class MemoryStore implements OutboxStore {
     id: string,
     leaseToken: string,
   ): Promise<void> {
+    if (this.failPublish) throw new Error("acknowledgement unavailable");
     this.published.push({ id, leaseToken });
   }
 
@@ -101,6 +107,22 @@ test("processor marks a failed handler for retry and continues the batch", async
   assert.equal(store.failed[0]?.error, "broker unavailable");
   assert.ok(store.failed[0]?.retryAt.getTime() >= before + 1990);
   assert.ok(store.failed[0]?.retryAt.getTime() <= Date.now() + 2100);
+});
+
+test("processor does not clear a completed handler's lease when acknowledgement fails", async () => {
+  const store = new MemoryStore([event("1")]);
+  store.setPublishFailure(true);
+  let handled = 0;
+  const processor = new OutboxProcessor(store, async () => {
+    handled += 1;
+  });
+
+  const result = await processor.process("tenant-1", 50);
+
+  assert.deepEqual(result, { claimed: 1, published: 0, failed: 1 });
+  assert.equal(handled, 1);
+  assert.equal(store.published.length, 0);
+  assert.equal(store.failed.length, 0);
 });
 
 test("processor truncates non-Error failure messages before persisting", async () => {
