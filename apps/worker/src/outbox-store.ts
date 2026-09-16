@@ -60,6 +60,44 @@ export class PgOutboxStore implements OutboxStore {
     }
   }
 
+  async renewLease(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+    leaseMs = 5 * 60 * 1000,
+  ): Promise<void> {
+    if (!Number.isFinite(leaseMs) || leaseMs <= 0) {
+      throw new Error("OUTBOX_LEASE_INVALID");
+    }
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config($1, $2, true)", [
+        "app.tenant_id",
+        tenantId,
+      ]);
+      const result = await client.query(
+        `update outbox_events
+         set available_at = now() + ($4 * interval '1 millisecond'),
+             updated_at = now()
+         where tenant_id = $1 and id = $2 and status = 'pending'
+           and lease_token = $3
+         returning id`,
+        [tenantId, id, leaseToken, leaseMs],
+      );
+      if (!result.rows[0]) {
+        throw new Error("OUTBOX_LEASE_RENEWAL_FAILED");
+      }
+      await client.query("commit");
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async markPublished(
     tenantId: string,
     id: string,
