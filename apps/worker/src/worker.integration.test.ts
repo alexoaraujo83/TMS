@@ -160,30 +160,34 @@ async function testDurableJobConcurrency(
   assert.equal(claimed?.status, "running");
 }
 
+async function expireDurableJobLease(id: string): Promise<void> {
+  if (!adminDatabaseUrl) throw new Error("DATABASE_ADMIN_URL is required");
+  const adminPool = new Pool({ connectionString: adminDatabaseUrl });
+  const adminClient = await adminPool.connect();
+  try {
+    await adminClient.query(
+      "update durable_jobs set available_at = now() - interval '1 minute', status = 'running' where id = $1::uuid",
+      [id],
+    );
+  } finally {
+    adminClient.release();
+    await adminPool.end();
+  }
+}
+
 async function testDurableJobLeaseOwnership(
   pool: Pool,
   tenantId: string,
   id: string,
 ): Promise<void> {
-  const adminPool = new Pool({ connectionString: adminDatabaseUrl });
-  const adminClient = await adminPool.connect();
-  try {
-    await adminClient.query("alter table durable_jobs disable row level security");
-    await adminClient.query(
-      "update durable_jobs set available_at = now() - interval '1 minute', status = 'running' where id = $1::uuid",
-      [id],
-    );
-    await adminClient.query("alter table durable_jobs enable row level security");
-    await adminClient.query("alter table durable_jobs force row level security");
-  } finally {
-    adminClient.release();
-    await adminPool.end();
-  }
+  await expireDurableJobLease(id);
 
   const first = new PgDurableJobStore(pool);
   const firstClaim = await first.claimPending(tenantId, 1);
   assert.equal(firstClaim.length, 1);
   const oldLease = firstClaim[0]!.leaseToken!;
+
+  await expireDurableJobLease(id);
 
   const second = new PgDurableJobStore(pool);
   const secondClaim = await second.claimPending(tenantId, 1);
