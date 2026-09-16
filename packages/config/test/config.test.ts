@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadConfig } from "../src/index.js";
+import { loadConfig } from "../dist/index.js";
 
 const baseEnv = {
   APP_ENV: "development",
