@@ -3,7 +3,12 @@ import { withTenantContext } from "./tenant-transaction.js";
 export type FinancialDirection = "receivable" | "payable";
 export type FinancialEntryStatus = "pending" | "settled" | "cancelled";
 export type FinancialEntryType =
-  "freight" | "carrier" | "driver" | "fee" | "commission" | "adjustment";
+  | "freight"
+  | "carrier"
+  | "driver"
+  | "fee"
+  | "commission"
+  | "adjustment";
 
 export interface FinancialEntryRecord {
   id: string;
@@ -47,6 +52,31 @@ export class FinanceRepository {
     input: CreateFinancialEntryInput,
   ): Promise<FinancialEntryRecord> {
     return withTenantContext(this.pool, input.tenantId, async (client: any) => {
+      if (input.assignmentId) {
+        const assignment = await client.query(
+          `select id from freight_assignments
+           where tenant_id = $1 and id = $2 and freight_id = $3`,
+          [input.tenantId, input.assignmentId, input.freightId],
+        );
+        if (!assignment.rows[0]) {
+          throw new Error("Assignment does not belong to freight");
+        }
+      }
+
+      if (input.tripId) {
+        const trip = await client.query(
+          `select id, assignment_id from trips
+           where tenant_id = $1 and id = $2 and freight_id = $3`,
+          [input.tenantId, input.tripId, input.freightId],
+        );
+        if (!trip.rows[0]) {
+          throw new Error("Trip does not belong to freight");
+        }
+        if (input.assignmentId && trip.rows[0].assignment_id !== input.assignmentId) {
+          throw new Error("Trip does not belong to assignment");
+        }
+      }
+
       const result = await client.query(
         `insert into financial_entries
           (tenant_id, freight_id, assignment_id, trip_id, direction, entry_type,
