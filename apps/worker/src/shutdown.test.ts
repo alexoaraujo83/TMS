@@ -1,13 +1,9 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import test from "node:test";
 
-describe("worker shutdown contract", () => {
-  it("documents that shutdown clears scheduling before awaiting the active run", () => {
-    const source = `clearInterval(timer); await activeRun; await pool.end();`;
-    expect(source.indexOf("clearInterval(timer)")).toBeLessThan(
-      source.indexOf("await activeRun"),
-    );
-    expect(source.indexOf("await activeRun")).toBeLessThan(
-      source.indexOf("await pool.end()"),
-    );
-  });
+test("worker shutdown clears scheduling before awaiting the active run", () => {
+  const source = `clearInterval(timer); await activeRun; await pool.end();`;
+
+  assert.ok(source.indexOf("clearInterval(timer)") < source.indexOf("await activeRun"));
+  assert.ok(source.indexOf("await activeRun") < source.indexOf("await pool.end()"));
 });
