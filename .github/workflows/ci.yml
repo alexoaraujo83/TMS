@@ -43,15 +43,36 @@ jobs:
       - run: npm install --global pnpm@11.24.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tms/database migrate
-      - name: Provision CI runtime role credential
+      - name: Provision non-bypass runtime role
         shell: bash
         run: |
           set -euo pipefail
           runtime_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
-          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" \
-            -v ON_ERROR_STOP=1 \
-            -c "ALTER ROLE tms_app PASSWORD '$runtime_password'"
-          printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
+          PGPASSWORD=tms psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 <<SQL
+          DO \$\$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'tms_app') THEN
+              CREATE ROLE tms_app LOGIN PASSWORD '$runtime_password' NOSUPERUSER NOBYPASSRLS;
+            ELSE
+              ALTER ROLE tms_app LOGIN PASSWORD '$runtime_password' NOSUPERUSER NOBYPASSRLS;
+            END IF;
+          END
+          \$\$;
+          GRANT USAGE ON SCHEMA public TO tms_app;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tms_app;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tms_app;
+          REVOKE ALL ON TABLE public.schema_migrations FROM tms_app;
+          GRANT EXECUTE ON FUNCTION public.check_tenant_membership(text, uuid) TO tms_app;
+          SQL
+          printf 'RUNTIME_DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
+      - name: Validate runtime role attributes
+        run: |
+          psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select rolname, rolsuper, rolbypassrls, rolcanlogin from pg_roles where rolname = 'tms_app'"
+          psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select has_function_privilege('tms_app', 'public.check_tenant_membership(text, uuid)', 'execute') as runtime_can_execute, has_function_privilege('public', 'public.check_tenant_membership(text, uuid)', 'execute') as public_can_execute"
+      - name: Validate RLS with non-bypass runtime role
+        run: pnpm --filter @tms/database exec node --import tsx --test test/rls-runtime.integration.test.ts
+      - name: Validate IAM runtime resolver
+        run: pnpm --filter @tms/database exec node --import tsx --test test/iam-runtime.integration.test.ts
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
