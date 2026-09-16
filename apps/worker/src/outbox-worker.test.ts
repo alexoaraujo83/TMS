@@ -28,6 +28,7 @@ class MemoryStore implements OutboxStore {
     error: string;
     retryAt: Date;
   }> = [];
+  readonly renewed: Array<{ id: string; leaseToken: string; leaseMs: number }> = [];
   private readonly events: OutboxEvent[];
   private failPublish = false;
 
@@ -41,6 +42,15 @@ class MemoryStore implements OutboxStore {
 
   async claimPending(_tenantId: string, limit: number): Promise<OutboxEvent[]> {
     return this.events.slice(0, limit);
+  }
+
+  async renewLease(
+    _tenantId: string,
+    id: string,
+    leaseToken: string,
+    leaseMs = 300000,
+  ): Promise<void> {
+    this.renewed.push({ id, leaseToken, leaseMs });
   }
 
   async markPublished(
@@ -123,6 +133,34 @@ test("processor does not clear a completed handler's lease when acknowledgement 
   assert.equal(handled, 1);
   assert.equal(store.published.length, 0);
   assert.equal(store.failed.length, 0);
+});
+
+test("processor renews all claimed leases while processing a long sequential batch", async () => {
+  const store = new MemoryStore([event("1"), event("2")]);
+  const processor = new OutboxProcessor(
+    store,
+    async (outboxEvent) => {
+      if (outboxEvent.id === "1") {
+        await new Promise((resolve) => setTimeout(resolve, 1100));
+      }
+    },
+    { leaseMs: 3000, heartbeatMs: 1000 },
+  );
+
+  const result = await processor.process("tenant-1", 2);
+
+  assert.deepEqual(result, { claimed: 2, published: 2, failed: 0 });
+  assert.ok(store.renewed.some((renewal) => renewal.id === "1"));
+  assert.ok(store.renewed.some((renewal) => renewal.id === "2"));
+  assert.ok(store.renewed.every((renewal) => renewal.leaseMs === 3000));
+});
+
+test("processor rejects an invalid heartbeat configuration", () => {
+  const store = new MemoryStore([]);
+  assert.throws(
+    () => new OutboxProcessor(store, async () => undefined, { leaseMs: 10, heartbeatMs: 10 }),
+    /OUTBOX_HEARTBEAT_INVALID/,
+  );
 });
 
 test("processor truncates non-Error failure messages before persisting", async () => {
