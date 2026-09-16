@@ -17,6 +17,16 @@ Required cycle:
 
 DISCOVER → ANALYZE → CLASSIFY → CORRECT → CLEAN → REFACTOR → TEST → VALIDATE → DOCUMENT → EVIDENCE → NEXT
 
+## Current execution state
+
+CHAT 03 — INVENTÁRIO TÉCNICO: EXECUTED / INVENTORY CONFIRMED / FILE-LEVEL ORPHAN SCAN PENDING.
+
+CHAT 04 — INVENTÁRIO DE FUNCIONALIDADES: EXECUTED / STRUCTURAL DOMAIN TRACEABILITY CONFIRMED / END-TO-END REQUIREMENT TRACEABILITY PENDING.
+
+CHAT 05 — GATE 02 — ESTRUTURA DO PROJETO: EXECUTED / WORKSPACE STRUCTURE CONFIRMED / DEEP DEAD-CODE AND CIRCULAR-DEPENDENCY ANALYSIS PENDING.
+
+The controller did not modify application code in these stages because no safe code correction was established by the available evidence. Audit evidence and controller records were updated instead.
+
 ## Evidence levels
 
 - E0 — not verified
@@ -29,81 +39,77 @@ DISCOVER → ANALYZE → CLASSIFY → CORRECT → CLEAN → REFACTOR → TEST �
 
 CONCLUÍDO / COMPROVADO · FUNCIONAL · PARCIAL · IMPLEMENTADO / NÃO VALIDADO · CONFIGURADO · QUEBRADO · AUSENTE · OBSOLETO · DUPLICADO · NÃO VERIFICADO
 
+## Reconciliation result
+
+The prior controller record contained the parent commit `f12f6ece...` as HEAD. GitHub `main` was re-read and is now confirmed at `520b6f3008585bee4334064cd536444be87c5836`, whose parent is `f12f6ece...` and whose commit message is `docs(audit): activate master controller and evidence ledger`.
+
+Therefore `520b6f3` is the current canonical baseline. The Evidence Ledger was subsequently updated by commit `9e00da465596c21f5e4db2c81242eddfcb7f37ee`, and this controller update is the next reconciliation commit.
+
+## CHAT 03–05 findings
+
+### F-03-001 — Monorepo inventory
+
+`apps/` currently contains `api`, `web`, and `worker`. `packages/` contains `audit`, `auth`, `config`, `database`, `freight`, `matching`, `security`, `shared`, and `tenancy` in the current repository tree.
+
+Status: INVENTORIED. Evidence level E1 for component existence.
+
+### F-04-001 — Functional traceability
+
+API structure exposes common infrastructure, health controller, bootstrap, and domain modules; domain packages include freight, matching, tenancy and security. This is structural evidence only. It does not prove every business capability end-to-end.
+
+Status: PARTIAL. Evidence level E1. Blocker BLK-005 remains active.
+
+### F-05-001 — Workspace structure
+
+`pnpm-workspace.yaml` declares `apps/*` and `packages/*`, matching the observed top-level repository structure.
+
+Status: COMPROVADO / STRUCTURE ALIGNED. Evidence level E2 for configuration-to-tree alignment.
+
+### F-05-002 — Root toolchain
+
+Root `package.json` pins pnpm 11.24.0, Node 24.20.0, Prettier 3.9.6, Turbo 2.10.12 and TypeScript 6.0.3.
+
+Status: CONFIGURED. Evidence level E1; runtime compatibility still requires execution evidence.
+
 ## Blocker routing
 
 When a P0/P1 finding affects the current gate, the controller routes execution to the smallest corrective stage capable of resolving it, then requires regression validation before returning to the main sequence. No blocker is silently carried forward.
 
-Current routing priorities from the live audit:
+### Active blockers
 
-1. Environment drift: Neon `development` and `staging` are materially divergent from canonical `main` and their ownership/consumption must be established before synchronization, reset or deletion.
-2. Worker freshness/lifecycle: `tms-worker` starts successfully but its deployment from the latest repository commit is not proven; production currently has zero tenants and `OUTBOX_TENANT_IDS` is not configured.
-3. Backup/DR: deployment and implementation exist, but independent recurring backup execution, retention/restore evidence, RPO and RTO are not fully proven.
-4. Runtime smoke: API health is proven, but route/permission/application runtime smoke reconciliation remains pending.
-5. Frontend: foundation-level and must be audited independently; backend capability is not counted as frontend implementation.
+1. **BLK-001 — Environment drift (P1):** development and staging diverge from canonical main; ownership/active consumers must be established before synchronization, reset or deletion.
+2. **BLK-002 — Worker deployment freshness (P1):** worker starts/idle, but deployment of current repository commit is not proven; do not invent tenant IDs to force activity.
+3. **BLK-003 — Backup/DR readiness (P1):** recurring backup execution, retention proof and approved RPO/RTO remain incomplete; Issues #28/#29 are open.
+4. **BLK-004 — Runtime application coverage (P1):** production `/health` is proven, but complete route/permission/runtime smoke is pending.
+5. **BLK-005 — Functional traceability (P1):** requirement-to-operation mapping is incomplete.
+6. **BLK-006 — Deep structural analysis (P2):** file-level orphan/dead-code scan and circular-dependency analysis remain pending.
 
-## Current controller position
+## Blocker route after CHAT 03–05
 
-The historical audit is already beyond the early discovery-only state. The controller therefore does not restart the project from zero. It reconciles the latest `main` state and routes remaining work to the applicable 109 stages.
+Do not perform destructive environment reconciliation as part of CHAT 03–05.
 
-Current repository HEAD observed on 2026-09-16:
-`f12f6ece077f4eb1b071a381d00b00ab0b867da0`
+Next execution route:
 
-Current canonical database baseline: 31 migrations through `0031_finance_relationship_invariants.sql`, with 21 public tables on Neon `main`.
+**CHAT 46/49 → fresh CI evidence → CHAT 50/51 runtime validation → CHAT 38–45 environment ownership/parity → CHAT 32–34 worker/outbox validation → CHAT 55–57 backup/DR → CHAT 23–25 frontend → regression → return to main 109-stage sequence.**
 
-## 109-stage control register
+The route intentionally jumps to existing P1 blockers rather than repeating already-proven discovery work.
 
-The complete stage definitions remain in the operational master source. The controller uses the following stage IDs as the authoritative execution keys:
+## Regression loop
 
-00–04 Control/Discovery
-05–08 Structure/Architecture
-09–12 Database
-13–19 Authentication/IAM/Tenancy/Security
-20–25 Backend/Frontend
-26–31 Domain/Matching
-32–34 Worker/Outbox/Jobs
-35–37 Infrastructure
-38–45 Environments/Variables
-46–51 GitHub/CI/CD
-52–54 Tests
-55–57 Backup/DR
-58–61 Performance/Observability
-62–64 Cleanup
-65–67 Refactoring
-68–70 Modernization
-71–72 Code Quality
-73–80 Documentation/Runbooks/ADR
-81–83 Dependencies
-84–85 Traceability/Gap Analysis
-86–87 Operational/Production Readiness
-88–91 P0/P1/P2/P3 corrections
-92–93 Regression/Cross-system reconciliation
-94–98 Status/Evidence/Risk/Progress/Debt matrices
-99–102 Full consistency/DoD
-103–107 Final report/P0–P3 roadmap
-108–109 Continuous improvement/Re-audit
+For every code/configuration correction:
 
-## Controller gate rule
+1. Reproduce the finding.
+2. Apply the smallest safe correction.
+3. Run targeted regression tests.
+4. Run format/lint/typecheck/test/build as applicable.
+5. Verify the affected runtime/integration boundary.
+6. Record evidence and update blocker status.
+7. Re-enter the 109-stage sequence only after the blocker is cleared or formally documented.
 
-A stage may advance only when:
+## Release gate
 
-- its entry dependencies are satisfied;
-- findings are classified;
-- required corrections are applied or formally blocked;
-- applicable tests/validation execute;
-- evidence is written to the Evidence Ledger;
-- documentation is reconciled;
-- no unresolved higher-priority blocker invalidates the stage.
+Overall audit remains IN PROGRESS. The historical ~74% metric remains a historical audit metric and is not treated as 74/109 completed stages.
 
-## Current release gate
+## FINAL DoD gate
 
-Overall audit remains IN PROGRESS. The latest audit baseline reports approximately 74% overall progress, with the major remaining work concentrated in environment reconciliation, runtime smoke validation, frontend, worker/outbox runtime validation, operations, and production DR evidence.
-
-This percentage is retained as the existing audit metric; it is not reinterpreted as completion of 74 of the 109 stages.
-
-## Next execution route
-
-1. CHAT 00 — controller baseline and ledger activation.
-2. CHAT 01/02 — reconcile repository baseline and discovery against current `main`.
-3. Route immediately to the active blockers instead of repeating already-proven historical work.
-4. Execute regression loop after each correction.
-5. Continue through the 109-stage register until FINAL DoD.
+The controller may only enter FINAL DoD after P0/P1 blockers are resolved or formally accepted, critical regression is green, environments are reconciled or explicitly governed, security/tenancy boundaries are evidenced, backup/restore is proven to the required operational target, and documentation/evidence are current.
