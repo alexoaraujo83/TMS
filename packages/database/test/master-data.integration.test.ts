@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import { after, before, describe, it } from "node:test";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const runIntegration =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -13,6 +14,7 @@ if (!runIntegration) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const tenantA = randomUUID();
   const tenantB = randomUUID();
   const userA = randomUUID();
@@ -28,7 +30,7 @@ if (!runIntegration) {
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -100,7 +102,7 @@ if (!runIntegration) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of [
@@ -141,6 +143,7 @@ if (!runIntegration) {
     } finally {
       client.release();
       await pool.end();
+      await adminPool.end();
     }
   });
 
@@ -149,9 +152,6 @@ if (!runIntegration) {
       const client = await pool.connect();
       try {
         await client.query("begin");
-        for (const table of ["vehicles", "drivers", "carriers"]) {
-          await client.query(`alter table ${table} disable row level security`);
-        }
         const result = await client.query(
           `select c.tenant_id as "carrierTenant", d.tenant_id as "driverTenant",
                   d.carrier_id as "carrierId", v.driver_id as "driverId"
@@ -182,8 +182,6 @@ if (!runIntegration) {
       const client = await pool.connect();
       try {
         await client.query("begin");
-        await client.query("alter table drivers disable row level security");
-        await client.query("alter table carriers disable row level security");
         await client.query(
           `insert into drivers (tenant_id, carrier_id, name, document_number, rntrc)
            values ($1, $2, 'Cross Tenant Driver', $3, $4)`,
@@ -215,8 +213,6 @@ if (!runIntegration) {
       const client = await pool.connect();
       try {
         await client.query("begin");
-        await client.query("alter table vehicles disable row level security");
-        await client.query("alter table drivers disable row level security");
         await client.query(
           `insert into vehicles
              (tenant_id, driver_id, plate, vehicle_type, body_type, capacity_kg)
