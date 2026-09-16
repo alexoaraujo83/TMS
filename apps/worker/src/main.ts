@@ -4,6 +4,7 @@ import { PgDurableJobStore } from "./durable-jobs-store.js";
 import { OutboxProcessor } from "./outbox-worker.js";
 import { PgOutboxStore } from "./outbox-store.js";
 import { WebhookPublisher } from "./webhook-publisher.js";
+import { createDurableWebhookHandler } from "./durable-job-handlers.js";
 import { normalizeDatabaseUrl } from "./database-url.js";
 import { parseTenantIds, positiveIntegerEnv } from "./config.js";
 import { assertConfiguredTenantsAreActive } from "./tenant-config.js";
@@ -125,6 +126,7 @@ if (!databaseUrl) {
               );
             },
           ],
+          ["external.webhook", createDurableWebhookHandler(webhookPublisher)],
         ]),
         {
           onTelemetry: (event) => console.log(JSON.stringify(event)),
