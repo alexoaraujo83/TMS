@@ -14,19 +14,24 @@ Audit the durable-job lease lifecycle after the lease-heartbeat hardening merged
 - Lease expiry permits reclamation by another worker.
 - Regression coverage verifies invalid lease durations do not reach the database and stale lease finalization is rejected.
 
-## Residual P1 risk
+## Real external-side-effect handler
 
-A lease token fences database finalization, but it cannot automatically undo external side effects performed by a handler before lease loss. A handler that performs a non-idempotent external operation and then loses its lease can be followed by another worker reclaiming the job and repeating that operation.
+The worker now has a non-noop `external.webhook` Durable Job handler. The handler validates a typed webhook payload and delegates to the existing HTTPS-only `WebhookPublisher`.
 
-Therefore durable-job correctness requires one of the following for handlers with external side effects:
+The durable job ID is passed as the outbound event ID, which becomes the deterministic `Idempotency-Key` header. This means a retry/reclaim of the same durable job reuses the same external idempotency key rather than generating a new key.
 
-1. an idempotency key derived from the durable job identity and enforced by the destination;
-2. a transactional inbox/outbox or equivalent deduplication record inside the authoritative database;
-3. a destination-side compare-and-set/fencing mechanism;
-4. another explicitly documented idempotency mechanism with equivalent guarantees.
+The publisher also requires an HMAC secret when endpoints are configured, signs the exact JSON body, rejects non-HTTPS endpoints, disables redirects, and treats non-success responses/timeouts as failures.
+
+Automated tests cover handler payload validation and verify that the durable job ID is preserved as the external event identity. Existing publisher tests verify the emitted idempotency header and request security controls.
+
+## Remaining boundary
+
+The TMS side now provides a deterministic idempotency key and a real non-noop external handler, but exactly-once external effects still depend on the destination enforcing that key atomically. The worker cannot independently prove the behavior of an external system it does not control.
+
+Therefore the production integration contract requires each webhook destination to deduplicate atomically by `Idempotency-Key` and return the previously committed result for a replay of the same key. Destination-side evidence must be collected when a real external integration is enabled.
 
 Lease renewal is not itself an idempotency guarantee.
 
 ## Acceptance gate
 
-The lease-validation and stale-finalization controls are implemented and covered by automated tests. The remaining P1 gate is handler-side idempotency evidence for real external side effects. CI must pass format, lint, typecheck, tests, and build before production-readiness is declared.
+Lease validation, stale-finalization fencing, a real non-noop external handler, deterministic external idempotency-key propagation, and automated handler/publisher tests are implemented. Production exactly-once behavior remains dependent on destination-side idempotency enforcement and is not claimed without destination evidence.
