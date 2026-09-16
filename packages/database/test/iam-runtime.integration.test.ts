@@ -2,13 +2,13 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { after, before, describe, it } from "node:test";
 
-const ownerUrl = process.env.DATABASE_URL;
+const ownerUrl = process.env.DATABASE_ADMIN_URL;
 const runtimeUrl = process.env.RUNTIME_DATABASE_URL;
 const runIntegration = Boolean(ownerUrl && runtimeUrl);
 
 if (!runIntegration) {
   describe("database IAM runtime integration", () => {
-    it("is disabled unless DATABASE_URL and RUNTIME_DATABASE_URL are configured", () => {});
+    it("is disabled unless DATABASE_ADMIN_URL and RUNTIME_DATABASE_URL are configured", () => {});
   });
 } else {
   const ownerPool = new Pool({ connectionString: ownerUrl });
