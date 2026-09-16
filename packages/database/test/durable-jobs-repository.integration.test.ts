@@ -88,6 +88,26 @@ if (!enabled) {
     assert.ok(claimed[0].leaseToken);
   });
 
+  it("does not claim jobs for suspended tenants", async () => {
+    const job = await jobs.enqueue({
+      tenantId,
+      jobType: "integration.suspended",
+    });
+    await adminPool.query("update tenants set status = 'suspended' where id = $1", [
+      tenantId,
+    ]);
+
+    const claimedWhileSuspended = await jobs.claimPending(tenantId, 10);
+    assert.equal(claimedWhileSuspended.length, 0);
+
+    await adminPool.query("update tenants set status = 'active' where id = $1", [
+      tenantId,
+    ]);
+    const claimedAfterReactivation = await jobs.claimPending(tenantId, 10);
+    assert.equal(claimedAfterReactivation.length, 1);
+    assert.equal(claimedAfterReactivation[0].id, job.id);
+  });
+
   it("completes only with the active lease", async () => {
     const job = await jobs.enqueue({
       tenantId,
