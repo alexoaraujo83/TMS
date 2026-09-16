@@ -35,6 +35,11 @@ export interface ProcessResult {
   failed: number;
 }
 
+export interface OutboxProcessorOptions {
+  leaseMs?: number;
+  heartbeatMs?: number;
+}
+
 export function retryDelayMs(
   attempts: number,
   baseDelayMs = 1000,
@@ -47,10 +52,26 @@ const DEFAULT_LEASE_MS = 5 * 60 * 1000;
 const MIN_HEARTBEAT_MS = 1000;
 
 export class OutboxProcessor {
+  private readonly leaseMs: number;
+  private readonly heartbeatMs: number;
+
   constructor(
     private readonly store: OutboxStore,
     private readonly handler: EventHandler,
-  ) {}
+    options: OutboxProcessorOptions = {},
+  ) {
+    this.leaseMs = options.leaseMs ?? DEFAULT_LEASE_MS;
+    this.heartbeatMs = Math.max(
+      MIN_HEARTBEAT_MS,
+      options.heartbeatMs ?? Math.floor(this.leaseMs / 3),
+    );
+    if (!Number.isFinite(this.leaseMs) || this.leaseMs <= 0) {
+      throw new Error("OUTBOX_LEASE_INVALID");
+    }
+    if (this.heartbeatMs >= this.leaseMs) {
+      throw new Error("OUTBOX_HEARTBEAT_INVALID");
+    }
+  }
 
   async process(tenantId: string, limit = 50): Promise<ProcessResult> {
     const events = await this.store.claimPending(tenantId, limit);
@@ -59,17 +80,13 @@ export class OutboxProcessor {
 
     for (const event of events) {
       let leaseLost = false;
-      const heartbeatMs = Math.max(
-        MIN_HEARTBEAT_MS,
-        Math.floor(DEFAULT_LEASE_MS / 3),
-      );
       const heartbeat = setInterval(() => {
         void this.store
-          .renewLease(tenantId, event.id, event.leaseToken, DEFAULT_LEASE_MS)
+          .renewLease(tenantId, event.id, event.leaseToken, this.leaseMs)
           .catch(() => {
             leaseLost = true;
           });
-      }, heartbeatMs);
+      }, this.heartbeatMs);
 
       try {
         await this.handler(event);
