@@ -43,15 +43,23 @@ jobs:
       - run: npm install --global pnpm@11.24.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @tms/database migrate
-      - name: Provision CI runtime role credential
+      - name: Provision CI database roles
         shell: bash
         run: |
           set -euo pipefail
           runtime_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
+          admin_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" \
             -v ON_ERROR_STOP=1 \
             -c "ALTER ROLE tms_app PASSWORD '$runtime_password'"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" \
+            -v ON_ERROR_STOP=1 \
+            -c "DROP ROLE IF EXISTS tms_ci_admin"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" \
+            -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE tms_ci_admin LOGIN SUPERUSER PASSWORD '$admin_password'"
           printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
+          printf 'DATABASE_ADMIN_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
