@@ -36,8 +36,11 @@ Relevant variables currently declared in `.env.example`:
 - `WORKER_ENABLED`
 - `WORKER_CONCURRENCY`
 - `LOG_LEVEL`
+- `BACKUP_RETENTION_DAYS`
 
 `CORS_ALLOWED_ORIGINS` is an explicit comma-separated browser-origin allowlist. The API does not enable wildcard `*` origins and does not enable credentialed CORS. The example file is documentation only; it is not automatically loaded by the API. Secrets must come from the runtime secret store. Auth0 audiences are environment-specific: development, staging and production use distinct audience values as documented in `.env.example`.
+
+`BACKUP_RETENTION_DAYS` is a positive integer controlling backup-object retention; the backup worker defaults to 14 days when the variable is absent. Retention is applied only after the current backup has passed remote size and checksum verification.
 
 ## 3. Web → API transport contract
 
@@ -113,7 +116,17 @@ The operational model is:
 
 This does **not** imply that every future external integration is implemented. Receiver-side deduplication, complete replay tooling and business-specific handlers must be independently exercised and evidenced before being described as production-ready.
 
-## 8. Deployment procedure
+## 8. Backup and retention
+
+The scheduled backup worker creates an encrypted PostgreSQL custom-format dump, writes a SHA-256 checksum and manifest, uploads all three objects under `tms/postgres/<backup_id>/`, then verifies remote object size and checksum before reporting `backup_status=verified`.
+
+Retention is configured with `BACKUP_RETENTION_DAYS` (default: 14). After the current backup is verified, objects under `tms/postgres/` older than the retention cutoff are eligible for deletion. Only keys belonging to timestamped backup run prefixes (`YYYYMMDDTHHMMSSZ`) are considered. The current run is explicitly excluded. A retention deletion error fails the backup job so cleanup cannot be reported as successful when the object-store operation was not confirmed.
+
+Retention policy is separate from restore verification. A successful scheduled backup does not by itself prove disaster-recovery readiness; periodic restore drills must still verify decryption, PostgreSQL restore, schema/table presence and migration count where configured.
+
+Operational evidence for backup/retention should include the backup ID, verified checksum, remote object size, retention window, deleted-object count, job exit status and the object-store listing before/after a controlled retention test. Do not report production retention as proven solely because the script contains the deletion path.
+
+## 9. Deployment procedure
 
 1. Verify repository state and required Node/pnpm versions.
 2. Install with the committed lockfile.
@@ -127,13 +140,13 @@ This does **not** imply that every future external integration is implemented. R
 
 Never deploy a populated `.env` file or production credentials through Git.
 
-## 9. Rollback
+## 10. Rollback
 
 Application rollback should first confirm database compatibility. Because migrations are forward-only by default, prefer rolling the application back only when the schema remains backward compatible. For incompatible changes, use expand/contract rather than destructive rollback SQL.
 
 If data integrity is at risk, stop writes, preserve evidence/logs, identify the last known-good commit/schema, and execute the approved recovery procedure rather than attempting ad-hoc production edits.
 
-## 10. Incident response
+## 11. Incident response
 
 ### P0 — security/data integrity
 
@@ -147,11 +160,11 @@ Identify affected domain, reproduce with tenant-scoped test data, inspect API/wo
 
 Track through normal issue/maintenance workflow with owner, impact, reproduction, expected behavior and verification evidence.
 
-## 11. Observability
+## 12. Observability
 
 All operational flows should carry a correlation/request ID. Audit events support actor, action, entity, request ID, before/after state and metadata. Production observability must make it possible to trace a request from HTTP boundary through use case, transaction and asynchronous side effect.
 
-## 12. Maintenance
+## 13. Maintenance
 
 - Keep Node/pnpm versions aligned with the repository.
 - Keep migrations immutable after release.
@@ -159,4 +172,5 @@ All operational flows should carry a correlation/request ID. Audit events suppor
 - Review indexes when query patterns change.
 - Run security and dependency checks before production promotion.
 - Perform periodic backup/restore drills.
+- Perform a controlled retention test before declaring retention production-proven.
 - Remove unused environment variables and integrations rather than leaving undocumented operational dependencies.
