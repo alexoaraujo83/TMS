@@ -47,6 +47,31 @@ test("claimPending uses tenant context and row locking for concurrent workers", 
   assert.deepEqual(values[1], ["app.tenant_id", "tenant-1"]);
 });
 
+test("renewLease extends only the current fenced pending event", async () => {
+  const { pool, queries, values } = createPool([{ id: "event-1" }]);
+  const store = new PgOutboxStore(pool);
+
+  await store.renewLease("tenant-1", "event-1", "lease-1", 300000);
+
+  const updateIndex = queries.findIndex((query) => /^update outbox_events/.test(query));
+  assert.ok(updateIndex >= 0);
+  assert.match(queries[updateIndex] ?? "", /available_at = now\(\) \+ \(\$4 \* interval '1 millisecond'\)/);
+  assert.match(queries[updateIndex] ?? "", /status = 'pending'/);
+  assert.match(queries[updateIndex] ?? "", /lease_token = \$3/);
+  assert.deepEqual(values[updateIndex], ["tenant-1", "event-1", "lease-1", 300000]);
+});
+
+test("renewLease rejects an invalid lease duration before database access", async () => {
+  const { pool, queries } = createPool([]);
+  const store = new PgOutboxStore(pool);
+
+  await assert.rejects(
+    store.renewLease("tenant-1", "event-1", "lease-1", 0),
+    /OUTBOX_LEASE_INVALID/,
+  );
+  assert.equal(queries.length, 0);
+});
+
 test("markPublished requires the claimed lease token", async () => {
   const { pool, queries, values } = createPool([{ id: "event-1" }]);
   const store = new PgOutboxStore(pool);
