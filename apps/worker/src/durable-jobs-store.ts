@@ -42,6 +42,7 @@ export class PgDurableJobStore implements DurableJobStore {
   }
 
   async renewLease(tenantId: string, id: string, leaseToken: string, leaseMs = 300_000): Promise<DurableJob> {
+    if (!Number.isFinite(leaseMs) || leaseMs <= 0) throw new Error("DURABLE_JOB_LEASE_INVALID");
     return withTenantTransaction(this.pool, tenantId, async (client) => {
       const result = await client.query(
         `update durable_jobs
