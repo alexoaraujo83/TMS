@@ -41,6 +41,30 @@ export class PgDurableJobStore implements DurableJobStore {
     });
   }
 
+  async renewLease(
+    tenantId: string,
+    id: string,
+    leaseToken: string,
+    leaseMs = 300_000,
+  ): Promise<DurableJob> {
+    return withTenantTransaction(this.pool, tenantId, async (client) => {
+      const result = await client.query(
+        `update durable_jobs
+         set available_at = now() + ($4 * interval '1 millisecond'),
+             updated_at = now()
+         where tenant_id = $1
+           and id = $2
+           and status = 'running'
+           and lease_token = $3
+         returning id, tenant_id, job_type, payload, status, attempts, max_attempts,
+           available_at, lease_token, last_error, completed_at, created_at, updated_at`,
+        [tenantId, id, leaseToken, leaseMs],
+      );
+      if (!result.rows[0]) throw new Error("DURABLE_JOB_LEASE_RENEWAL_FAILED");
+      return mapJob(result.rows[0]);
+    });
+  }
+
   async complete(
     tenantId: string,
     id: string,
