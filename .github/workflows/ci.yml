@@ -55,10 +55,16 @@ jobs:
           END
           $$;
           GRANT USAGE ON SCHEMA public TO tms_app;
-          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tms_app;
-          REVOKE ALL ON TABLE public.schema_migrations FROM tms_app;
           SQL
       - run: pnpm --filter @tms/database migrate
+      - name: Grant runtime table and sequence access
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          GRANT USAGE ON SCHEMA public TO tms_app;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO tms_app;
+          GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO tms_app;
+          REVOKE ALL ON TABLE public.schema_migrations FROM tms_app;
+          SQL
       - name: Grant runtime function access
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "GRANT EXECUTE ON FUNCTION public.check_tenant_membership(text, uuid) TO tms_app"
       - name: Validate RLS with runtime role
