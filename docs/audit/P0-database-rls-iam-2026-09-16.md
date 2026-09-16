@@ -6,18 +6,13 @@ Continue the canonical TMS database security audit from `main` without reopening
 
 ## Finding addressed
 
-`public.check_tenant_membership(text, uuid)` is the authoritative Auth0-subject membership resolver. Migration `0020` revokes `PUBLIC` execution, but a later migration is required to make runtime application access explicit without creating database roles or credentials inside migrations.
+`public.check_tenant_membership(text, uuid)` is the authoritative Auth0-subject membership resolver. Migration `0020_auth0_subject_identity.sql` revokes `PUBLIC` execution and defines the `(text, uuid)` signature. The runtime proof must therefore grant execution to the ephemeral application role without creating credentials in migrations.
 
 ## Correction
 
-Migration `0029_iam_runtime_execute_grant.sql`:
+No additional migration was retained: the canonical `0029_runtime_app_role.sql` already provisions the intended `tms_app` role posture and grants the resolver execution privilege. The earlier duplicate `0029_iam_runtime_execute_grant.sql` was removed.
 
-- revokes execution from `PUBLIC`;
-- grants execution to `tms_app` when that role exists;
-- grants execution to `nexora_app` when that role exists;
-- does not create roles or store passwords.
-
-The CI workflow independently provisions an ephemeral `tms_app` role as `NOSUPERUSER NOBYPASSRLS`, grants only the database access required by the integration tests, and supplies its credential through `GITHUB_ENV`.
+The CI workflow independently provisions an ephemeral `tms_app` role as `NOSUPERUSER NOBYPASSRLS`, grants only the database access required for the integration proofs, and supplies its credential through `GITHUB_ENV`. The normal quality chain continues to receive `DATABASE_URL` as the runtime role; dedicated integration tests use `DATABASE_ADMIN_URL` only for fixture setup and cleanup.
 
 ## Behavioral proofs added
 
@@ -41,9 +36,10 @@ The CI workflow independently provisions an ephemeral `tms_app` role as `NOSUPER
 2. Run canonical migrations using the administrative database connection.
 3. Provision `tms_app` with `NOSUPERUSER NOBYPASSRLS` and a random ephemeral password.
 4. Grant table/sequence/function access required for runtime behavior and explicitly remove `schema_migrations` access.
-5. Validate runtime role attributes and resolver privileges.
-6. Run the dedicated RLS and IAM integration tests.
-7. Run the existing quality chain: `pnpm format:fix` → `pnpm format:check` → `pnpm lint` → `pnpm typecheck` → `pnpm test` → `pnpm build`.
+5. Export the same runtime credential to both `DATABASE_URL` and `RUNTIME_DATABASE_URL` for the appropriate quality and dedicated-test paths.
+6. Validate runtime role attributes and resolver privileges.
+7. Run the dedicated RLS and IAM integration tests.
+8. Run the existing quality chain: `pnpm format:fix` → `pnpm format:check` → `pnpm lint` → `pnpm typecheck` → `pnpm test` → `pnpm build`.
 
 ## Evidence rule
 
