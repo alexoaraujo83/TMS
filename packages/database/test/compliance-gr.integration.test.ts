@@ -168,4 +168,32 @@ if (!enabled) {
       client.release();
     }
   });
+
+  it("keeps compliance and GR assignment foreign keys freight-scoped", async () => {
+    const client = await adminPool.connect();
+    try {
+      const result = await client.query(
+        `select conrelid::regclass::text as table_name,
+                conname,
+                pg_get_constraintdef(oid) as definition
+           from pg_constraint
+          where conname in ('compliance_checks_assignment_fk', 'gr_requests_assignment_fk')
+          order by conname`,
+      );
+
+      assert.equal(result.rows.length, 2);
+      for (const row of result.rows) {
+        assert.match(
+          row.definition,
+          /FOREIGN KEY \(tenant_id, freight_id, assignment_id\)/,
+        );
+        assert.match(
+          row.definition,
+          /freight_assignments \(tenant_id, freight_id, id\)/,
+        );
+      }
+    } finally {
+      client.release();
+    }
+  });
 }

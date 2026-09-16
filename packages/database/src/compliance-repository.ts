@@ -53,10 +53,13 @@ export class ComplianceRepository {
 
         if (input.assignmentId) {
           const assignment = await client.query(
-            "select id from freight_assignments where tenant_id = $1 and id = $2",
-            [input.tenantId, input.assignmentId],
+            `select id from freight_assignments
+             where tenant_id = $1 and id = $2 and freight_id = $3`,
+            [input.tenantId, input.assignmentId, input.freightId],
           );
-          if (!assignment.rows[0]) throw new Error("Assignment not found");
+          if (!assignment.rows[0]) {
+            throw new Error("Assignment does not belong to freight");
+          }
         }
 
         const result = await client.query(
@@ -188,6 +191,17 @@ export class ComplianceRepository {
           [input.tenantId, input.freightId],
         );
         if (!freight.rows[0]) throw new Error("Freight not found");
+
+        if (input.assignmentId) {
+          const assignment = await client.query(
+            `select id from freight_assignments
+             where tenant_id = $1 and id = $2 and freight_id = $3`,
+            [input.tenantId, input.assignmentId, input.freightId],
+          );
+          if (!assignment.rows[0]) {
+            throw new Error("Assignment does not belong to freight");
+          }
+        }
 
         const result = await client.query(
           `insert into gr_requests (
