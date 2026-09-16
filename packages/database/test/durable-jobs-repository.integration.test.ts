@@ -6,6 +6,7 @@ import { Pool } from "pg";
 import { DurableJobsRepository } from "../src/durable-jobs-repository.js";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const enabled =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -15,6 +16,7 @@ if (!enabled) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const jobs = new DurableJobsRepository(pool);
   const tenantId = randomUUID();
   const otherTenantId = randomUUID();
@@ -25,7 +27,7 @@ if (!enabled) {
       env: process.env,
       stdio: "inherit",
     });
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query("alter table durable_jobs disable row level security");
@@ -49,7 +51,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query("alter table durable_jobs disable row level security");
@@ -65,6 +67,7 @@ if (!enabled) {
       await client.query("commit");
     } finally {
       client.release();
+      await adminPool.end();
       await pool.end();
     }
   });
