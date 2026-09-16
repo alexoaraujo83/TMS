@@ -9,6 +9,10 @@
     "dev": { "cache": false, "persistent": true },
     "lint": { "dependsOn": ["build"] },
     "typecheck": { "dependsOn": ["build"] },
-    "test": { "dependsOn": ["build"], "outputs": ["coverage/**"] }
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["coverage/**"],
+      "env": ["DATABASE_URL", "DATABASE_ADMIN_URL", "RUN_DB_INTEGRATION"]
+    }
   }
 }
