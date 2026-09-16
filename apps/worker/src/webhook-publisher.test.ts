@@ -132,7 +132,7 @@ test("rejects a non-positive timeout", () => {
   );
 });
 
-test("does not perform a request when no endpoints are configured", async () => {
+test("fails closed when no endpoints are configured", async () => {
   let calls = 0;
   const fetchImpl = async () => {
     calls += 1;
@@ -140,7 +140,6 @@ test("does not perform a request when no endpoints are configured", async () => 
   };
   const publisher = new WebhookPublisher([], { fetchImpl });
 
-  await publisher.publish(event);
-
+  await assert.rejects(publisher.publish(event), /WEBHOOK_ENDPOINTS_REQUIRED/);
   assert.equal(calls, 0);
 });
