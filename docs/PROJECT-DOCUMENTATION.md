@@ -8,7 +8,7 @@
 
 TMS is a new, independent Transportation Management System/SaaS. `alexoaraujo83/nexora-tms` is reference material only. The TMS repository explicitly forbids a runtime dependency, shared database, copied application boundary, or fork relationship with Nexora.
 
-The implemented baseline is a TypeScript monorepo using pnpm/Turborepo with a Next.js web application, NestJS API, asynchronous worker, PostgreSQL/Neon persistence and shared packages. The current database migration history reaches `0028_durable_jobs.sql` and includes tenancy, IAM, master-data/freight foundations, audit events, assignments, Trip Operations, Compliance/GR, outbox events and durable jobs.
+The implemented baseline is a TypeScript monorepo using pnpm/Turborepo with a Next.js web application, NestJS API, asynchronous worker, PostgreSQL/Neon persistence and shared packages. The current database migration history reaches `0029_runtime_app_role.sql` and includes tenancy, IAM, master-data/freight foundations, audit events, assignments, Trip Operations, Compliance/GR, outbox events and durable jobs.
 
 ## 2. Repository topology
 
@@ -94,7 +94,7 @@ Database hardening also prevents cross-tenant carrier/driver/vehicle relationshi
 
 ## 6. Implemented business data
 
-The current schema includes tenancy/IAM, master data, freight, audit, assignment, Trip Operations, Compliance/GR, outbox events and durable jobs. Critical recovery validation has confirmed the presence of 21 public base tables and 28 applied migrations, with `0028_durable_jobs.sql` as the latest migration in the validated recovery branch.
+The current main schema has 21 public tables and 29 applied migrations, with `0029_runtime_app_role.sql` as the latest migration. A separate recovery drill documented elsewhere intentionally validated an earlier 28-migration restore state; that historical evidence must not be used to describe the current main schema.
 
 Freight supports dedicated, shared, complement and urgent types; route, cargo, quantity, weight, volume, linear meters, commercial/driver prices, BRL currency, collection/delivery windows and matching requirements.
 
@@ -136,7 +136,7 @@ Nexora has a mature engineering baseline including the same Node/pnpm/Turborepo 
 | ------------------------------ | -------------- |
 | Monorepo/toolchain             | Implemented |
 | Web/API/Worker deployables     | Implemented foundation; worker has outbox processing |
-| PostgreSQL migrations          | Implemented through migration `0028_durable_jobs.sql` |
+| PostgreSQL migrations          | Implemented through migration `0029_runtime_app_role.sql` |
 | Multi-tenancy                  | Implemented foundation |
 | IAM/permissions                | Implemented foundation |
 | Master data                    | Implemented foundation: carrier/driver/vehicle |
@@ -145,7 +145,7 @@ Nexora has a mature engineering baseline including the same Node/pnpm/Turborepo 
 | Trip execution                 | Implemented foundation |
 | Compliance/GR                  | Implemented foundation |
 | Finance                        | Implemented foundation; broader product scope remains under validation |
-| Transactional outbox           | Implemented and tested foundation |
+| Transactional outbox            | Implemented and tested foundation |
 | Webhook delivery               | Implemented and tested foundation |
 | Durable jobs                   | Migration/persistence foundation implemented; broader runtime orchestration remains under validation |
 | External business integrations | Not established as implemented production connectors |
