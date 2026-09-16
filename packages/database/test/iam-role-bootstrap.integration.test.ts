@@ -41,15 +41,38 @@ if (!enabled) {
         await client.query(`alter table ${table} disable row level security`);
       }
       await client.query(
-        "insert into tenants (id, name, slug, status) values ($1, 'IAM Test', $2, 'active')",
+        "insert into tenants (id, name, slug, status) values ($1::uuid, 'IAM Test', $2::text, 'active')",
         [tenantId, `iam-${tenantId}`],
       );
       await client.query(
-        "insert into users (id, email, display_name, status) values ($1, $2, 'IAM Test', 'active')",
+        "insert into users (id, email, display_name, status) values ($1::uuid, $2::text, 'IAM Test', 'active')",
         [userId, `iam-${userId}@test.local`],
       );
       await client.query(
-        "insert into tenant_memberships (user_id, tenant_id, role) values ($1, $2, 'operator')",
+        "insert into roles (tenant_id, name, description) values ($1::uuid, 'operator', 'IAM integration operator')",
+        [tenantId],
+      );
+      await client.query(
+        `insert into role_permissions (role_id, permission_id)
+         select r.id, p.id
+           from roles r
+           cross join permissions p
+          where r.tenant_id = $1::uuid
+            and r.name = 'operator'
+            and p.code in (
+              'freight:read', 'matching:assign',
+              'trip:read', 'trip:create', 'trip:update'
+            )`,
+        [tenantId],
+      );
+      await client.query(
+        `insert into tenant_memberships (user_id, tenant_id, role, role_id)
+         values (
+           $1::uuid,
+           $2::uuid,
+           'operator',
+           (select id from roles where tenant_id = $2::uuid and name = 'operator')
+         )`,
         [userId, tenantId],
       );
       for (const table of [
@@ -85,11 +108,11 @@ if (!enabled) {
         await client.query(`alter table ${table} disable row level security`);
       }
       await client.query(
-        "delete from tenant_memberships where tenant_id = $1",
+        "delete from tenant_memberships where tenant_id = $1::uuid",
         [tenantId],
       );
-      await client.query("delete from users where id = $1", [userId]);
-      await client.query("delete from tenants where id = $1", [tenantId]);
+      await client.query("delete from users where id = $1::uuid", [userId]);
+      await client.query("delete from tenants where id = $1::uuid", [tenantId]);
       await client.query("commit");
     } finally {
       client.release();
@@ -118,7 +141,7 @@ if (!enabled) {
            left join roles r on r.id = tm.role_id
            left join role_permissions rp on rp.role_id = r.id
            left join permissions p on p.id = rp.permission_id
-          where tm.tenant_id = $1 and tm.user_id = $2
+          where tm.tenant_id = $1::uuid and tm.user_id = $2::uuid
           group by r.name, tm.role, tm.role_id`,
         [tenantId, userId],
       );
@@ -143,7 +166,7 @@ if (!enabled) {
     try {
       await adminClient.query("begin");
       await adminClient.query(
-        "delete from tenant_memberships where tenant_id = $1 and user_id = $2",
+        "delete from tenant_memberships where tenant_id = $1::uuid and user_id = $2::uuid",
         [tenantId, userId],
       );
       for (const table of [
@@ -173,8 +196,13 @@ if (!enabled) {
       ]);
 
       const result = await client.query<{ roleId: string | null }>(
-        `insert into tenant_memberships (user_id, tenant_id, role)
-         values ($1, $2, 'operator')
+        `insert into tenant_memberships (user_id, tenant_id, role, role_id)
+         values (
+           $1::uuid,
+           $2::uuid,
+           'operator',
+           (select id from roles where tenant_id = $2::uuid and name = 'operator')
+         )
          returning role_id as "roleId"`,
         [userId, tenantId],
       );
