@@ -23,6 +23,7 @@ Relevant variables currently declared in `.env.example`:
 - `APP_NAME`
 - `APP_URL`
 - `API_URL`
+- `CORS_ALLOWED_ORIGINS`
 - `DATABASE_URL`
 - `DATABASE_DIRECT_URL`
 - `AUTH0_DOMAIN`
@@ -36,9 +37,35 @@ Relevant variables currently declared in `.env.example`:
 - `WORKER_CONCURRENCY`
 - `LOG_LEVEL`
 
-The example file is documentation only; it is not automatically loaded by the API. Secrets must come from the runtime secret store. Auth0 audiences are environment-specific: development, staging and production use distinct audience values as documented in `.env.example`.
+`CORS_ALLOWED_ORIGINS` is an explicit comma-separated browser-origin allowlist. The API does not enable wildcard `*` origins and does not enable credentialed CORS. The example file is documentation only; it is not automatically loaded by the API. Secrets must come from the runtime secret store. Auth0 audiences are environment-specific: development, staging and production use distinct audience values as documented in `.env.example`.
 
-## 3. Authentication and authorization
+## 3. Web → API transport contract
+
+The current topology uses direct browser HTTP access to the NestJS API when the Web and API have different origins. The API therefore applies an environment-driven CORS allowlist through `CORS_ALLOWED_ORIGINS`.
+
+Rules:
+
+- Origins are exact values such as `https://app.example.com`, separated by commas.
+- `*` is not a valid production policy and is not configured by the repository baseline.
+- Credentialed browser requests are disabled (`credentials: false`). Authentication uses bearer access tokens rather than browser cookies.
+- Requests without an `Origin` header remain accepted so server-to-server, health and CLI traffic are not blocked by browser CORS policy.
+- A browser origin absent from the allowlist is rejected by the CORS middleware.
+
+For local development the baseline example allows `http://localhost:3000` to reach the API on `http://localhost:3001`. Production/staging origins must be populated in the platform secret/configuration store and must not be committed.
+
+### Web/API request-response contract
+
+| Case | HTTP | Body contract |
+|---|---:|---|
+| Authentication missing/invalid | 401 | `{ code: "REQUEST_ERROR", message, requestId? }` |
+| Permission denied | 403 | `{ code: "REQUEST_ERROR", message, requestId? }` |
+| Validation failure | 400 | `{ code: "REQUEST_ERROR", message, requestId? }` |
+| Resource not found | 404 | `{ code: "REQUEST_ERROR", message, requestId? }` |
+| Unexpected server failure | 500 | `{ code: "INTERNAL_ERROR", message: "Internal server error", requestId? }` |
+
+Clients must not infer authorization state from human-readable messages. They should use HTTP status and the stable `code` field, while treating `message` as display/diagnostic text.
+
+## 4. Authentication and authorization
 
 Authentication uses Auth0/OIDC bearer tokens. The API validates the token issuer, audience and signing keys through the configured Auth0 settings. The authenticated token must provide the tenant claim required by the API; when `TENANT_HEADER` is supplied, it cannot override a different authenticated tenant. The authentication layer also verifies active tenant membership before constructing the request context.
 
@@ -46,7 +73,7 @@ The API uses an authentication guard, current-request context and permission gua
 
 Authorization is tenant-aware and must remain enforced in application code plus database isolation. Never trust a tenant ID supplied by the browser without validating membership and establishing the server-side tenant context.
 
-## 4. HTTP contract
+## 5. HTTP contract
 
 Base path: `/api/v1`.
 
@@ -54,7 +81,7 @@ Health: `GET /health`.
 
 Freight endpoints are documented in `docs/PROJECT-DOCUMENTATION.md`. Errors are normalized by the API error/HTTP exception infrastructure; clients should use HTTP status plus the stable application error payload rather than parsing human-readable text.
 
-## 5. External services
+## 6. External services
 
 ### Neon PostgreSQL
 
@@ -76,7 +103,7 @@ No Redis variable is currently declared in `.env.example`, and no production Red
 
 No external freight marketplace, carrier API, tracking provider, fiscal provider, payment provider or notification provider is documented as an implemented production connector in the inspected baseline. Do not create operational documentation that implies otherwise.
 
-## 6. Events and asynchronous processing
+## 7. Events and asynchronous processing
 
 The current baseline contains a transactional outbox processor and durable-job persistence/claiming paths. Outbox events are persisted transactionally and claimed with tenant-aware leasing/fencing. Durable jobs likewise use tenant-aware claiming, and recent hardening aligns claims with active tenant lifecycle. Worker lease renewal/acknowledgement behavior is protected by fencing and regression coverage.
 
@@ -86,7 +113,7 @@ The operational model is:
 
 This does **not** imply that every future external integration is implemented. Receiver-side deduplication, complete replay tooling and business-specific handlers must be independently exercised and evidenced before being described as production-ready.
 
-## 7. Deployment procedure
+## 8. Deployment procedure
 
 1. Verify repository state and required Node/pnpm versions.
 2. Install with the committed lockfile.
@@ -100,13 +127,13 @@ This does **not** imply that every future external integration is implemented. R
 
 Never deploy a populated `.env` file or production credentials through Git.
 
-## 8. Rollback
+## 9. Rollback
 
 Application rollback should first confirm database compatibility. Because migrations are forward-only by default, prefer rolling the application back only when the schema remains backward compatible. For incompatible changes, use expand/contract rather than destructive rollback SQL.
 
 If data integrity is at risk, stop writes, preserve evidence/logs, identify the last known-good commit/schema, and execute the approved recovery procedure rather than attempting ad-hoc production edits.
 
-## 9. Incident response
+## 10. Incident response
 
 ### P0 — security/data integrity
 
@@ -120,11 +147,11 @@ Identify affected domain, reproduce with tenant-scoped test data, inspect API/wo
 
 Track through normal issue/maintenance workflow with owner, impact, reproduction, expected behavior and verification evidence.
 
-## 10. Observability
+## 11. Observability
 
 All operational flows should carry a correlation/request ID. Audit events support actor, action, entity, request ID, before/after state and metadata. Production observability must make it possible to trace a request from HTTP boundary through use case, transaction and asynchronous side effect.
 
-## 11. Maintenance
+## 12. Maintenance
 
 - Keep Node/pnpm versions aligned with the repository.
 - Keep migrations immutable after release.
