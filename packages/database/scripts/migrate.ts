@@ -6,12 +6,12 @@ import { Client } from "pg";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const migrationsDir = join(root, "migrations");
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_ADMIN_URL ?? process.env.DATABASE_URL;
 const allowExistingSchemaBaseline =
   process.env.TMS_ALLOW_EXISTING_SCHEMA_BASELINE === "true";
 
 if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
+  throw new Error("DATABASE_ADMIN_URL or DATABASE_URL is required");
 }
 
 const expectedTables = [
@@ -43,15 +43,7 @@ const rlsTables = expectedTables.filter(
 );
 
 const requiredColumns: Record<string, string[]> = {
-  users: [
-    "id",
-    "email",
-    "display_name",
-    "status",
-    "auth0_subject",
-    "created_at",
-    "updated_at",
-  ],
+  users: ["id", "email", "display_name", "status", "auth0_subject", "created_at", "updated_at"],
   tenants: ["id", "name", "status", "created_at", "updated_at"],
   tenant_memberships: ["tenant_id", "user_id", "role_id"],
   roles: ["id", "tenant_id", "name", "description"],
@@ -65,62 +57,11 @@ const requiredColumns: Record<string, string[]> = {
   trips: ["id", "tenant_id", "freight_id", "assignment_id", "status"],
   trip_occurrences: ["id", "tenant_id", "trip_id", "type", "severity"],
   trip_pods: ["id", "tenant_id", "trip_id", "recipient_name", "document_ref"],
-  compliance_checks: [
-    "id",
-    "tenant_id",
-    "freight_id",
-    "assignment_id",
-    "check_type",
-    "status",
-    "provider",
-    "external_reference",
-    "metadata",
-    "checked_at",
-    "expires_at",
-  ],
-  gr_requests: [
-    "id",
-    "tenant_id",
-    "freight_id",
-    "assignment_id",
-    "status",
-    "provider",
-    "protocol",
-    "external_reference",
-    "metadata",
-    "submitted_at",
-    "approved_at",
-    "rejected_at",
-    "expires_at",
-  ],
-  financial_entries: [
-    "id",
-    "tenant_id",
-    "freight_id",
-    "assignment_id",
-    "trip_id",
-    "amount_cents",
-    "status",
-  ],
-  outbox_events: [
-    "id",
-    "tenant_id",
-    "aggregate_type",
-    "aggregate_id",
-    "event_type",
-    "status",
-    "attempts",
-  ],
-  durable_jobs: [
-    "id",
-    "tenant_id",
-    "job_type",
-    "payload",
-    "status",
-    "attempts",
-    "max_attempts",
-    "lease_token",
-  ],
+  compliance_checks: ["id", "tenant_id", "freight_id", "assignment_id", "check_type", "status", "provider", "external_reference", "metadata", "checked_at", "expires_at"],
+  gr_requests: ["id", "tenant_id", "freight_id", "assignment_id", "status", "provider", "protocol", "external_reference", "metadata", "submitted_at", "approved_at", "rejected_at", "expires_at"],
+  financial_entries: ["id", "tenant_id", "freight_id", "assignment_id", "trip_id", "amount_cents", "status"],
+  outbox_events: ["id", "tenant_id", "aggregate_type", "aggregate_id", "event_type", "status", "attempts"],
+  durable_jobs: ["id", "tenant_id", "job_type", "payload", "status", "attempts", "max_attempts", "lease_token"],
   audit_events: ["id", "tenant_id", "actor_user_id", "action", "created_at"],
 };
 
