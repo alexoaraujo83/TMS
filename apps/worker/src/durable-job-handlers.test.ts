@@ -5,9 +5,7 @@ import { createDurableWebhookHandler } from "./durable-job-handlers.js";
 
 function job(overrides: Partial<DurableJob> = {}): DurableJob {
   return {
-    id: "job-123",
-    tenantId: "tenant-123",
-    jobType: "external.webhook",
+    id: "job-123", tenantId: "tenant-123", jobType: "external.webhook",
     payload: { aggregateType: "freight", aggregateId: "freight-123", eventType: "freight.created", payload: { reference: "ABC-123" } },
     status: "running", attempts: 1, maxAttempts: 5, availableAt: new Date(), leaseToken: "lease-123",
     lastError: null, completedAt: null, createdAt: new Date(), updatedAt: new Date(), ...overrides,
