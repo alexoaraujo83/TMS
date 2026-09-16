@@ -31,7 +31,7 @@ test("claimPending excludes jobs that already exhausted attempts", async () => {
   );
 
   assert.deepEqual(jobs, []);
-  assert.ok(queries.some((query) => /attempts < max_attempts/.test(query)));
+  assert.ok(queries.some((query) => /jobs\.attempts < jobs\.max_attempts/.test(query)));
 });
 
 test("claimPending can reclaim an expired running lease", async () => {
