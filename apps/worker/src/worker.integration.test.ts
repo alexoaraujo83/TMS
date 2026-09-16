@@ -56,21 +56,22 @@ async function provisionFixtures(
 
     await client.query(
       `insert into tenants (id, name, slug, status)
-       values ($1, 'Worker Tenant A', $1, 'active'), ($2, 'Worker Tenant B', $2, 'active')`,
-      [tenantA, tenantB],
+       values ($1::uuid, 'Worker Tenant A', $3::text, 'active'),
+              ($2::uuid, 'Worker Tenant B', $4::text, 'active')`,
+      [tenantA, tenantB, `worker-${tenantA}`, `worker-${tenantB}`],
     );
     await client.query(
       `insert into outbox_events
        (id, tenant_id, aggregate_type, aggregate_id, event_type, payload, status, attempts, available_at, created_at, updated_at)
        values
-       ($1, $3, 'freight', $1, 'freight.created', '{"tenant":"a"}', 'pending', 0, now(), now(), now()),
-       ($2, $3, 'freight', $2, 'freight.updated', '{"tenant":"a"}', 'pending', 0, now(), now(), now())`,
+       ($1::uuid, $3::uuid, 'freight', $1::uuid, 'freight.created', '{"tenant":"a"}', 'pending', 0, now(), now(), now()),
+       ($2::uuid, $3::uuid, 'freight', $2::uuid, 'freight.updated', '{"tenant":"a"}', 'pending', 0, now(), now(), now())`,
       [outboxIds[0], outboxIds[1], tenantA],
     );
     await client.query(
       `insert into durable_jobs
        (id, tenant_id, job_type, payload, status, attempts, max_attempts, available_at, created_at, updated_at)
-       values ($1, $2, 'system.noop', '{"tenant":"a"}', 'pending', 0, 3, now(), now(), now())`,
+       values ($1::uuid, $2::uuid, 'system.noop', '{"tenant":"a"}', 'pending', 0, 3, now(), now(), now())`,
       [durableJobId, tenantA],
     );
     await client.query("commit");
@@ -169,7 +170,7 @@ async function testDurableJobLeaseOwnership(
   try {
     await adminClient.query("alter table durable_jobs disable row level security");
     await adminClient.query(
-      "update durable_jobs set available_at = now() - interval '1 minute', status = 'running' where id = $1",
+      "update durable_jobs set available_at = now() - interval '1 minute', status = 'running' where id = $1::uuid",
       [id],
     );
     await adminClient.query("alter table durable_jobs enable row level security");
@@ -208,15 +209,18 @@ async function cleanupFixtures(
     for (const table of ["outbox_events", "durable_jobs", "tenants"]) {
       await client.query(`alter table ${table} disable row level security`);
     }
-    await client.query("delete from outbox_events where tenant_id in ($1, $2)", [
-      tenantA,
-      tenantB,
-    ]);
-    await client.query("delete from durable_jobs where tenant_id in ($1, $2)", [
-      tenantA,
-      tenantB,
-    ]);
-    await client.query("delete from tenants where id in ($1, $2)", [tenantA, tenantB]);
+    await client.query(
+      "delete from outbox_events where tenant_id in ($1::uuid, $2::uuid)",
+      [tenantA, tenantB],
+    );
+    await client.query(
+      "delete from durable_jobs where tenant_id in ($1::uuid, $2::uuid)",
+      [tenantA, tenantB],
+    );
+    await client.query(
+      "delete from tenants where id in ($1::uuid, $2::uuid)",
+      [tenantA, tenantB],
+    );
     await client.query("commit");
   } finally {
     client.release();
