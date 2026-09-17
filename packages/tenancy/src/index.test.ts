@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { assertSameTenant, assertTenantContext } from "./index.ts";
+import { assertSameTenant, assertTenantContext } from "./index.js";
 
 test("accepts a complete tenant context", () => {
   const context = { tenantId: "tenant-1", userId: "user-1", roles: [] };
