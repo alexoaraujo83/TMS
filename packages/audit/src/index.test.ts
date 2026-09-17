@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createAuditEvent } from "./index.ts";
+import { createAuditEvent } from "./index.js";
 
 const context = {
   tenantId: "tenant-1",
