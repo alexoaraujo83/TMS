@@ -6,7 +6,7 @@ import {
   assertSafeIdentifier,
   hasPermission,
   requirePermission,
-} from "./index.ts";
+} from "./index.js";
 
 const context = {
   userId: "user-1",
