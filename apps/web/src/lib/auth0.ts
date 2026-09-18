@@ -21,11 +21,11 @@ function required(name: string): string {
 }
 
 function issuer(): string {
-  return required("AUTH0_ISSUER_BASE_URL").replace(/\\/$/, "");
+  return required("AUTH0_ISSUER_BASE_URL").replace(/\/$/, "");
 }
 
 function baseUrl(): string {
-  return required("AUTH0_BASE_URL").replace(/\\/$/, "");
+  return required("AUTH0_BASE_URL").replace(/\/$/, "");
 }
 
 function sessionKey(): Buffer {
