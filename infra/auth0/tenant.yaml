@@ -1,0 +1,21 @@
+# TMS Auth0 tenant configuration (managed resource subset)
+#
+# IMPORTANT:
+# - This file intentionally manages only the Post-Login Action and its binding.
+# - Application credentials, user app_metadata and tenant-specific secrets remain
+#   outside source control.
+# - Run a dry-run before applying to Production.
+#
+actions:
+  - name: TMS — Tenant Claim
+    code: ./actions/post-login.js
+    deployed: true
+    status: built
+    supported_triggers:
+      - id: post-login
+        version: v3
+
+triggers:
+  post-login:
+    - action_name: TMS — Tenant Claim
+      display_name: TMS — Tenant Claim
