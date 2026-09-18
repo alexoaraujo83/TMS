@@ -25,7 +25,7 @@ The API does **not** trust the claim as authorization by itself. It validates th
 
 ## Production deployment
 
-Use a dedicated Auth0 Machine-to-Machine application for the Deploy CLI. Do not reuse the TMS Web application's client secret.
+Use a **dedicated Auth0 Machine-to-Machine application** for the Deploy CLI. Do not reuse the TMS Web application's client secret.
 
 Required environment variables:
 
@@ -35,7 +35,9 @@ export AUTH0_CLIENT_ID='<deploy-cli-m2m-client-id>'
 export AUTH0_CLIENT_SECRET='<deploy-cli-m2m-client-secret>'
 ```
 
-Install the Auth0 Deploy CLI:
+The Auth0 Deploy CLI can read these environment variables directly, so no `config.json` containing credentials is required.
+
+Install/run the CLI:
 
 ```bash
 pnpm dlx auth0-deploy-cli --help
@@ -44,8 +46,7 @@ pnpm dlx auth0-deploy-cli --help
 Run a dry-run first:
 
 ```bash
-pnpm dlx a0deploy import \
-  -c ./infra/auth0/config.json \
+pnpm dlx auth0-deploy-cli import \
   -i ./infra/auth0/tenant.yaml \
   --dry-run
 ```
@@ -53,8 +54,7 @@ pnpm dlx a0deploy import \
 Only after reviewing the proposed changes:
 
 ```bash
-pnpm dlx a0deploy import \
-  -c ./infra/auth0/config.json \
+pnpm dlx auth0-deploy-cli import \
   -i ./infra/auth0/tenant.yaml
 ```
 
@@ -64,7 +64,7 @@ Auth0 documents that an Action being deployed does not automatically mean it is 
 
 For the current bootstrap tenant, the test user's Auth0 `app_metadata.tenant_id` must contain the authoritative TMS tenant UUID before the claim can appear in a token.
 
-Do not put this UUID in the Action source and do not use the TMS Web client secret to modify Auth0 users.
+Do not put the tenant UUID into the Action source and do not use the TMS Web client secret to modify Auth0 users.
 
 ## Evidence required for E3-001
 
