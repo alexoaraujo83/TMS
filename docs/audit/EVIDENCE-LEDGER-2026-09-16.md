@@ -33,6 +33,7 @@ Branch: `main`
 | EV-025 | CHAT 13 / Infrastructure | Railway worker is deployed but intentionally/operationally idle with durable jobs disabled | Latest runtime logs report `configuredTenants=0`, `durableJobsEnabled=false`, `webhookEndpoints=0`, and `reason=OUTBOX_TENANT_IDS is not configured` | E4 | COMPROVADO / BLOCKER | P1 | Determine required production tenant configuration before enabling workload processing |
 | EV-026 | CHAT 13 / Infrastructure | Railway project currently contains both TMS worker and backup worker services | Project `tms-backup` production contains `tms-worker`, `tms-backup-worker` and an additional `backup-worker` with no latest deployment; `tms-backup-worker` has cron `0 2 * * *` and SUCCESS latest deployment | E4 | COMPROVADO | P1 | Reconcile service ownership, duplicate backup-worker lifecycle and intended topology |
 | EV-027 | CI/CD | Production-build test-source regression is resolved on current main | CI #881 / run `35302942154`, job `105469199663` completed SUCCESS. Steps `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` all completed SUCCESS after the tenancy/security/audit production-tsconfig corrections | E4 | COMPROVADO | P1 | Preserve green CI and proceed to runtime/Auth0 validation |
+| EV-028 | CHAT 14 / Auth0 | API-side OIDC contract is implemented and security-tested | `packages/auth/src/index.ts` enforces RS256, issuer, audience, JWKS and `sub`; `apps/api/src/common/auth.guard.ts` requires Bearer access token, tenant claim, optional matching `x-tenant-id`, active DB membership and builds RequestContext from DB membership; `apps/api/test/auth-guard.security.test.ts` covers invalid issuer/audience/expiry, missing tenant, forged/inactive membership and tenant-header mismatch; CI #881 is green | E4 | CODE + CI PROVEN / RUNTIME PENDING | P1 | Verify deployed `AUTH0_ISSUER_BASE_URL`, per-environment `AUTH0_AUDIENCE`, real Auth0 Action tenant claim, and Web→Auth0→API E2E |
 
 ## Evidence rules
 
@@ -65,6 +66,9 @@ The real PostgreSQL durable-job path is now CI-proven through persistence → cl
 
 ### BLK-007 — Infrastructure topology reconciliation
 Railway production currently hosts `tms-worker`, `tms-backup-worker`, and an additional `backup-worker` with no latest deployment. Ownership and intended lifecycle of the duplicate/unused-looking backup service are not yet reconciled.
+
+### BLK-008 — Auth0 runtime reconciliation
+Repository code and CI prove the OIDC validation contract, but current evidence does not prove the deployed Auth0 issuer/audience values, the live Auth0 Action claim namespace/value, or a real Web → Auth0 → API authenticated request. Do not mark Auth0 runtime integration complete until those external/runtime boundaries are executed and evidenced.
 
 ## Regression loop
 
