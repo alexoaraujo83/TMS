@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAccessToken } from "../../../../../lib/auth0";
+import { getAccessToken } from "../../../../lib/auth0";
 
 export async function GET() {
   const token = await getAccessToken();
