@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exchangeCode } from "../../../../../../lib/auth0";
+import { exchangeCode } from "../../../../../lib/auth0";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
