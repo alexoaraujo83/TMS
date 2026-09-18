@@ -11,12 +11,14 @@ const CLAIM_NAMESPACE = "https://tms.tms/claims";
 const TENANT_ID_CLAIM = `${CLAIM_NAMESPACE}/tenant_id`;
 
 exports.onExecutePostLogin = async (event, api) => {
-  // app_metadata is optional. Missing tenant metadata must not block login:
-  // the TMS API resolves/validates the active tenant membership itself.
+  // app_metadata is the current token-issuance bridge to the authoritative
+  // TMS tenant UUID. Login itself is not blocked when it is missing, but the
+  // TMS API requires this claim for protected tenant-scoped requests.
   const tenantId = event.user?.app_metadata?.tenant_id;
 
-  if (typeof tenantId === "string" && tenantId.length > 0) {
-    api.accessToken.setCustomClaim(TENANT_ID_CLAIM, tenantId);
-    api.idToken.setCustomClaim(TENANT_ID_CLAIM, tenantId);
+  if (typeof tenantId === "string" && tenantId.trim().length > 0) {
+    const normalizedTenantId = tenantId.trim();
+    api.accessToken.setCustomClaim(TENANT_ID_CLAIM, normalizedTenantId);
+    api.idToken.setCustomClaim(TENANT_ID_CLAIM, normalizedTenantId);
   }
 };
