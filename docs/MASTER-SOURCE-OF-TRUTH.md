@@ -271,10 +271,16 @@ Fresh reconciliation on 2026-09-19:
 
 - project: `tms-core-api`
 - project id: `prj_XJxfrZjHBzikSMWgOlO8UE3xt8fn`
-- latest observed deployment: `dpl_3rd88eoYDiBdAy93ihNvey38ju6g`
-- latest deployment branch: `audit/ssot-2026-09-19`
-- latest deployment commit: `2d32e13ae00d59deefb32bc453a15c917f6ece6d`
-- latest deployment state: BUILDING (runtime outcome not yet available)
+- latest observed deployment: `dpl_9VLE2djxiDp3Z1tKhhatzFaEfR9g`
+- latest deployment branch: `fix/vercel-monorepo-project-build-config`
+- latest deployment commit: `729358bee097c1cec558b32666ebde28775b2a78`
+- latest deployment state: ERROR
+- Vercel error code: `NEXT_NO_VERSION`
+- Vercel framework detected/configured for project: `nextjs`
+- error: `No Next.js version detected`
+- repository `vercel.json` at this commit contains only the install command; the previous global Web build override was removed
+- `apps/api/package.json` is a NestJS package with build `tsc -p tsconfig.json`
+- `apps/api/vercel.json` is absent
 - deployment target: preview/branch deployment (target is null)
 - public deployment URL resolves to Vercel's `Deployment has failed` page
 - previous production deployment on `main` (`dpl_EaE4r2PUCJKw7GUST9DjVbwczoFJ`) is also ERROR
@@ -287,9 +293,13 @@ Repository-side build configuration was rechecked on `main`:
 - `apps/api/package.json` defines the API build as `tsc -p tsconfig.json`;
 - `apps/api/vercel.json` does not exist.
 
-Therefore there is a concrete configuration mismatch: the dedicated Core API Vercel project is receiving a repository-level build command explicitly targeting `@tms/web`. The available Vercel connector does not expose a working project-settings mutation path in this session, so the production project configuration has not been changed automatically.
+Therefore the first configuration mismatch has been narrowed further: the repository-level Web build override was removed, but the dedicated `tms-core-api` Vercel project still has the **Next.js framework preset/configuration**, causing the build to fail before the NestJS API can compile. Vercel currently reports `NEXT_NO_VERSION`.
 
-**P0:** set/verify the `tms-core-api` project build configuration independently from the Web project, then trigger a fresh deployment and validate the resulting API endpoint. Do not mark the API operational until a successful build and runtime health check exist.
+Vercel's current platform documentation confirms first-class NestJS support and zero-configuration NestJS deployment, so the remaining blocker is project configuration/root detection rather than evidence that NestJS itself is unsupported. citeturn1search5turn1search0
+
+**P0:** change/verify the `tms-core-api` Vercel project framework/root/build configuration so it is detected and built as the NestJS API, then trigger a fresh deployment. Do not add a fake Next.js dependency or alter API code to satisfy the incorrect framework preset. The available connector in this session does not expose a working project-settings mutation path, so the Vercel project setting itself remains unchanged.
+
+After the configuration correction, require successful build evidence followed by `/health` and `/ready` runtime validation.
 
 ---
 
@@ -380,7 +390,7 @@ Secret values are not copied into the SSOT.
 | E2-005 | Railway | Worker deployment succeeded | Railway deployment metadata | E2 | COMPROVADO |
 | E2-006 | Railway | Backup worker deployment succeeded | Railway deployment metadata | E2 | COMPROVADO |
 | E2-007 | Vercel | Web production deployment READY | Vercel deployment metadata | E2 | COMPROVADO |
-| E2-008 | Vercel | Core API latest observed deployment is ERROR | Vercel deployment inventory + failed public deployment page | E2 | COMPROVADO |
+| E2-008 | Vercel | Core API latest deployment fails with `NEXT_NO_VERSION` under Next.js project configuration | Vercel deployment metadata + repository configuration | E2 | COMPROVADO |
 | E1-005 | Auth0 | Automation implementation exists in repo/PR | PR #48 + repository infrastructure | E1 | COMPROVADO |
 | E3-001 | Backup | External backup/isolated restore have prior project evidence | Issues #28/#29 | E2/E3 | PARCIAL |
 | E3-002 | Durable Jobs | DB-backed runtime path proven in CI | Issue #32 evidence | E2/E3 | PARCIAL |
@@ -560,6 +570,20 @@ Actions performed:
 - recorded the shared-helper consistency candidate for outbox/durable-job claim methods;
 - no new P0 blocker created by this pass.
 
+
+### 2026-09-19 — Vercel Core API root-cause refinement
+
+Fresh Vercel deployment inspection established:
+
+- deployment: `dpl_9VLE2djxiDp3Z1tKhhatzFaEfR9g`;
+- commit: `729358bee097c1cec558b32666ebde28775b2a78`;
+- state: ERROR;
+- project framework: `nextjs`;
+- error code: `NEXT_NO_VERSION`;
+- repository root `vercel.json` no longer contains the previous `@tms/web` build override;
+- API package remains NestJS with `tsc -p tsconfig.json`.
+
+This narrows the active P0 from a repository-level build override to the Vercel project framework/root configuration. No fake Next.js dependency was introduced.
 
 ### 2026-09-19 — Vercel post-SSOT deployment observation
 
