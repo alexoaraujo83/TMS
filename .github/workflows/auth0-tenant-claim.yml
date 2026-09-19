@@ -2,9 +2,6 @@ name: Auth0 Tenant Claim
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - auth0-tenant-claim-action
 
 permissions:
   contents: read
