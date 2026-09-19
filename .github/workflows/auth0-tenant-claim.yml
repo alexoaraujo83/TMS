@@ -16,7 +16,7 @@ jobs:
     environment: production
     env:
       AUTH0_DOMAIN: tms-platform.us.auth0.com
-      AUTH0_ACTION_NAME: TMS - Tenant Claim
+      AUTH0_ACTION_NAME: TMS — Tenant ID Access Token
       AUTH0_POST_LOGIN_TRIGGER_VERSION: v3
       AUTH0_MGMT_TOKEN: ${{ secrets.AUTH0_MGMT_TOKEN }}
 
