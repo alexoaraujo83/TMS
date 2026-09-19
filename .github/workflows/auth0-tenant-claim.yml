@@ -1,0 +1,37 @@
+name: Auth0 Tenant Claim
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apply-auth0-action:
+    name: Deploy and bind TMS Post Login Action
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AUTH0_DOMAIN: tms-platform.us.auth0.com
+      AUTH0_ACTION_NAME: TMS - Tenant Claim
+      AUTH0_POST_LOGIN_TRIGGER_VERSION: v3
+      AUTH0_MGMT_TOKEN: ${{ secrets.AUTH0_MGMT_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tools/auth0-action-manager/package.json
+
+      - name: Install Auth0 SDK
+        working-directory: tools/auth0-action-manager
+        run: npm install --ignore-scripts
+
+      - name: Apply Action
+        working-directory: tools/auth0-action-manager
+        run: npm run apply
