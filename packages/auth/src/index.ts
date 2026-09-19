@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { TenantContext } from "@tms/tenancy";
 
-export const TMS_AUTH_CLAIMS_NAMESPACE = "https://tms.tms/claims";
+export const TMS_AUTH_CLAIMS_NAMESPACE = "https://tms-platform.io/claims";
 export const TMS_TENANT_ID_CLAIM = `${TMS_AUTH_CLAIMS_NAMESPACE}/tenant_id`;
 
 export interface AuthClaims {
