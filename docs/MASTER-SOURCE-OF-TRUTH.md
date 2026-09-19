@@ -486,6 +486,53 @@ The codebase has a coherent authorization boundary for business APIs and a coher
 Remaining proof gap is runtime/integration evidence: a real Auth0 access token must traverse the deployed API and demonstrate positive access for tenant A plus denial/isolation for tenant B. The Vercel Core API deployment blocker remains the prerequisite for that runtime gate.
 
 
+## 12C. Neon runtime reconciliation — 2026-09-19
+
+Fresh read-only inspection of the canonical Neon project `tms` established:
+
+- project: `shiny-hall-34679912`;
+- region: `aws-sa-east-1`;
+- PostgreSQL: `17.11`;
+- default branch: `main` (`br-lingering-shadow-act0vvi9`);
+- database: `neondb`;
+- inspected database role: `neondb_owner` (therefore privileged/bypass-RLS; this is **not** runtime application evidence);
+- application role `tms_app` exists, can login, is not superuser and does not have `rolbypassrls`;
+- 31 schema migrations are recorded, latest observed `0031_finance_relationship_invariants.sql`;
+- current public schema contains the expected TMS tenancy/RBAC/business/outbox/job tables;
+- tenant-scoped business tables have RLS enabled and FORCE ROW LEVEL SECURITY, with one tenant-isolation policy each;
+- `permissions` and `schema_migrations` are intentionally not tenant-scoped;
+- the main branch currently contains exactly 1 tenant, 1 user and 1 membership.
+
+### RLS evidence
+
+The tenant policies consistently compare `tenant_id` (or the corresponding tenant key) to `current_setting('app.tenant_id', true)`. The `users` and `role_permissions` policies derive isolation through tenant membership/role relationships.
+
+This is **E2 database-state evidence**, not E3 isolation proof.
+
+### Critical validation limitation
+
+Because the canonical main branch currently contains only one tenant, a true:
+
+`Tenant A → Tenant B = blocked`
+
+runtime test cannot yet be demonstrated against production/canonical data without introducing a second test tenant and controlled test fixtures. No data mutation was performed during this audit.
+
+Also, the read-only inspection connection used the privileged `neondb_owner` role, which has `rolbypassrls=true`; therefore successful queries from this connection must **not** be interpreted as evidence that RLS blocks `tms_app`.
+
+The correct E3 gate remains:
+
+1. obtain/validate a real Auth0 access token;
+2. exercise the deployed API;
+3. use the non-bypass `tms_app` runtime path;
+4. validate tenant A positive access;
+5. validate tenant B negative isolation;
+6. validate membership/permission denial cases.
+
+### Database hygiene observation
+
+Neon currently has multiple historical/validation branches, including `development`, `staging`, IAM validation, restore-proof and DR restore branches. They are not being deleted during audit. Each must be classified before any cleanup decision.
+
+
 ## 13. Reconciliation findings
 
 ### Documentation vs runtime
@@ -594,6 +641,11 @@ A new automatic Vercel deployment was observed for the audit branch after the SS
 - state at observation time: `BUILDING`
 
 This does not resolve B-P0-001. The gate remains open until the deployment reaches a successful state and `/health` plus `/ready` are validated against the deployed API.
+
+
+### 2026-09-19 — Neon runtime/database reconciliation
+
+Read-only runtime inspection performed against the canonical `tms` project and `main` branch. Recorded PostgreSQL version, role posture, migration state, schema inventory, RLS/force-RLS coverage, policy definitions, tenant/user/membership cardinality and validation limitations. No database mutation was performed.
 
 
 ### 2026-09-19 — Vercel Core API reconciliation
