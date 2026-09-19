@@ -420,6 +420,62 @@ This is **E1/E2 code-path evidence**, not E3 runtime integration evidence. A rea
 
 `/health` is not protected by the business controller guards and returns process-level health. `/ready` performs a database readiness check and requires the runtime database user to be `tms_app`. This distinction is appropriate for infrastructure probes but requires deployment/runtime validation.
 
+## 12B. CHAT 03 — API route, authorization and database access-path inventory
+
+Fresh inspection of the canonical `main` tree on 2026-09-19 covered the API bootstrap, all currently registered business controllers, and the principal PostgreSQL repositories.
+
+### Route protection matrix
+
+| Controller | Route family | AuthGuard | PermissionGuard | Explicit permission metadata |
+|---|---|---:|---:|---:|
+| HealthController | `/health`, `/ready` | No | No | No |
+| FreightController | `/freights/**` | Yes | Yes | Yes |
+| ComplianceController | `/compliance/**` | Yes | Yes | Yes |
+| FinanceController | `/finance/**` | Yes | Yes | Yes |
+| OperationsController | `/operations/**` | Yes | Yes | Yes |
+| TripExecutionController | `/operations/trips/:tripId/**` | Yes | Yes | Yes |
+
+No additional business controller was found in the registered API module tree during this pass.
+
+### Authorization findings
+
+- Business controllers consistently apply `@UseGuards(AuthGuard, PermissionGuard)`.
+- Every inspected business handler declares `@RequirePermission(...)`.
+- `PermissionGuard` fails closed when permission metadata is absent.
+- `AuthGuard` requires a Bearer token, validates OIDC configuration, requires the canonical tenant claim, rejects a conflicting `x-tenant-id`, and checks active tenant membership.
+- `TenantGuard` remains unused by the inspected controllers. This is recorded as an explicit architectural choice rather than a defect because `AuthGuard` is the component that establishes the authenticated tenant context.
+
+### Database access-path findings
+
+The principal tenant-scoped repositories inspected use `withTransaction` or `withTenantContext`, which establishes `app.tenant_id` transaction-locally before business queries.
+
+Observed examples include:
+
+- freight creation/list/read/status transition;
+- freight assignment;
+- finance create/list/settle;
+- trip create/read/list/transition;
+- outbox enqueue/list/claim/publish/fail;
+- durable-job enqueue/claim/complete/fail.
+
+The outbox and durable-job `claimPending` methods use an explicit transaction plus `set_config('app.tenant_id', ... , true)` rather than the shared helper. This is functionally aligned with the tenant-context contract, but it is a consistency/refactoring candidate because the common transaction primitive is otherwise the canonical mechanism.
+
+### API bootstrap / operational boundary
+
+- `RequestContextMiddleware` runs for all routes and normalizes `X-Request-Id`, while adding baseline security response headers.
+- Global validation uses whitelist + forbid-non-whitelisted + transform.
+- `/health` is process-level and intentionally unauthenticated.
+- `/ready` performs a database check and verifies `current_user = tms_app`; it is not tenant-scoped and should remain treated as an infrastructure readiness probe, not as proof of application authorization or RLS isolation.
+
+### CHAT 03 conclusion
+
+**Result: technical route inventory substantially reconciled.**
+
+The codebase has a coherent authorization boundary for business APIs and a coherent tenant transaction primitive. No new P0 was created from this pass.
+
+Remaining proof gap is runtime/integration evidence: a real Auth0 access token must traverse the deployed API and demonstrate positive access for tenant A plus denial/isolation for tenant B. The Vercel Core API deployment blocker remains the prerequisite for that runtime gate.
+
+
 ## 13. Reconciliation findings
 
 ### Documentation vs runtime
@@ -490,6 +546,20 @@ Actions performed:
 - recorded the distinction between code-path evidence and real-token/runtime integration evidence;
 - recorded that TenantGuard exists but is not currently applied to the inspected business controllers;
 - recorded `/health` versus `/ready` operational boundary.
+
+### 2026-09-19 — CHAT 03 route and database access-path inventory
+
+Actions performed:
+
+- enumerated the API module tree;
+- inspected all registered business controllers and route families;
+- verified AuthGuard/PermissionGuard coverage and explicit permission metadata;
+- inspected API bootstrap, request context middleware and health/readiness boundary;
+- inspected principal tenant-scoped PostgreSQL repositories;
+- confirmed use of transaction-local `app.tenant_id` in the main business data paths;
+- recorded the shared-helper consistency candidate for outbox/durable-job claim methods;
+- no new P0 blocker created by this pass.
+
 
 ### 2026-09-19 — Vercel Core API reconciliation
 
