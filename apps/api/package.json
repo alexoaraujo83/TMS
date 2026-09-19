@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
-    "lint": "tsc --noEmit -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "pnpm --filter @tms/api... build && tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm --filter @tms/api... build && tsc --noEmit -p tsconfig.json",
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
