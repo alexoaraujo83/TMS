@@ -56,20 +56,18 @@ async function ensureAction() {
     dependencies: [],
   };
   if (!action) {
-    const response = await management.actions.create(payload);
-    action = response.data;
+    action = await management.actions.create(payload);
     console.log("Created Action: " + action.id);
   } else {
-    const response = await management.actions.update(action.id, payload);
-    action = response.data;
+    action = await management.actions.update(action.id, payload);
     console.log("Updated Action: " + action.id);
   }
+  if (!action?.id) throw new Error("Auth0 Action response did not contain an id.");
   return action;
 }
 
 async function deployAction(actionId) {
-  const response = await management.actions.deploy(actionId);
-  return response.data;
+  return management.actions.deploy(actionId);
 }
 
 async function getBindings() {
