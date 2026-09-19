@@ -55,7 +55,7 @@ No configuration, file, deployment, migration, test definition or documentation 
 | Neon main/development/staging | branches exist and are ready | E1/E2 | FUNCIONAL | P1 |
 | RLS | Public business tables have row security enabled | E2 | PARCIAL / requires runtime isolation proof | P0 |
 | Vercel Web | Production deployment on main is READY | E2 | FUNCIONAL | P1 |
-| Vercel Core API | observed production deployment is ERROR / ENOENT | E2 | QUEBRADO | P0 |
+| Vercel Core API | latest observed deployments remain ERROR; current deployment is failed | E2 | QUEBRADO | P0 |
 | Railway Worker | latest deployment SUCCESS | E2 | FUNCIONAL | P1 |
 | Railway Backup Worker | cron 0 2 * * *, latest deployment SUCCESS | E2 | FUNCIONAL | P1 |
 | Railway legacy backup-worker | service exists with no deployment | E1 | OBSOLETO? NÃO VALIDADO | P2 |
@@ -267,18 +267,29 @@ Therefore deployment execution is proven for this deployment.
 
 ### TMS Core API
 
-Observed deployment:
+Fresh reconciliation on 2026-09-19:
 
 - project: `tms-core-api`
 - project id: `prj_XJxfrZjHBzikSMWgOlO8UE3xt8fn`
-- framework: NestJS
-- commit: `3e5e0f6d779c562534d1b5cb05862ac219f784ce`
-- target: production
-- state: ERROR
-- error code: `ENOENT`
-- failing command: `pnpm turbo run build --filter=@tms/web...`
+- latest observed deployment: `dpl_8h9NB1Zpufq4wwU79pTgHGHqKrYY`
+- latest deployment branch: `audit/ssot-2026-09-19`
+- latest deployment commit: `149cd09a679b0ed15cc7be8f60082bcc1c0237c3`
+- latest deployment state: ERROR
+- deployment target: preview/branch deployment (target is null)
+- public deployment URL resolves to Vercel's `Deployment has failed` page
+- previous production deployment on `main` (`dpl_EaE4r2PUCJKw7GUST9DjVbwczoFJ`) is also ERROR
 
-**P0:** the observed production API deployment is not healthy and the build command is inconsistent with the API project name. This must be reconciled before production readiness can be claimed for the API.
+Repository-side build configuration was rechecked on `main`:
+
+- root `vercel.json` exists;
+- it defines `installCommand: pnpm install --no-frozen-lockfile`;
+- it defines `buildCommand: pnpm turbo run build --filter=@tms/web...`;
+- `apps/api/package.json` defines the API build as `tsc -p tsconfig.json`;
+- `apps/api/vercel.json` does not exist.
+
+Therefore there is a concrete configuration mismatch: the dedicated Core API Vercel project is receiving a repository-level build command explicitly targeting `@tms/web`. The available Vercel connector does not expose a working project-settings mutation path in this session, so the production project configuration has not been changed automatically.
+
+**P0:** set/verify the `tms-core-api` project build configuration independently from the Web project, then trigger a fresh deployment and validate the resulting API endpoint. Do not mark the API operational until a successful build and runtime health check exist.
 
 ---
 
@@ -369,7 +380,7 @@ Secret values are not copied into the SSOT.
 | E2-005 | Railway | Worker deployment succeeded | Railway deployment metadata | E2 | COMPROVADO |
 | E2-006 | Railway | Backup worker deployment succeeded | Railway deployment metadata | E2 | COMPROVADO |
 | E2-007 | Vercel | Web production deployment READY | Vercel deployment metadata | E2 | COMPROVADO |
-| E2-008 | Vercel | Core API deployment currently ERROR | Vercel deployment metadata | E2 | COMPROVADO |
+| E2-008 | Vercel | Core API latest observed deployment is ERROR | Vercel deployment inventory + failed public deployment page | E2 | COMPROVADO |
 | E1-005 | Auth0 | Automation implementation exists in repo/PR | PR #48 + repository infrastructure | E1 | COMPROVADO |
 | E3-001 | Backup | External backup/isolated restore have prior project evidence | Issues #28/#29 | E2/E3 | PARCIAL |
 | E3-002 | Durable Jobs | DB-backed runtime path proven in CI | Issue #32 evidence | E2/E3 | PARCIAL |
@@ -446,6 +457,19 @@ No gate is marked CONCLUÍDO/COMPROVADO without new evidence.
 ---
 
 ## 16. Change history
+
+### 2026-09-19 — Vercel Core API reconciliation
+
+Actions performed:
+
+- refreshed Vercel team/project inventory;
+- confirmed `tms-core-api` project id and latest failed deployment;
+- confirmed the failed deployment URL serves Vercel's deployment-failed page;
+- re-read repository `vercel.json` and `apps/api/package.json` from `main`;
+- confirmed no `apps/api/vercel.json` exists;
+- registered the project-level configuration mismatch as the active P0 correction path.
+
+The Vercel connector available in this session did not expose a working mutation path for project settings, so no Vercel production configuration was changed automatically.
 
 ### 2026-09-19 — Initial SSOT consolidation
 
