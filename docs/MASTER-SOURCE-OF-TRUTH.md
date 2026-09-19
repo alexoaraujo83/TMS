@@ -391,13 +391,34 @@ Secret values are not copied into the SSOT.
 
 | ID | Blocker | Area | Severity | Status | Required action |
 |---|---|---|---|---|---|
-| B-P0-001 | Core API production deployment is ERROR / ENOENT | Vercel/API | P0 | OPEN | Inspect project root/build configuration and redeploy only after correction |
+| B-P0-001 | Core API production deployment is ERROR / configuration mismatch | Vercel/API | P0 | OPEN | Inspect project root/build configuration and redeploy only after correction |
 | B-P0-002 | Real Auth0 → token → API → tenant → RLS chain not directly validated | Auth/IAM/Tenancy | P0 | OPEN | Obtain direct Auth0/runtime evidence and execute positive/negative isolation tests |
 | B-P1-001 | Recurring backup/retention/RPO/RTO operational evidence incomplete | DR | P1 | OPEN | Validate schedule, retention and restore cadence; obtain business approval for targets |
 | B-P1-002 | Receiver-side webhook idempotency and operational ownership not proven | Durable Jobs/Webhooks | P1 | OPEN | Validate external receiver semantics and operational monitoring |
 | B-P2-001 | Railway `backup-worker` has no deployment | Infrastructure cleanup | P2 | OPEN | Trace references before deletion/deactivation |
 
 ---
+
+## 12A. API authentication/tenancy code-path reconciliation
+
+Fresh source inspection on 2026-09-19 establishes that the API contains a concrete Auth0/tenant authorization path in code:
+
+- `packages/auth/src/index.ts` implements JWT verification with RS256, issuer, audience and remote JWKS validation and extracts the canonical tenant claim `https://tms-platform.io/claims/tenant_id`.
+- `apps/api/src/common/auth.guard.ts` reads `Authorization: Bearer`, validates issuer/audience/JWKS configuration, requires the tenant claim, rejects a mismatching `x-tenant-id`, and checks active membership using `check_tenant_membership`.
+- `PermissionGuard` fails closed when a permission is not declared and checks the authenticated context.
+- Business controllers inspected (freight, finance, compliance, operations, trip execution) use `@UseGuards(AuthGuard, PermissionGuard)` and `@RequirePermission(...)`.
+- `packages/database/src/transaction.ts` sets `app.tenant_id` transaction-locally before repository work.
+- `verifyTenantMembership` resolves the Auth0 subject to the application user/tenant membership.
+
+This is **E1/E2 code-path evidence**, not E3 runtime integration evidence. A real Auth0 token and production request are still required to prove the complete chain.
+
+### Important finding
+
+`TenantGuard` exists but is not applied to the inspected business controllers. The current controllers rely on `AuthGuard` to establish the tenant context and on `PermissionGuard` for authorization. This is not automatically a defect, but it is an architecture/documentation decision that must remain explicit and covered by tests.
+
+### Health endpoint boundary
+
+`/health` is not protected by the business controller guards and returns process-level health. `/ready` performs a database readiness check and requires the runtime database user to be `tms_app`. This distinction is appropriate for infrastructure probes but requires deployment/runtime validation.
 
 ## 13. Reconciliation findings
 
@@ -457,6 +478,18 @@ No gate is marked CONCLUÍDO/COMPROVADO without new evidence.
 ---
 
 ## 16. Change history
+
+### 2026-09-19 — API/Auth/Tenancy code-path reconciliation
+
+Actions performed:
+
+- inspected Auth0 verifier implementation;
+- inspected API AuthGuard, PermissionGuard and tenant context flow;
+- inspected business controllers for guard and permission coverage;
+- inspected database transaction tenant-context propagation;
+- recorded the distinction between code-path evidence and real-token/runtime integration evidence;
+- recorded that TenantGuard exists but is not currently applied to the inspected business controllers;
+- recorded `/health` versus `/ready` operational boundary.
 
 ### 2026-09-19 — Vercel Core API reconciliation
 
