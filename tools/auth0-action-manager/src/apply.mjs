@@ -103,6 +103,7 @@ function normalizeBindings(payload) {
 async function ensureBinding(actionId) {
   const current = await getBindings();
   const bindings = normalizeBindings(current);
+  console.log("Current Post Login bindings: " + JSON.stringify(bindings));
   const exists = bindings.some((b) => b?.ref?.type === "action_id" && b?.ref?.value === actionId);
   if (exists) return;
   const next = [...bindings, { ref: { type: "action_id", value: actionId }, display_name: actionName }];
