@@ -12,7 +12,7 @@ The Action reads:
 
 and, when it is a non-empty string, emits:
 
-`https://tms.tms/claims/tenant_id`
+`https://tms-platform.io/claims/tenant_id`
 
 into both the Access Token and ID Token.
 
@@ -46,15 +46,15 @@ pnpm dlx auth0-deploy-cli --help
 Run a dry-run first:
 
 ```bash
-pnpm dlx auth0-deploy-cli import \
-  -i ./infra/auth0/tenant.yaml \
+pnpm dlx auth0-deploy-cli import \\
+  -i ./infra/auth0/tenant.yaml \\
   --dry-run
 ```
 
 Only after reviewing the proposed changes:
 
 ```bash
-pnpm dlx auth0-deploy-cli import \
+pnpm dlx auth0-deploy-cli import \\
   -i ./infra/auth0/tenant.yaml
 ```
 
@@ -66,6 +66,14 @@ For the current bootstrap tenant, the test user's Auth0 `app_metadata.tenant_id`
 
 Do not put the tenant UUID into the Action source and do not use the TMS Web client secret to modify Auth0 users.
 
+## Claim namespace
+
+The custom claim namespace is intentionally stable and independent of the Auth0 tenant domain or the Vercel deployment URL:
+
+`https://tms-platform.io/claims/tenant_id`
+
+The namespace is a URI-like identifier used to avoid collisions with standard JWT/OIDC claims. It is not used as the application's callback URL or website URL.
+
 ## Evidence required for E3-001
 
 After deployment and a fresh interactive login, capture evidence for:
@@ -73,7 +81,7 @@ After deployment and a fresh interactive login, capture evidence for:
 1. Action exists and is deployed.
 2. Action is attached to the Post-Login/Login Flow.
 3. Test user has `app_metadata.tenant_id`.
-4. A newly issued Access Token contains `https://tms.tms/claims/tenant_id`.
+4. A newly issued Access Token contains `https://tms-platform.io/claims/tenant_id`.
 5. The API accepts the token.
 6. The API re-checks membership for the token `sub` and tenant.
 7. A tenant-scoped operation reaches PostgreSQL under the expected tenant context/RLS.
