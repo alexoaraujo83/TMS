@@ -159,7 +159,14 @@ export async function getSession(): Promise<SessionPayload | null> {
     if (typeof payload.accessToken !== "string" || typeof payload.expiresAt !== "number") {
       return null;
     }
-    return payload as SessionPayload;
+    return {
+      accessToken: payload.accessToken,
+      expiresAt: payload.expiresAt,
+      user:
+        payload.user && typeof payload.user === "object"
+          ? (payload.user as Record<string, unknown>)
+          : undefined,
+    };
   } catch {
     return null;
   }
