@@ -271,10 +271,10 @@ Fresh reconciliation on 2026-09-19:
 
 - project: `tms-core-api`
 - project id: `prj_XJxfrZjHBzikSMWgOlO8UE3xt8fn`
-- latest observed deployment: `dpl_8h9NB1Zpufq4wwU79pTgHGHqKrYY`
+- latest observed deployment: `dpl_3rd88eoYDiBdAy93ihNvey38ju6g`
 - latest deployment branch: `audit/ssot-2026-09-19`
-- latest deployment commit: `149cd09a679b0ed15cc7be8f60082bcc1c0237c3`
-- latest deployment state: ERROR
+- latest deployment commit: `2d32e13ae00d59deefb32bc453a15c917f6ece6d`
+- latest deployment state: BUILDING (runtime outcome not yet available)
 - deployment target: preview/branch deployment (target is null)
 - public deployment URL resolves to Vercel's `Deployment has failed` page
 - previous production deployment on `main` (`dpl_EaE4r2PUCJKw7GUST9DjVbwczoFJ`) is also ERROR
@@ -559,6 +559,17 @@ Actions performed:
 - confirmed use of transaction-local `app.tenant_id` in the main business data paths;
 - recorded the shared-helper consistency candidate for outbox/durable-job claim methods;
 - no new P0 blocker created by this pass.
+
+
+### 2026-09-19 — Vercel post-SSOT deployment observation
+
+A new automatic Vercel deployment was observed for the audit branch after the SSOT commit:
+
+- deployment: `dpl_3rd88eoYDiBdAy93ihNvey38ju6g`
+- commit: `2d32e13ae00d59deefb32bc453a15c917f6ece6d`
+- state at observation time: `BUILDING`
+
+This does not resolve B-P0-001. The gate remains open until the deployment reaches a successful state and `/health` plus `/ready` are validated against the deployed API.
 
 
 ### 2026-09-19 — Vercel Core API reconciliation
