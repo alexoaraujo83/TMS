@@ -7,7 +7,7 @@
  * Configure this Action in the Auth0 Login Flow for each environment.
  */
 
-const CLAIM_NAMESPACE = "https://tms.tms/claims";
+const CLAIM_NAMESPACE = "https://tms-platform.io/claims";
 const TENANT_ID_CLAIM = `${CLAIM_NAMESPACE}/tenant_id`;
 
 exports.onExecutePostLogin = async (event, api) => {
