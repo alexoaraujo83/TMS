@@ -66,6 +66,26 @@ async function ensureAction() {
   return action;
 }
 
+async function waitForBuilt(actionId) {
+  const timeoutMs = 60000;
+  const intervalMs = 2000;
+  const started = Date.now();
+
+  while (Date.now() - started < timeoutMs) {
+    const action = await management.actions.get(actionId);
+    console.log("Action build status: " + action.status);
+
+    if (action.status === "built") return action;
+    if (action.status === "failed") {
+      throw new Error("Auth0 Action build failed: " + JSON.stringify(action.errors ?? []));
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error("Timed out waiting for Auth0 Action to reach built state.");
+}
+
 async function deployAction(actionId) {
   return management.actions.deploy(actionId);
 }
@@ -99,6 +119,7 @@ async function main() {
   console.log("Claim: " + tenantClaim);
 
   const action = await ensureAction();
+  await waitForBuilt(action.id);
   await deployAction(action.id);
   await ensureBinding(action.id);
   const finalBindings = normalizeBindings(await getBindings());
