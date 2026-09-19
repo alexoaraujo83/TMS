@@ -2,7 +2,7 @@ import { ManagementClient } from "auth0";
 
 const domain = process.env.AUTH0_DOMAIN ?? "tms-platform.us.auth0.com";
 const token = process.env.AUTH0_MGMT_TOKEN;
-const actionName = process.env.AUTH0_ACTION_NAME ?? "TMS - Tenant Claim";
+const actionName = process.env.AUTH0_ACTION_NAME ?? "TMS — Tenant ID Access Token";
 const triggerVersion = process.env.AUTH0_POST_LOGIN_TRIGGER_VERSION ?? "v3";
 const namespace = "https://tms-platform.io/claims";
 const tenantClaim = namespace + "/tenant_id";
@@ -15,7 +15,13 @@ const code = [
   "  const namespace = \"https://tms-platform.io/claims\";",
   "  const tenantId = event.user.app_metadata?.tenant_id;",
   "",
-  "  if (!tenantId) return;",
+  "  if (!tenantId) {",
+  "    api.access.deny(",
+  "      \"missing_tenant_id\",",
+  "      \"User is not associated with a TMS tenant.\"",
+  "    );",
+  "    return;",
+  "  }",
   "",
   "  api.accessToken.setCustomClaim(namespace + \"/tenant_id\", tenantId);",
   "  api.idToken.setCustomClaim(namespace + \"/tenant_id\", tenantId);",
@@ -103,8 +109,7 @@ function normalizeBindings(payload) {
 async function ensureBinding(actionId) {
   const current = await getBindings();
   const bindings = normalizeBindings(current);
-  console.log("Current Post Login bindings: " + JSON.stringify(bindings));
-  const exists = bindings.some((b) => b?.ref?.type === "action_id" && b?.ref?.value === actionId);
+  const exists = bindings.some((b) => b?.action?.id === actionId || (b?.ref?.type === "action_id" && b?.ref?.value === actionId));
   if (exists) return;
   const next = [...bindings, { ref: { type: "action_id", value: actionId }, display_name: actionName }];
   await managementFetch("/actions/triggers/post-login/bindings", {
@@ -124,7 +129,7 @@ async function main() {
   await deployAction(action.id);
   await ensureBinding(action.id);
   const finalBindings = normalizeBindings(await getBindings());
-  const bound = finalBindings.some((b) => b?.ref?.type === "action_id" && b?.ref?.value === action.id);
+  const bound = finalBindings.some((b) => b?.action?.id === action.id || (b?.ref?.type === "action_id" && b?.ref?.value === action.id));
   if (!bound) throw new Error("Action deployed but Post Login binding was not verified.");
 
   console.log(JSON.stringify({
