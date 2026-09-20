@@ -6,8 +6,6 @@ Evidence-ledger snapshot. This document records verified state only; it is not a
 
 - Repository: alexoaraujo83/TMS
 - Canonical branch: main
-- Current main HEAD: 40808eb15f21e10aac2c04d475ca241912d48260
-- HEAD message: docs(audit): reconcile operational SSOT on main
 
 ## Current Vercel production state
 
