@@ -93,9 +93,24 @@ Fresh Railway inspection on 2026-09-20 found:
 
 A direct redeploy was attempted, but Railway rejected it because the service's latest deployment is `SKIPPED` and has no build snapshot to copy. The available connected Railway action cannot create the first deployment for this existing service; therefore no false deployment success is recorded.
 
-Worker production workload remains unproven:
+The last successful Worker startup emitted:
+- `configuredTenants=1`
+- `durableJobsEnabled=false`
+- runtime role verification: `tms_app`
+- `worker.tenants_verified` with one configured tenant
+
+Current read-only Neon evidence on the production/default database reports:
+- active tenants: `1`
+- ready pending Outbox events: `0`
+- failed Outbox events: `0`
+- ready pending Durable Jobs: `0`
+- failed Durable Jobs: `0`
+
+These database counts do not prove that the current-main Worker is deployed or that it processed workload.
+
+Worker production workload therefore remains unproven:
 - current-main Worker deployment freshness: **BLOCKED**
-- active tenant configuration: pending
+- active tenant configuration on current deployment: pending
 - actual Outbox event processing: pending
 - idempotent handler execution: pending
 
@@ -118,16 +133,31 @@ Fresh Railway evidence proves a successful scheduled backup execution for `tms-b
 - `retention_status=verified`
 - retention deleted objects/runs: `0/0`
 
-This upgrades the backup execution/retention evidence to **E2 / COMPROVADO** for the observed run.
+This upgrades the backup execution/retention evidence to **E2 / COMPROVADO** for the observed scheduled run.
 
-The repository backup script verifies required backup configuration, remote object size, checksum, and retention, but it does **not** perform a restore drill. Therefore DR readiness remains incomplete.
+### Restore evidence
 
-Still required:
-- independent restore drill
-- restore integrity validation
-- approved RPO
-- approved RTO
-- evidence that the restore path is operational
+The repository contains a documented isolated Neon restore drill:
+- recovery branch reached `ready`
+- restore was performed with `finalize: false`
+- isolated branch remained non-primary/non-default
+- PostgreSQL `17.11`
+- `21` public base tables
+- `28` migration rows in the historical recovery point
+- `10/10` critical TMS tables validated
+- no destructive SQL was executed against production
+
+The drill documentation classifies the **restore mechanism and safe isolated restore as PROVEN**, but also records that production backup/recovery readiness is not fully proven because recurring recovery policy, ownership, approved RPO/RTO, and the current scheduled recovery procedure remain unresolved.
+
+The current backup script verifies required configuration, remote object size, checksum, and retention; the separate `restore-verify.sh` provides an isolated restore path but was not executed against today's encrypted backup during this audit cycle.
+
+Therefore:
+- scheduled backup execution: **E2 / COMPROVADO**
+- object/retention verification for observed run: **E2 / COMPROVADO**
+- isolated restore mechanism: **previously PROVEN**
+- today's backup restore: **NOT VALIDATED**
+- approved RPO/RTO: **ABSENT**
+- full production DR readiness: **BLOCKED**
 
 ## 6. Frontend / Auth0 — BLOCKED / AUTH0-REAL-TOKEN-01 / P1
 
@@ -145,7 +175,7 @@ Final regression remains:
 
 `format → lint → typecheck → unit → integration → E2E → build → security → smoke → health`
 
-Current CI covers the repository quality/build stages. Authenticated production E2E and operational Worker workload evidence remain downstream gates.
+Current CI covers the repository quality/build stages. Authenticated production E2E and current-main Worker workload evidence remain downstream gates.
 
 ## Blocker matrix
 
@@ -153,7 +183,7 @@ Current CI covers the repository quality/build stages. Authenticated production 
 |---|---|---:|---|---|
 | BLK-001 | Environment parity / production freshness | P1 | BLOCKED | reconcile envs and promote current main |
 | BLK-002 | Worker freshness / tenant lifecycle | P1 | BLOCKED | deploy current main + prove active workload |
-| BLK-003 | Backup/DR | P1 | PARTIAL | execute restore drill + define RPO/RTO |
+| BLK-003 | Backup/DR | P1 | PARTIAL/BLOCKED | validate current backup restore + define RPO/RTO |
 | BLK-004 | Runtime application coverage | P1 | BLOCKED | authenticated production request |
 | BLK-005 | Functional traceability | P1 | BLOCKED | close authenticated E2E path |
 | BLK-008 / AUTH0-REAL-TOKEN-01 | Real Auth0 token | P1 | BLOCKED | execute real OIDC flow |
@@ -164,8 +194,14 @@ CHAT 07 remains **implemented/reconciled**.
 
 Fresh CI evidence upgrades the current-main CI gate to **COMPROVADO / E2**.
 
-Fresh backup evidence upgrades the scheduled backup execution and retention verification to **COMPROVADO / E2** for the observed run, but does not close DR.
+Fresh backup evidence upgrades the scheduled backup execution and retention verification to **COMPROVADO / E2** for the observed run.
 
-The remaining critical dependency is **environment parity + production freshness**, followed by authenticated Auth0 E2E. Worker/Outbox current-main deployment and restore verification remain operational gates.
+The historical isolated Neon restore drill proves that the recovery mechanism can restore and validate a recovery point without replacing production, but it does not prove today's backup restore or establish an approved production DR target.
+
+The Worker service remains the immediate operational deployment blocker because Railway's connected redeploy operation cannot redeploy a skipped deployment without a build snapshot.
+
+The remaining critical dependency chain is:
+
+**environment parity → current-main production freshness → Worker current-main deployment → authenticated Auth0 E2E → current-backup restore validation → final regression.**
 
 No diagram, configuration, deployment, or written test is treated as E2/E3/E4 proof by itself.
