@@ -34,12 +34,14 @@ export default function HomePage() {
   }
 
   async function loadSession() {
-    const response = await fetch("/api/auth/session", { cache: "no-store" });
+    const response = await fetch("/auth/profile", { cache: "no-store" });
     if (!response.ok) {
       setSession({ authenticated: false });
       return;
     }
-    setSession((await response.json()) as SessionState);
+
+    const user = (await response.json()) as SessionState["user"];
+    setSession({ authenticated: true, user });
   }
 
   async function checkProtectedApi() {
@@ -54,18 +56,10 @@ export default function HomePage() {
     return () => controller.abort();
   }, []);
 
-  const authFailed =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("auth") === "failed";
-
   return (
     <main>
       <h1>TMS</h1>
       <p>Frontend foundation with Auth0 session and live API integration.</p>
-
-      {authFailed && (
-        <p role="alert">Authentication failed. Check the Auth0 callback configuration.</p>
-      )}
 
       <section aria-labelledby="auth-heading">
         <h2 id="auth-heading">Authentication</h2>
@@ -78,13 +72,13 @@ export default function HomePage() {
             <button type="button" onClick={() => void checkProtectedApi()}>
               Check protected API
             </button>
-            <a href="/api/auth/logout">Log out</a>
+            <a href="/auth/logout">Log out</a>
             {freightsStatus !== null && (
               <p role="status">GET /freights via server session: HTTP {freightsStatus}</p>
             )}
           </>
         ) : (
-          <a href="/api/auth/login">Log in with Auth0</a>
+          <a href="/auth/login">Log in with Auth0</a>
         )}
       </section>
 
