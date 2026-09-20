@@ -21,10 +21,10 @@ Previously authorized cleanup targets remain absent:
 
 ### tms-web
 
-- Production deployment: dpl_7pnRabcG9Pxaf2oSPshDdwYScaY7
+- Latest observed production deployment: dpl_73x4yrEr5ZAaq3HKXWkcSRhAo9Bc
 - State: READY
 - Git ref: main
-- Git SHA: b93940767b8d46389662dbbe91a46c53d798baaa
+- Git SHA: ec67b9879f478eee1f2fd7d19f378113e2c41f61
 - Target: production
 - Region: iad1
 - Production aliases include tms-web-chi.vercel.app
@@ -32,10 +32,9 @@ Previously authorized cleanup targets remain absent:
 
 ### tms-core-api
 
-- Latest production deployment for current main SHA b93940767b8d46389662dbbe91a46c53d798baaa: CANCELED
-- Latest READY production deployment: dpl_38GQpyb1qgH5i8i4cVo6Mj3HTsru
-- READY production SHA: 01decc9be27afed7177026075ca28c6035a55266
-- Therefore API production is not currently on the latest main HEAD b939407.
+- Latest observed READY production deployment: dpl_Gmv3sHbNDqdAXoJ7t4QL6dFfnkNN
+- READY production SHA: ec67b9879f478eee1f2fd7d19f378113e2c41f61
+- Therefore both canonical production services are currently deployed from the current main HEAD ec67b987.
 - Production API /health: HTTP 200, response status=ok, service=tms-api.
 - This documentation-only Web commit does not itself establish a need for an API redeploy; production API freshness remains separately tracked.
 
@@ -91,10 +90,10 @@ Canonical CI workflow is structurally present with:
 - Durable Jobs PostgreSQL integration
 - format, lint, typecheck, tests and build
 
-For current main SHA b93940767b8d46389662dbbe91a46c53d798baaa:
-- GitHub combined status: SUCCESS for tms-worker, tms-backup-worker, Vercel tms-web and Vercel tms-core-api.
-- GitHub connector workflow-run lookup returned no pull-request-triggered workflow run for this exact SHA.
-- Therefore the combined status is recorded, but no new exact-SHA workflow execution claim is made.
+For current main SHA ec67b9879f478eee1f2fd7d19f378113e2c41f61:
+- GitHub Actions CI run 35534534067 (#984): SUCCESS.
+- Event: push to main; workflow: .github/workflows/ci.yml.
+- Therefore current-main CI execution is directly verified for this SHA.
 
 ## Auth0
 
@@ -131,9 +130,9 @@ Previously exposed token material must not be reused or documented.
 | Vercel project cleanup | PASS | E2 |
 | Railway legacy backup cleanup | PASS | E2 |
 | Neon legacy project cleanup | PASS | E2 |
-| tms-web current-main production | PASS | E4 deployment evidence |
+| tms-web current-main production | PASS | E4 deployment evidence on ec67b987 |
 | tms-core-api health | PASS | E4 runtime HTTP 200 |
-| tms-core-api current-main production parity | OPEN | Latest READY is 01decc9; b939 deployment canceled |
+| tms-core-api current-main production parity | PASS | READY production deployment dpl_Gmv3sHbNDqdAXoJ7t4QL6dFfnkNN runs ec67b987 |
 | Auth0 Action deployment/binding | PASS | E3/E4 historical deployment evidence |
 | Auth0 runtime AUTH0-log check on current Web deployment | PASS for inspected 24h window | E4 log observation |
 | Auth0 real-token E2E | OPEN/BLOCKER | AUTH0-REAL-TOKEN-01 |
@@ -144,12 +143,11 @@ Previously exposed token material must not be reused or documented.
 ## Required next execution order
 
 1. Obtain a newly issued real TMS Access Token and perform production IAM E2E without exposing the token.
-2. Reconcile API deployment parity only if required by the canonical release state; do not create artificial trigger commits.
-3. Validate tenant/RBAC/RLS rejection and isolation paths.
-4. Resolve worker current-main deployment parity using a supported Railway deployment path.
-5. Execute isolated backup restore verification.
-6. Run final regression and update the evidence ledger/SSOT.
-7. Only then evaluate Final DoD.
+2. Validate tenant/RBAC/RLS rejection and isolation paths.
+3. Resolve worker current-main deployment parity using a supported Railway deployment path; do not create artificial trigger commits.
+4. Execute isolated backup restore verification against the current encrypted backup.
+5. Run final regression and update the evidence ledger/SSOT.
+6. Only then evaluate Final DoD.
 
 ## Safety rules
 
