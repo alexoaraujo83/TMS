@@ -78,13 +78,13 @@ export default function HomePage() {
             <button type="button" onClick={() => void checkProtectedApi()}>
               Check protected API
             </button>
-            <a href="/api/auth/logout">Log out</a>
+            <a href="/auth/logout">Log out</a>
             {freightsStatus !== null && (
               <p role="status">GET /freights via server session: HTTP {freightsStatus}</p>
             )}
           </>
         ) : (
-          <a href="/api/auth/login">Log in with Auth0</a>
+          <a href="/auth/login">Log in with Auth0</a>
         )}
       </section>
 
