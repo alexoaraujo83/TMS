@@ -6,141 +6,146 @@ Evidence-ledger snapshot. This document records verified state only; it is not a
 
 - Repository: alexoaraujo83/TMS
 - Canonical branch: main
-- Latest verified API production commit: f884b973343e6c00c582cbb2272e1faa33ba4dac
-- Latest API production deployment: dpl_7WgthWPqiRWdsKhFU7jyf2QjFq4n
-- API production deployment state: READY
-- API deployment target: production
-- API deployment region: iad1
+- Audited GitHub HEAD before this SSOT reconciliation: 675fbaaf11081c721b0a6d9ad0beebca14056353
+- HEAD message: fix(web): harden Auth0 SDK BFF flow
+- GitHub commit: verified/signed
+- SSOT reconciliation branch: audit/chat-09-current-state-2026-09-20
 
-## Cross-system reconciliation
+## Current infrastructure inventory
 
-| System | Component | Observed state | Evidence level | Notes |
-|---|---|---|---|---|
-| GitHub | TMS main | f884b973343e6c00c582cbb2272e1faa33ba4dac | E2 | Includes API lint/typecheck workspace-build correction |
-| GitHub | commit status | all reported checks success | E3 | Vercel Web, Vercel Core API, Railway Worker and Railway Backup Worker |
-| Vercel | tms-web | SUCCESS | E3 | Production Git integration check passed for current main commit |
-| Vercel | tms-core-api | READY | E3 | Production deployment dpl_7WgthWPqiRWdsKhFU7jyf2QjFq4n |
-| Vercel | tms-core-api /health | HTTP 200 | E4 | Real production runtime request observed |
-| Vercel | tms-core-api /ready | HTTP 200 | E4 | Temporary authenticated/shareable access path returned status=ready |
-| Vercel | API runtime DB role assertion | PASS | E4 | /ready only returns 200 after current_user = tms_app |
-| Vercel | API runtime startup | successful | E4 | DatabaseModule and application modules initialized; Nest application started |
-| Railway | tms-worker | SUCCESS / main | E3 | Deployment status only; business-event completeness remains separate |
-| Railway | tms-backup-worker | SUCCESS / main | E3 | Backup/restore verification remains separate |
-| Railway | backup-worker (legacy) | no current deployment observed | E1 | Do not delete without dependency analysis |
-| Neon | main branch | available | E3 | Inspected migration count = 31 |
-| Code | database schema version | 31 | E1 | Matches inspected Neon migration count |
-| Auth0 | Post-Login Action | deployed and bound | E3/E4 | Action ID 71b2ff45-77a6-408e-a881-002ab82b9d9e; verified by GitHub Actions run 35475091311 |
-| Auth0 | tenant claim | verified in deployed Action | E3 | https://tms-platform.io/claims/tenant_id |
-| GitHub | Auth0 automation | verified on auth0-tenant-claim-action | E2/E3 | Run 35475091311 succeeded; workflow restored to manual dispatch after execution |
+### Vercel
 
-## Resolved blockers
+Only the canonical projects remain:
 
-### VERCEL-API-PROD-01 — RESOLVED
+| Project | State | Evidence |
+|---|---|---|
+| tms-web | PRESERVE | Current project inventory |
+| tms-core-api | PRESERVE | Current project inventory |
 
-The API production deployment is on GitHub main commit f884b973343e6c00c582cbb2272e1faa33ba4dac and is READY.
+Previously authorized cleanup targets are no longer present:
+- transportadora — REMOVED
+- alexoaraujo83-agenciador — REMOVED
+- agenciador — REMOVED
+- nextjs-boilerplate — REMOVED
 
-The same commit has successful reported status checks for:
-- Vercel – tms-web
-- Vercel – tms-core-api
-- tms-backup – tms-worker
-- tms-backup – tms-backup-worker
+Current latest READY deployments observed:
+- tms-web: dpl_CxG37FZfhL2rTJasWquwqsFuWkLm, commit c535edcdfbd00ffa9da1a9f070f349f41456bf96, branch audit/chat-08-operational-routing-2026-09-20
+- tms-core-api: dpl_rJQN2rHvAnACC51RJhbg27TVUkM1, commit c535edcdfbd00ffa9da1a9f070f349f41456bf96, branch audit/chat-08-operational-routing-2026-09-20
 
-### VERCEL-API-RUNTIME-DB-01 — RESOLVED
+Important parity finding:
+- The latest READY deployments are not the current main HEAD.
+- The latest production-target deployments observed for both projects are still on commit d5abedff8c5e986578c5abd1c9b0db71385f6e7a.
+- Therefore Vercel production freshness against current main is NOT yet E4-proven.
+- Do not treat the READY preview/audit deployment as proof that production runs 675fbaaf.
 
-The production /ready endpoint was exercised through a legitimate temporary Vercel authenticated/shareable access path and returned:
+### Railway
 
-- HTTP 200
-- {"status":"ready","service":"tms-api"}
+Current project topology:
+- tms-worker — PRESERVE
+- tms-backup-worker — PRESERVE
+- legacy backup-worker — REMOVED
 
-The route implementation performs a PostgreSQL query for current_user and rejects the request unless the runtime role is exactly tms_app. Therefore the successful response is operational evidence that the deployed Vercel runtime reached PostgreSQL and passed the tms_app assertion.
+A current GitHub code search shows no operational code reference to the removed legacy service. Historical audit documents still mention it; those records are retained as evidence and must not be rewritten as if they were current state.
 
-No code change was made to expose the database role or weaken the readiness gate.
+### Neon
 
-### AUTH0-POST-LOGIN-TENANT-01 — RESOLVED
+Current Neon project:
+- tms — PRESERVE
 
-The existing Auth0 Action was reconciled rather than duplicated.
+The previously authorized nexora-tms project is absent from the current Neon project inventory.
 
-Verified external state:
-- Tenant: tms-platform.us.auth0.com
-- Action: TMS — Tenant ID Access Token
+Current tms branches observed:
+- main
+- development
+- staging
+- iam-validation-20260918
+- mcp-migration-2026-09-13T15-16-12
+- stage10.11-restore-proof-safe
+- tms-dr-restore-20260916
+- stage10.11-restore-proof-2026-09-14 (1)
+- tms-canonical-baseline-test
+
+Restore/DR branches are retained pending formal evidence reconciliation; no blind deletion is authorized by this document.
+
+## CI/CD current state
+
+The canonical CI workflow is structurally present and includes:
+- push/PR gates on main
+- Node 24.20.0
+- pnpm 11.24.0
+- frozen lockfile installation
+- database migrations
+- runtime-role validation
+- RLS runtime integration
+- IAM runtime resolver integration
+- Durable Jobs PostgreSQL integration
+- format, lint, typecheck, tests and build
+
+The database migration workflow is production-scoped and uses GitHub Environment `production` with secret `NEON_DATABASE_URL`.
+
+For commit 675fbaaf11081c721b0a6d9ad0beebca14056353, the current GitHub connector returned no associated pull-request-triggered workflow run. This is not evidence of failure; it means CI execution for that exact SHA is not currently proven by the inspected connector result.
+
+## Auth0 state
+
+The deployed/bound Post-Login Action remains the verified tenant-claim implementation:
 - Action ID: 71b2ff45-77a6-408e-a881-002ab82b9d9e
 - Trigger: post-login/v3
-- Status after build: built
-- Deployment: verified
-- Post-Login binding: verified
 - Tenant claim: https://tms-platform.io/claims/tenant_id
+- Action reads `event.user.app_metadata.tenant_id`
+- Missing tenant_id is denied
+- Namespaced tenant claim is set for Access Token and ID Token
+- Prior GitHub Actions deployment evidence: run 35475091311, conclusion success
 
-The deployed Action reads event.user.app_metadata.tenant_id, denies login when the tenant_id is absent, and sets the namespaced tenant claim in both the access token and ID token.
+### Current blocker: AUTH0-REAL-TOKEN-01
 
-GitHub Actions evidence:
-- Workflow run: 35475091311
-- Commit: 38917899a5fed64cc93281628809bd974386474a
-- Job: Deploy and bind TMS Post Login Action
-- Conclusion: success
-- Log output verified deployed=true and bound=true.
+The remaining IAM gate is a newly issued real TMS Access Token exercised end-to-end.
 
-Auth0 documents that Post-Login Actions can set custom Access Token claims with api.accessToken.setCustomClaim() and recommends namespaced custom claims. citeturn8search0turn8search1
+Required evidence:
+1. issuer
+2. audience
+3. RS256 signature/JWKS
+4. expiry/time validity
+5. namespaced tenant claim
+6. production API authentication acceptance
+7. tenant authorization
+8. RBAC behavior
+9. rejection behavior for missing/invalid tenant context
 
-## Current blocker
+Previously exposed token material must not be reused or documented.
 
-### AUTH0-REAL-TOKEN-01
+## Operational status
 
-The remaining gate is production real Access Token validation.
+| Gate | Status | Evidence level |
+|---|---|---|
+| GitHub canonical repository | PASS | E2 |
+| Vercel project cleanup | PASS | E2 |
+| Railway legacy backup service cleanup | PASS | E2 |
+| Neon legacy project cleanup | PASS | E2 |
+| Vercel latest READY deployment | PASS | E3 |
+| Vercel production parity with current main | OPEN | E2/E3 pending |
+| Railway tms-worker | PRESERVE | E3 previously verified |
+| Railway tms-backup-worker | PRESERVE | E3 previously verified |
+| Neon canonical project/branches | PASS | E3 |
+| Auth0 Action deployment/binding | PASS | E3/E4 |
+| Auth0 real-token E2E | OPEN/BLOCKER | E0/E1 until new evidence |
 
-The Action publication and binding gate is closed, and the API production database-readiness gate is closed. The next validation must use a newly issued real TMS Access Token after the deployed Action is active.
+## Required next execution order
 
-Required checks:
-- issuer
-- audience
-- RS256 signature and JWKS key
-- expiry/time validity
-- presence and value shape of the namespaced tenant claim
-- API authentication acceptance
-- tenant authorization
-- RBAC/permission behavior
-- rejection behavior for missing/invalid tenant context
-
-Previously exposed token material must not be reused or copied into documentation.
-
-## Required validation sequence
-
-1. Keep the current production API deployment f884b973... as the runtime baseline.
-2. Keep the verified Auth0 Action 71b2ff45-77a6-408e-a881-002ab82b9d9e bound to Post Login.
-3. Obtain a newly issued real TMS Access Token through the configured OIDC flow.
-4. Validate the JWT locally/independently: issuer, audience, RS256 signature, JWKS, expiry and tenant claim.
-5. Send the real token to the production TMS API.
-6. Confirm the API accepts a valid token and derives tenant context correctly.
-7. Confirm tenant isolation and RBAC behavior.
-8. Record E4 evidence and close AUTH0-REAL-TOKEN-01.
-9. Only then proceed to broader IAM/RBAC/RLS regression validation.
+1. Reconcile Vercel production deployment to the intended canonical main SHA.
+2. Verify production deployment state and runtime endpoints.
+3. Re-run/obtain CI evidence for the exact promoted SHA.
+4. Validate production environment parity without exposing secrets.
+5. Execute Auth0 real-token E4 validation.
+6. Validate tenant/RBAC/RLS rejection and isolation paths.
+7. Execute worker/outbox runtime validation.
+8. Execute backup/restore verification.
+9. Run final regression and update the evidence ledger.
 
 ## Safety rules
 
-- Do not create artificial/no-op commits solely to trigger infrastructure.
-- Do not reset, delete, or recreate Neon branches/databases to force synchronization.
-- Do not apply migrations merely because GitHub and Neon have different identifiers; reconcile migration state first.
-- Do not delete the legacy Railway backup-worker until dependency/use analysis proves it is obsolete.
-- Do not claim E2/E3/E4 evidence from configuration files alone.
-- Do not expose secrets, client secrets, database URLs, signing keys, or tokens in this document.
-- Do not modify /ready to return or expose the database role merely to pass the gate.
-- Do not reuse an old exposed Access Token for production validation.
-- Do not approve Auth0 real-token validation from configuration alone; require a newly issued token and runtime evidence.
-
-## Evidence status
-
-- GitHub → Vercel Web: PASS for current main commit status.
-- GitHub → Vercel Core API production deployment: PASS; READY on f884b973.
-- API production /health: PASS; HTTP 200.
-- API production /ready: PASS; HTTP 200 with status=ready.
-- API production database readiness: PASS; tms_app assertion passed inside /ready.
-- Auth0 Post-Login Action deployment: PASS; action 71b2ff45-77a6-408e-a881-002ab82b9d9e.
-- Auth0 Post-Login binding: PASS; binding verified by automation.
-- Auth0 tenant claim implementation: PASS; namespaced claim configured for access and ID tokens.
-- Auth0 real-token gate: OPEN/BLOCKER until a newly issued real production token is validated end-to-end.
-- Neon schema count: observed at 31; this is not proof of Vercel runtime identity beyond the separate /ready evidence.
-
-## Next gate
-
-GATE: AUTH0 → REAL TMS ACCESS TOKEN → PRODUCTION API
-
-No final IAM/Auth0 approval is granted until the real-token E4 path is evidenced.
+- Do not expose secrets, client secrets, database URLs, signing keys, or access tokens.
+- Do not reuse an old exposed Access Token.
+- Do not delete Neon restore/DR branches without branch-level evidence and explicit authorization.
+- Do not treat a preview/audit deployment as production proof.
+- Do not claim CI success for a SHA without a matching run or equivalent execution evidence.
+- Preserve historical audit documents; correct current SSOT separately.
