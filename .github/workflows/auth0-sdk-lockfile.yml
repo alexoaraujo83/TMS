@@ -1,0 +1,35 @@
+name: Regenerate Auth0 SDK lockfile
+
+on:
+  push:
+    branches:
+      - auth0-sdk-v4-integration
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+      - run: npm install --global pnpm@11.24.0
+      - run: pnpm install --no-frozen-lockfile
+      - name: Commit generated lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "Lockfile already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore(web): regenerate lockfile for Auth0 SDK v4"
+          git push
