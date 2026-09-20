@@ -6,9 +6,8 @@ Evidence-ledger snapshot. This document records verified state only; it is not a
 
 - Repository: alexoaraujo83/TMS
 - Canonical branch: main
-- Current main HEAD: b93940767b8d46389662dbbe91a46c53d798baaa
-- HEAD message: docs(web): document Auth0 issuer and JWKS variables
-- SSOT reconciliation branch: audit/chat-09-current-state-2026-09-20
+- Current main HEAD: 40808eb15f21e10aac2c04d475ca241912d48260
+- HEAD message: docs(audit): reconcile operational SSOT on main
 
 ## Current Vercel production state
 
