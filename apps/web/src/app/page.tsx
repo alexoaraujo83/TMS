@@ -34,12 +34,12 @@ export default function HomePage() {
   }
 
   async function loadSession() {
-    const response = await fetch("/api/auth/session", { cache: "no-store" });
+    const response = await fetch("/auth/profile", { cache: "no-store" });
     if (!response.ok) {
       setSession({ authenticated: false });
       return;
     }
-    setSession((await response.json()) as SessionState);
+    setSession({ authenticated: true, user: (await response.json()) as SessionState["user"] });
   }
 
   async function checkProtectedApi() {
@@ -84,7 +84,11 @@ export default function HomePage() {
             )}
           </>
         ) : (
-          <a href="/auth/login">Log in with Auth0</a>
+          <>
+            <a href="/auth/login">Log in with Auth0</a>
+            <br />
+            <a href="/auth/login?screen_hint=signup">Sign up</a>
+          </>
         )}
       </section>
 
