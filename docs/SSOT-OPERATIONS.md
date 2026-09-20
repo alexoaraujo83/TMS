@@ -6,146 +6,160 @@ Evidence-ledger snapshot. This document records verified state only; it is not a
 
 - Repository: alexoaraujo83/TMS
 - Canonical branch: main
-- Audited GitHub HEAD before this SSOT reconciliation: 675fbaaf11081c721b0a6d9ad0beebca14056353
-- HEAD message: fix(web): harden Auth0 SDK BFF flow
-- GitHub commit: verified/signed
+- Current main HEAD: b93940767b8d46389662dbbe91a46c53d798baaa
+- HEAD message: docs(web): document Auth0 issuer and JWKS variables
 - SSOT reconciliation branch: audit/chat-09-current-state-2026-09-20
 
-## Current infrastructure inventory
+## Current Vercel production state
 
-### Vercel
+Canonical projects:
+- tms-web — PRESERVE
+- tms-core-api — PRESERVE
 
-Only the canonical projects remain:
-
-| Project | State | Evidence |
-|---|---|---|
-| tms-web | PRESERVE | Current project inventory |
-| tms-core-api | PRESERVE | Current project inventory |
-
-Previously authorized cleanup targets are no longer present:
+Previously authorized cleanup targets remain absent:
 - transportadora — REMOVED
 - alexoaraujo83-agenciador — REMOVED
 - agenciador — REMOVED
 - nextjs-boilerplate — REMOVED
 
-Current latest READY deployments observed:
-- tms-web: dpl_CxG37FZfhL2rTJasWquwqsFuWkLm, commit c535edcdfbd00ffa9da1a9f070f349f41456bf96, branch audit/chat-08-operational-routing-2026-09-20
-- tms-core-api: dpl_rJQN2rHvAnACC51RJhbg27TVUkM1, commit c535edcdfbd00ffa9da1a9f070f349f41456bf96, branch audit/chat-08-operational-routing-2026-09-20
+### tms-web
 
-Important parity finding:
-- The latest READY deployments are not the current main HEAD.
-- The latest production-target deployments observed for both projects are still on commit d5abedff8c5e986578c5abd1c9b0db71385f6e7a.
-- Therefore Vercel production freshness against current main is NOT yet E4-proven.
-- Do not treat the READY preview/audit deployment as proof that production runs 675fbaaf.
+- Production deployment: dpl_7pnRabcG9Pxaf2oSPshDdwYScaY7
+- State: READY
+- Git ref: main
+- Git SHA: b93940767b8d46389662dbbe91a46c53d798baaa
+- Target: production
+- Region: iad1
+- Production aliases include tms-web-chi.vercel.app
+- Fresh runtime-log query for this deployment, last 24h, error/warning level, query AUTH0: no logs found.
 
-### Railway
+### tms-core-api
 
-Current project topology:
+- Latest production deployment for current main SHA b93940767b8d46389662dbbe91a46c53d798baaa: CANCELED
+- Latest READY production deployment: dpl_38GQpyb1qgH5i8i4cVo6Mj3HTsru
+- READY production SHA: 01decc9be27afed7177026075ca28c6035a55266
+- Therefore API production is not currently on the latest main HEAD b939407.
+- Production API /health: HTTP 200, response status=ok, service=tms-api.
+- This documentation-only Web commit does not itself establish a need for an API redeploy; production API freshness remains separately tracked.
+
+### Production parity classification
+
+- Web current-main production parity: E4 for deployment state.
+- API current-main production parity: OPEN; latest READY production is one documentation commit behind.
+- Do not claim both production services run the same SHA.
+
+## Railway
+
+Current topology:
 - tms-worker — PRESERVE
 - tms-backup-worker — PRESERVE
 - legacy backup-worker — REMOVED
 
-A current GitHub code search shows no operational code reference to the removed legacy service. Historical audit documents still mention it; those records are retained as evidence and must not be rewritten as if they were current state.
+tms-worker current-main deployment parity remains BLOCKED (BLK-WORKER-01): Railway's latest deployment is SKIPPED without a reusable build snapshot. Previous successful deployment evidence remains historical and is not promoted to current-main parity.
 
-### Neon
+tms-backup-worker latest successful backup evidence remains verified:
+- backup_status=verified
+- retention_status=verified
+- migration_count=31
+- restore verification remains a separate open gate (BLK-DR-01).
 
-Current Neon project:
+## Neon
+
+Current project:
 - tms — PRESERVE
+- legacy nexora-tms project — absent from current project inventory
 
-The previously authorized nexora-tms project is absent from the current Neon project inventory.
+Current restore/DR branches are retained pending formal reconciliation. No production mutation was performed during this update.
 
-Current tms branches observed:
-- main
-- development
-- staging
-- iam-validation-20260918
-- mcp-migration-2026-09-13T15-16-12
-- stage10.11-restore-proof-safe
-- tms-dr-restore-20260916
-- stage10.11-restore-proof-2026-09-14 (1)
-- tms-canonical-baseline-test
+Live main read-only evidence previously observed:
+- tenants=1
+- tenant_memberships=1
+- freights=0
+- outbox_events=0
+- durable_jobs=0
+- migration count observed=31
 
-Restore/DR branches are retained pending formal evidence reconciliation; no blind deletion is authorized by this document.
+RLS structure and tms_app privilege evidence are verified at implementation/integration level; cross-tenant production E4 remains open (BLK-RLS-E4-01).
 
-## CI/CD current state
+## CI/CD
 
-The canonical CI workflow is structurally present and includes:
-- push/PR gates on main
+Canonical CI workflow is structurally present with:
 - Node 24.20.0
 - pnpm 11.24.0
-- frozen lockfile installation
-- database migrations
+- frozen lockfile
+- migrations
 - runtime-role validation
 - RLS runtime integration
 - IAM runtime resolver integration
 - Durable Jobs PostgreSQL integration
 - format, lint, typecheck, tests and build
 
-The database migration workflow is production-scoped and uses GitHub Environment `production` with secret `NEON_DATABASE_URL`.
+For current main SHA b93940767b8d46389662dbbe91a46c53d798baaa:
+- GitHub combined status: SUCCESS for tms-worker, tms-backup-worker, Vercel tms-web and Vercel tms-core-api.
+- GitHub connector workflow-run lookup returned no pull-request-triggered workflow run for this exact SHA.
+- Therefore the combined status is recorded, but no new exact-SHA workflow execution claim is made.
 
-For commit 675fbaaf11081c721b0a6d9ad0beebca14056353, the current GitHub connector returned no associated pull-request-triggered workflow run. This is not evidence of failure; it means CI execution for that exact SHA is not currently proven by the inspected connector result.
+## Auth0
 
-## Auth0 state
-
-The deployed/bound Post-Login Action remains the verified tenant-claim implementation:
+Verified deployed/bound Post-Login Action:
 - Action ID: 71b2ff45-77a6-408e-a881-002ab82b9d9e
 - Trigger: post-login/v3
 - Tenant claim: https://tms-platform.io/claims/tenant_id
-- Action reads `event.user.app_metadata.tenant_id`
-- Missing tenant_id is denied
-- Namespaced tenant claim is set for Access Token and ID Token
-- Prior GitHub Actions deployment evidence: run 35475091311, conclusion success
+- Source reads event.user.app_metadata.tenant_id
+- Prior deployment evidence: GitHub Actions run 35475091311, success
 
-### Current blocker: AUTH0-REAL-TOKEN-01
+Environment contract documentation now includes the canonical Auth0 domain/issuer/JWKS variables in root and Web .env.example files. No secrets or populated credentials were added.
 
-The remaining IAM gate is a newly issued real TMS Access Token exercised end-to-end.
+### AUTH0-REAL-TOKEN-01 — OPEN
 
-Required evidence:
-1. issuer
-2. audience
-3. RS256 signature/JWKS
-4. expiry/time validity
-5. namespaced tenant claim
-6. production API authentication acceptance
-7. tenant authorization
-8. RBAC behavior
-9. rejection behavior for missing/invalid tenant context
+Still required:
+1. newly issued real TMS Access Token
+2. issuer
+3. audience
+4. RS256 signature/JWKS
+5. expiry/time validity
+6. namespaced tenant claim
+7. production API acceptance
+8. tenant authorization
+9. RBAC behavior
+10. rejection behavior
 
 Previously exposed token material must not be reused or documented.
 
 ## Operational status
 
-| Gate | Status | Evidence level |
+| Gate | Status | Evidence |
 |---|---|---|
-| GitHub canonical repository | PASS | E2 |
+| Canonical GitHub repository | PASS | E2 |
 | Vercel project cleanup | PASS | E2 |
-| Railway legacy backup service cleanup | PASS | E2 |
+| Railway legacy backup cleanup | PASS | E2 |
 | Neon legacy project cleanup | PASS | E2 |
-| Vercel latest READY deployment | PASS | E3 |
-| Vercel production parity with current main | OPEN | E2/E3 pending |
-| Railway tms-worker | PRESERVE | E3 previously verified |
-| Railway tms-backup-worker | PRESERVE | E3 previously verified |
-| Neon canonical project/branches | PASS | E3 |
-| Auth0 Action deployment/binding | PASS | E3/E4 |
-| Auth0 real-token E2E | OPEN/BLOCKER | E0/E1 until new evidence |
+| tms-web current-main production | PASS | E4 deployment evidence |
+| tms-core-api health | PASS | E4 runtime HTTP 200 |
+| tms-core-api current-main production parity | OPEN | Latest READY is 01decc9; b939 deployment canceled |
+| Auth0 Action deployment/binding | PASS | E3/E4 historical deployment evidence |
+| Auth0 runtime AUTH0-log check on current Web deployment | PASS for inspected 24h window | E4 log observation |
+| Auth0 real-token E2E | OPEN/BLOCKER | AUTH0-REAL-TOKEN-01 |
+| Worker current-main parity | OPEN/BLOCKER | BLK-WORKER-01 |
+| Cross-tenant RLS E4 | OPEN/BLOCKER | BLK-RLS-E4-01 |
+| DR restore verification | OPEN/BLOCKER | BLK-DR-01 |
 
 ## Required next execution order
 
-1. Reconcile Vercel production deployment to the intended canonical main SHA.
-2. Verify production deployment state and runtime endpoints.
-3. Re-run/obtain CI evidence for the exact promoted SHA.
-4. Validate production environment parity without exposing secrets.
-5. Execute Auth0 real-token E4 validation.
-6. Validate tenant/RBAC/RLS rejection and isolation paths.
-7. Execute worker/outbox runtime validation.
-8. Execute backup/restore verification.
-9. Run final regression and update the evidence ledger.
+1. Obtain a newly issued real TMS Access Token and perform production IAM E2E without exposing the token.
+2. Reconcile API deployment parity only if required by the canonical release state; do not create artificial trigger commits.
+3. Validate tenant/RBAC/RLS rejection and isolation paths.
+4. Resolve worker current-main deployment parity using a supported Railway deployment path.
+5. Execute isolated backup restore verification.
+6. Run final regression and update the evidence ledger/SSOT.
+7. Only then evaluate Final DoD.
 
 ## Safety rules
 
-- Do not expose secrets, client secrets, database URLs, signing keys, or access tokens.
-- Do not reuse an old exposed Access Token.
+- Never expose secrets, client secrets, database URLs, signing keys, or access tokens.
+- Never reuse an old exposed Access Token.
+- Never treat a preview/audit deployment as production proof.
+- Never claim CI workflow execution for a SHA without matching workflow evidence.
+- Never mutate production data merely to manufacture evidence.
+- Preserve historical audit records and distinguish them from current state.
 - Do not delete Neon restore/DR branches without branch-level evidence and explicit authorization.
-- Do not treat a preview/audit deployment as production proof.
-- Do not claim CI success for a SHA without a matching run or equivalent execution evidence.
-- Preserve historical audit documents; correct current SSOT separately.
