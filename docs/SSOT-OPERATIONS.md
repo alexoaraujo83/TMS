@@ -167,6 +167,43 @@ Classification:
 - **Current encrypted-backup restore execution: OPEN**
 - **DR-RESTORE-E4 remains OPEN** until the current encrypted backup is independently restored/verified from the backup artifact itself. The present branch proves canonical schema reconciliation, not the full backup-runtime restore chain.
 
+
+## Logs / Audit / Observability gate — 2026-09-21
+
+The centralized observability implementation is present on the stacked observability branch, not yet on canonical main.
+
+Implemented in this branch:
+- @tms/observability structured JSON logger with TRACE/DEBUG/INFO/WARN/ERROR/CRITICAL levels.
+- recursive credential redaction for authorization, tokens, secrets, cookies, connection strings and private keys.
+- API request/correlation ID propagation and structured request telemetry.
+- audit context expansion with correlation, actor subject, network and outcome fields through migration 0032 on the branch.
+- Worker structured telemetry integration is source-level only until the business event contract is established.
+
+Evidence boundary:
+- source implementation: E1/E2 depending on component;
+- automated tests: not promoted until a passing CI run for the corrected branch is observed;
+- production runtime: not promoted from branch/preview evidence;
+- canonical production database remains at 31 migrations and does not include branch migration 0032.
+
+### CI correction routing
+
+CI run 35573893032 / quality job 106251277519 failed at @tms/worker build because DurableJobTelemetryEvent exposes event, error, attempt, durationMs, claimed, completed and failed, but the worker logger referenced nonexistent status and errorCode fields.
+
+Correction committed on the observability branch:
+- 922cc5c7ee876adfab30078312f126be643553f8 — maps only fields supported by DurableJobTelemetryEvent.
+
+The corrected branch requires a new CI execution before E3 is claimed. No CI success is inferred from the previous failed run.
+
+### Frontend continuation
+
+Stacked PR #62 adds the Web integration on top of the corrected observability branch:
+- consumes @tms/observability rather than duplicating redaction logic;
+- emits structured API/Auth0/protected-route events;
+- propagates X-Request-Id / X-Correlation-Id from API responses;
+- adds frontend adapter tests.
+
+PR #62 remains validation-pending until the parent branch is CI-green and the Web change receives a valid build/runtime check. Vercel preview creation is currently rate-limited by the provider and is not treated as an application failure.
+
 ## Operational status
 
 | Gate | Status | Evidence |
