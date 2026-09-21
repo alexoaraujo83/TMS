@@ -18,6 +18,7 @@
     "@tms/database": "workspace:*",
     "@tms/freight": "workspace:*",
     "@tms/matching": "workspace:*",
+    "@tms/observability": "workspace:*",
     "@tms/security": "workspace:*",
     "class-transformer": "0.5.1",
     "class-validator": "0.14.2",

@@ -10,10 +10,11 @@
     "test": "node --experimental-strip-types --test \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "^4.30.0",
+    "@tms/observability": "workspace:*",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "@auth0/nextjs-auth0": "^4.30.0"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "@types/node": "24.13.3",

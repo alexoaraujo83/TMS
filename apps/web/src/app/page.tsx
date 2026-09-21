@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchApiHealth, type ApiHealth } from "../lib/api";
+import { logFrontendEvent } from "../lib/logger";
 
 interface SessionState {
   authenticated: boolean;
@@ -19,33 +20,121 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   async function loadHealth(signal?: AbortSignal) {
+    const startedAt = performance.now();
     setLoading(true);
     setError(null);
 
     try {
-      setHealth(await fetchApiHealth(signal));
+      const result = await fetchApiHealth(signal);
+      setHealth(result);
+      logFrontendEvent(
+        "INFO",
+        "web.api.health.completed",
+        {
+          requestId: result.requestId,
+          correlationId: result.correlationId ?? result.requestId,
+        },
+        {
+          duration_ms: Math.round(performance.now() - startedAt),
+          status: result.status,
+          service: result.service,
+        },
+      );
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
+
+      const message = cause instanceof Error ? cause.message : "API request failed";
       setHealth(null);
-      setError(cause instanceof Error ? cause.message : "API request failed");
+      setError(message);
+      logFrontendEvent(
+        "ERROR",
+        "web.api.health.failed",
+        {},
+        {
+          duration_ms: Math.round(performance.now() - startedAt),
+          message,
+        },
+      );
     } finally {
       setLoading(false);
     }
   }
 
   async function loadSession() {
-    const response = await fetch("/auth/profile", { cache: "no-store" });
-    if (!response.ok) {
+    try {
+      const response = await fetch("/auth/profile", { cache: "no-store" });
+      const requestId = response.headers.get("x-request-id") ?? undefined;
+      const correlationId = response.headers.get("x-correlation-id") ?? requestId;
+
+      if (!response.ok) {
+        setSession({ authenticated: false });
+        logFrontendEvent(
+          "WARN",
+          "web.auth.profile.failed",
+          { requestId, correlationId },
+          { status_code: response.status },
+        );
+        return;
+      }
+
+      setSession({
+        authenticated: true,
+        user: (await response.json()) as SessionState["user"],
+      });
+      logFrontendEvent(
+        "INFO",
+        "web.auth.profile.completed",
+        { requestId, correlationId },
+        { status_code: response.status },
+      );
+    } catch (cause) {
       setSession({ authenticated: false });
-      return;
+      logFrontendEvent(
+        "ERROR",
+        "web.auth.profile.exception",
+        {},
+        {
+          message:
+            cause instanceof Error ? cause.message : "Session request failed",
+        },
+      );
     }
-    setSession({ authenticated: true, user: (await response.json()) as SessionState["user"] });
   }
 
   async function checkProtectedApi() {
+    const startedAt = performance.now();
     setFreightsStatus(null);
-    const response = await fetch("/api/tms/freights", { cache: "no-store" });
-    setFreightsStatus(response.status);
+
+    try {
+      const response = await fetch("/api/tms/freights", { cache: "no-store" });
+      const requestId = response.headers.get("x-request-id") ?? undefined;
+      const correlationId = response.headers.get("x-correlation-id") ?? requestId;
+
+      setFreightsStatus(response.status);
+      logFrontendEvent(
+        response.ok ? "INFO" : "WARN",
+        "web.api.freights.completed",
+        { requestId, correlationId },
+        {
+          duration_ms: Math.round(performance.now() - startedAt),
+          status_code: response.status,
+        },
+      );
+    } catch (cause) {
+      setFreightsStatus(null);
+      logFrontendEvent(
+        "ERROR",
+        "web.api.freights.exception",
+        {},
+        {
+          duration_ms: Math.round(performance.now() - startedAt),
+          message:
+            cause instanceof Error
+              ? cause.message
+              : "Protected API request failed",
+        },
+      );
+    }
   }
 
   useEffect(() => {
@@ -58,13 +147,21 @@ export default function HomePage() {
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("auth") === "failed";
 
+  useEffect(() => {
+    if (authFailed) {
+      logFrontendEvent("WARN", "web.auth.callback.failed");
+    }
+  }, [authFailed]);
+
   return (
     <main>
       <h1>TMS</h1>
       <p>Frontend foundation with Auth0 session and live API integration.</p>
 
       {authFailed && (
-        <p role="alert">Authentication failed. Check the Auth0 callback configuration.</p>
+        <p role="alert">
+          Authentication failed. Check the Auth0 callback configuration.
+        </p>
       )}
 
       <section aria-labelledby="auth-heading">
@@ -73,14 +170,20 @@ export default function HomePage() {
         {session?.authenticated ? (
           <>
             <p role="status">
-              Signed in as {session.user?.name ?? session.user?.email ?? "authenticated user"}.
+              Signed in as{" "}
+              {session.user?.name ??
+                session.user?.email ??
+                "authenticated user"}
+              .
             </p>
             <button type="button" onClick={() => void checkProtectedApi()}>
               Check protected API
             </button>
             <a href="/auth/logout">Log out</a>
             {freightsStatus !== null && (
-              <p role="status">GET /freights via server session: HTTP {freightsStatus}</p>
+              <p role="status">
+                GET /freights via server session: HTTP {freightsStatus}
+              </p>
             )}
           </>
         ) : (
@@ -101,7 +204,11 @@ export default function HomePage() {
           </p>
         )}
         {!loading && error && <p role="alert">{error}</p>}
-        <button type="button" onClick={() => void loadHealth()} disabled={loading}>
+        <button
+          type="button"
+          onClick={() => void loadHealth()}
+          disabled={loading}
+        >
           Refresh API status
         </button>
       </section>

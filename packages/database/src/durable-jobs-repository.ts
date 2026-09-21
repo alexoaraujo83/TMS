@@ -24,6 +24,7 @@ export interface EnqueueDurableJobInput {
   payload?: Record<string, unknown>;
   availableAt?: Date;
   maxAttempts?: number;
+  idempotencyKey?: string;
 }
 
 export class DurableJobsRepository {
@@ -33,8 +34,11 @@ export class DurableJobsRepository {
     return withTenantContext(this.pool, input.tenantId, async (client: any) => {
       const result = await client.query(
         `insert into durable_jobs
-          (tenant_id, job_type, payload, available_at, max_attempts)
-         values ($1, $2, $3, coalesce($4, now()), coalesce($5, 5))
+          (tenant_id, job_type, payload, available_at, max_attempts, idempotency_key)
+         values ($1, $2, $3, coalesce($4, now()), coalesce($5, 5), $6)
+         on conflict (tenant_id, job_type, idempotency_key)
+         where idempotency_key is not null
+         do update set updated_at = durable_jobs.updated_at
          returning id, tenant_id, job_type, payload, status, attempts, max_attempts,
            available_at, lease_token, last_error, completed_at, created_at, updated_at`,
         [
@@ -43,6 +47,7 @@ export class DurableJobsRepository {
           JSON.stringify(input.payload ?? {}),
           input.availableAt ?? null,
           input.maxAttempts ?? null,
+          input.idempotencyKey ?? null,
         ],
       );
       return this.map(result.rows[0]);

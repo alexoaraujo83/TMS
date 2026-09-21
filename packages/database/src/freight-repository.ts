@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
 import { assertUuid } from "./query.js";
@@ -250,6 +251,27 @@ export class PostgresFreightRepository {
           tenantId,
           entityId: row.id,
         });
+
+        const eventId = randomUUID();
+        await client.query(
+          `insert into outbox_events (
+             id, tenant_id, aggregate_type, aggregate_id, event_type, payload
+           ) values ($1, $2, 'freight', $3, 'freight.status_changed', $4::jsonb)`,
+          [
+            eventId,
+            tenantId,
+            row.id,
+            JSON.stringify({
+              event_id: eventId,
+              freight_id: row.id,
+              from_status: expectedStatus,
+              to_status: nextStatus,
+              request_id: audit.requestId ?? null,
+              correlation_id: audit.correlationId ?? null,
+              actor_user_id: audit.actorUserId ?? null,
+            }),
+          ],
+        );
       }
 
       return row;

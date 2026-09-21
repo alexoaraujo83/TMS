@@ -1,6 +1,8 @@
 export interface ApiHealth {
   status: string;
   service: string;
+  requestId?: string;
+  correlationId?: string;
 }
 
 export function getApiBaseUrl(): string {
@@ -21,17 +23,25 @@ export async function fetchApiHealth(
     signal,
   });
 
+  const requestId = response.headers.get("x-request-id") ?? undefined;
+  const correlationId = response.headers.get("x-correlation-id") ?? undefined;
+
   if (!response.ok) {
     throw new Error(`API health request failed with HTTP ${response.status}`);
   }
 
   const payload = (await response.json()) as Partial<ApiHealth>;
-  if (typeof payload.status !== "string" || typeof payload.service !== "string") {
+  if (
+    typeof payload.status !== "string" ||
+    typeof payload.service !== "string"
+  ) {
     throw new Error("API health response contract is invalid");
   }
 
   return {
     status: payload.status,
     service: payload.service,
+    ...(requestId ? { requestId } : {}),
+    ...(correlationId ? { correlationId } : {}),
   };
 }
