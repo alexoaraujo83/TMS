@@ -38,7 +38,11 @@ test("fetches and validates the API health contract", async () => {
     request = new Request(input, init);
     return new Response(JSON.stringify({ status: "ok", service: "tms-api" }), {
       status: 200,
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": "request-123",
+        "x-correlation-id": "correlation-123",
+      },
     });
   };
 
@@ -46,6 +50,8 @@ test("fetches and validates the API health contract", async () => {
     assert.deepEqual(await fetchApiHealth(), {
       status: "ok",
       service: "tms-api",
+      requestId: "request-123",
+      correlationId: "correlation-123",
     });
     assert.equal(request?.url, "https://api.example.test/health");
     assert.equal(request?.method, "GET");
