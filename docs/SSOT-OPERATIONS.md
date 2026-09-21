@@ -49,7 +49,7 @@ Current topology:
 - tms-backup-worker — PRESERVE
 - legacy backup-worker — REMOVED
 
-tms-worker current-main deployment parity: PASS for deployment status. Deployment e1db84a3-9e75-4174-8370-104682bc366f is SUCCESS on commit 896a122. Runtime evidence shows durableJobsEnabled=true, configuredTenants=1, runtime role tms_app, and a durable_job.batch_completed observation with claimed=0/completed=0/failed=0. PR #63 now establishes the source-controlled business flow and idempotency contract; runtime proof remains open until migration 0033 is applied and a real freight status transition is observed end-to-end.
+tms-worker current-main deployment parity: PASS for deployment status. Deployment e1db84a3-9e75-4174-8370-104682bc366f is SUCCESS on commit 896a122. Runtime evidence shows durableJobsEnabled=true, configuredTenants=1, runtime role tms_app, and a durable_job.batch_completed observation with claimed=0/completed=0/failed=0. PR #63 now establishes the source-controlled business flow and idempotency contract. Canonical CI run 35578298593 / quality job 106265043138 proves the complete flow against a real CI PostgreSQL instance; Neon/Railway runtime proof remains open until migration 0033 is applied and the deployed worker processes a real event.
 
 tms-backup-worker latest deployment:
 - Deployment: 71784d43-8d6b-49a5-8838-03303438beda
@@ -181,7 +181,7 @@ Classification:
 | Auth0 Action source/deployment evidence | PASS | E3/E4 historical evidence |
 | Auth0 real-token E2E | OPEN/BLOCKER | AUTH0-REAL-TOKEN-01 |
 | Worker runtime durable jobs | PASS | e1db84a3, durableJobsEnabled=true |
-| Worker business event → durable job contract | IMPLEMENTED / RUNTIME OPEN | PR #63 source path; runtime E3/E4 not yet proven |
+| Worker business event → durable job contract | E2/E3 CI PROVEN / E4 OPEN | CI 35578298593 / job 106265043138; Neon/Railway runtime still open |
 | CI exact-current-HEAD execution | PASS | GitHub Actions run 35554413967 / quality job 106195137392 |
 | Cross-tenant RLS E4 | OPEN/BLOCKER | BLK-RLS-E4-01 |
 | DR schema parity on isolated restore-proof branch | PASS | 31 migrations + validated 0030/0031 constraints |
@@ -203,7 +203,7 @@ Implemented source path:
 4. `freight-status-changed.handler.ts` validates tenant/freight/status and writes an idempotent audit completion record.
 5. Worker telemetry records the handler event and durable-job lifecycle/status/errorCode.
 
-Classification: **IMPLEMENTED / NOT RUNTIME-PROVEN**. Migration `0033_durable_job_idempotency.sql` and a real Neon/Railway execution are still required before E3/E4 promotion.
+Classification: **E2/E3 CI-PROVEN / E4 RUNTIME OPEN**. The CI integration test passed against PostgreSQL with migration `0033_durable_job_idempotency.sql`. Production/main Neon remains at the previously observed 31 migrations, and Railway runtime execution of this business event is still unproven.
 
 ## Required next execution order
 
