@@ -41,7 +41,7 @@ export async function fetchApiHealth(
   return {
     status: payload.status,
     service: payload.service,
-    requestId,
-    correlationId,
+    ...(requestId ? { requestId } : {}),
+    ...(correlationId ? { correlationId } : {}),
   };
 }
