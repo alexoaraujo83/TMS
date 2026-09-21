@@ -53,7 +53,7 @@ export function createLogger(options: {
   level?: LogLevel;
   emit?: (line: string) => void;
 }) {
-  const environment = options.environment ?? process.env.NODE_ENV ?? "development";
+  const environment = options.environment ?? process.env.LOG_ENVIRONMENT ?? process.env.NODE_ENV ?? "development";
   const configured = options.level ?? (process.env.LOG_LEVEL as LogLevel | undefined) ?? "INFO";
   const rank: Record<LogLevel, number> = { TRACE: 10, DEBUG: 20, INFO: 30, WARN: 40, ERROR: 50, CRITICAL: 60 };
   const emit = options.emit ?? ((line: string) => console.log(line));
