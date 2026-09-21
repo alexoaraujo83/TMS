@@ -92,13 +92,6 @@ if (!databaseUrl) {
       const durableJobProcessor = new DurableJobProcessor(
         durableJobStore,
         new Map([
-          ["system.noop", async (job) => {
-            logger.log("INFO", "durable_job.execute", {}, {
-              job_id: job.id,
-              job_type: job.jobType,
-              tenant_id: job.tenantId,
-            });
-          }],
           ["external.webhook", createDurableWebhookHandler(webhookPublisher)],
           ["freight.status_changed", createFreightStatusChangedHandler(pool, (event, details) =>
             logger.log("INFO", event, { tenantId: String(details.tenant_id) }, details),
