@@ -64,5 +64,5 @@ test("handles freight.status_changed and is idempotent on replay", async () => {
   assert.equal(events[0]?.event, "freight.status_changed.handled");
   assert.equal(events[0]?.details.idempotent_replay, false);
   assert.equal(events[1]?.details.idempotent_replay, true);
-  assert.equal(pool.queries.filter((sql) => /insert into audit_events/i.test(sql)).length, 1);
+  assert.equal(pool.queries.filter((sql: string) => /insert into audit_events/i.test(sql)).length, 1);
 });
