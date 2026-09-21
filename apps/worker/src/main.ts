@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { DurableJobsRepository } from "@tms/database";
 import { createLogger } from "@tms/observability";
 import { DurableJobProcessor } from "./durable-jobs-worker.js";
 import { PgDurableJobStore } from "./durable-jobs-store.js";
@@ -6,6 +7,7 @@ import { OutboxProcessor } from "./outbox-worker.js";
 import { PgOutboxStore } from "./outbox-store.js";
 import { WebhookPublisher } from "./webhook-publisher.js";
 import { createDurableWebhookHandler } from "./durable-job-handlers.js";
+import { createFreightStatusChangedHandler } from "./freight-status-changed.handler.js";
 import { normalizeDatabaseUrl } from "./database-url.js";
 import { parseTenantIds, positiveIntegerEnv } from "./config.js";
 import { assertConfiguredTenantsAreActive } from "./tenant-config.js";
@@ -58,7 +60,23 @@ if (!databaseUrl) {
         timeoutMs: webhookTimeoutMs,
         secret: process.env.OUTBOX_WEBHOOK_SECRET,
       });
+      const durableJobRepository = new DurableJobsRepository(pool);
       const outboxProcessor = new OutboxProcessor(outboxStore, async (event) => {
+        if (event.eventType === "freight.status_changed") {
+          await durableJobRepository.enqueue({
+            tenantId: event.tenantId,
+            jobType: "freight.status_changed",
+            payload: event.payload,
+            idempotencyKey: event.id,
+          });
+          logger.log("INFO", "outbox.durable_job.enqueued", { tenantId: event.tenantId }, {
+            event_id: event.id,
+            event_type: event.eventType,
+            job_type: "freight.status_changed",
+          });
+          return;
+        }
+
         if (webhookUrls.length > 0) {
           await webhookPublisher.publish(event);
           return;
@@ -82,6 +100,9 @@ if (!databaseUrl) {
             });
           }],
           ["external.webhook", createDurableWebhookHandler(webhookPublisher)],
+          ["freight.status_changed", createFreightStatusChangedHandler(pool, (event, details) =>
+            logger.log("INFO", event, { tenantId: String(details.tenant_id) }, details),
+          )],
         ]),
         { onTelemetry: (event) => logger.log("INFO", "durable_job.telemetry", {}, {
           job_id: event.jobId,
