@@ -1,6 +1,6 @@
 # TMS — MASTER CONTROLLER — 109 ETAPAS
 
-Date: 2026-09-16
+Date: 2026-09-21
 Canonical repository: `alexoaraujo83/TMS`
 Canonical branch: `main`
 Controller mode: ACTIVE
@@ -19,13 +19,13 @@ DISCOVER → ANALYZE → CLASSIFY → CORRECT → CLEAN → REFACTOR → TEST �
 
 ## Current execution state
 
-CHAT 03 — INVENTÁRIO TÉCNICO: EXECUTED / INVENTORY CONFIRMED / FILE-LEVEL ORPHAN SCAN PENDING.
+CHAT 03–05 — EXECUTED / inventory and workspace structure confirmed.
 
-CHAT 04 — INVENTÁRIO DE FUNCIONALIDADES: EXECUTED / STRUCTURAL DOMAIN TRACEABILITY CONFIRMED / END-TO-END REQUIREMENT TRACEABILITY PENDING.
+CHAT 06 — Architecture 360° / AUD-004 — EXECUTED / architecture and infrastructure reconciliation advanced.
 
-CHAT 05 — GATE 02 — ESTRUTURA DO PROJETO: EXECUTED / WORKSPACE STRUCTURE CONFIRMED / DEEP DEAD-CODE AND CIRCULAR-DEPENDENCY ANALYSIS PENDING.
+Current routing is no longer discovery. Execution is in blocker-driven regression/release-gate mode:
 
-The controller did not modify application code in these stages because no safe code correction was established by the available evidence. Audit evidence and controller records were updated instead.
+CI current HEAD → runtime freshness → environment parity → worker/outbox → backup/DR → frontend/Auth0 → regression → FINAL DoD gate.
 
 ## Evidence levels
 
@@ -35,64 +35,116 @@ The controller did not modify application code in these stages because no safe c
 - E3 — integration proven
 - E4 — operation proven
 
-## Status vocabulary
+## Current evidence baseline
 
-CONCLUÍDO / COMPROVADO · FUNCIONAL · PARCIAL · IMPLEMENTADO / NÃO VALIDADO · CONFIGURADO · QUEBRADO · AUSENTE · OBSOLETO · DUPLICADO · NÃO VERIFICADO
+### CI
 
-## Reconciliation result
+Current application HEAD:
+`f9bb9d4225a777f4c2bc899c4008e2e0b2dd4d91`
 
-The prior controller record contained the parent commit `f12f6ece...` as HEAD. GitHub `main` was re-read and is now confirmed at `520b6f3008585bee4334064cd536444be87c5836`, whose parent is `f12f6ece...` and whose commit message is `docs(audit): activate master controller and evidence ledger`.
+GitHub Actions CI run:
+`35554413967`
 
-Therefore `520b6f3` is the current canonical baseline. The Evidence Ledger was subsequently updated by commit `9e00da465596c21f5e4db2c81242eddfcb7f37ee`, and this controller update is the next reconciliation commit.
+Quality job:
+`106195137392`
 
-## CHAT 03–05 findings
+Conclusion: SUCCESS. Migration, CI-role provisioning, runtime-role validation, RLS runtime integration, IAM runtime resolver, Durable Jobs PostgreSQL integration, format/lint/typecheck/test/build all passed in CI.
 
-### F-03-001 — Monorepo inventory
+Status: COMPROVADO — E3 for CI/integration boundary.
 
-`apps/` currently contains `api`, `web`, and `worker`. `packages/` contains `audit`, `auth`, `config`, `database`, `freight`, `matching`, `security`, `shared`, and `tenancy` in the current repository tree.
+### Production API/Web
 
-Status: INVENTORIED. Evidence level E1 for component existence.
+Production API health endpoint returns HTTP 200 with `{"status":"ok","service":"tms-api"}`.
 
-### F-04-001 — Functional traceability
+Production Web endpoint returns HTTP 200 and exposes the TMS/Auth0 login surface.
 
-API structure exposes common infrastructure, health controller, bootstrap, and domain modules; domain packages include freight, matching, tenancy and security. This is structural evidence only. It does not prove every business capability end-to-end.
+Status: COMPROVADO — E2 runtime availability.
 
-Status: PARTIAL. Evidence level E1. Blocker BLK-005 remains active.
+Authenticated production `/freights` and real Auth0 tenant-claim E2E remain separate gates.
 
-### F-05-001 — Workspace structure
+### Production database
 
-`pnpm-workspace.yaml` declares `apps/*` and `packages/*`, matching the observed top-level repository structure.
+Neon production main:
+`shiny-hall-34679912 / br-lingering-shadow-act0vvi9`
 
-Status: COMPROVADO / STRUCTURE ALIGNED. Evidence level E2 for configuration-to-tree alignment.
+Canonical migration state: 31 migrations through `0031_finance_relationship_invariants.sql`.
 
-### F-05-002 — Root toolchain
+Critical production tables have RLS + FORCE RLS. `tms_app` is LOGIN/NOSUPERUSER/NOBYPASSRLS with runtime DML and without migration-write privileges.
 
-Root `package.json` pins pnpm 11.24.0, Node 24.20.0, Prettier 3.9.6, Turbo 2.10.12 and TypeScript 6.0.3.
+Status: structural security COMPROVADO — E3.
 
-Status: CONFIGURED. Evidence level E1; runtime compatibility still requires execution evidence.
+Behavioral cross-tenant runtime proof remains OPEN because the available SQL execution surface cannot switch the session to `tms_app`; a prior `SET LOCAL ROLE tms_app` attempt was denied.
 
-## Blocker routing
+### DR schema reconciliation
 
-When a P0/P1 finding affects the current gate, the controller routes execution to the smallest corrective stage capable of resolving it, then requires regression validation before returning to the main sequence. No blocker is silently carried forward.
+Isolated branch `stage10.11-restore-proof-safe` was reconciled from 28 to 31 migrations with `0029`, `0030`, and `0031`.
 
-### Active blockers
+Post-migration checksums, runtime-role hardening, relationship constraints, RLS/Force-RLS and schema comparison were verified.
 
-1. **BLK-001 — Environment drift (P1):** development and staging diverge from canonical main; ownership/active consumers must be established before synchronization, reset or deletion.
-2. **BLK-002 — Worker deployment freshness (P1):** worker starts/idle, but deployment of current repository commit is not proven; do not invent tenant IDs to force activity.
-3. **BLK-003 — Backup/DR readiness (P1):** recurring backup execution, retention proof and approved RPO/RTO remain incomplete; Issues #28/#29 are open.
-4. **BLK-004 — Runtime application coverage (P1):** production `/health` is proven, but complete route/permission/runtime smoke is pending.
-5. **BLK-005 — Functional traceability (P1):** requirement-to-operation mapping is incomplete.
-6. **BLK-006 — Deep structural analysis (P2):** file-level orphan/dead-code scan and circular-dependency analysis remain pending.
+Status: schema parity COMPROVADO — E3.
 
-## Blocker route after CHAT 03–05
+Independent restore from the current encrypted backup remains OPEN.
 
-Do not perform destructive environment reconciliation as part of CHAT 03–05.
+## Active blockers
 
-Next execution route:
+1. **BLK-ENV-PARITY-01 — Environment parity (P1):** development and staging each contain 11 legacy public tables and no `schema_migrations`; production contains 21 canonical public tables and 31 migrations. Ownership/consumer intent exists only partially; automatic destructive synchronization is prohibited.
+2. **BLK-RLS-E4-01 — Production behavioral RLS (P1):** structural RLS and non-bypass runtime-role configuration are proven, but production cross-tenant behavior under `tms_app` is not directly executed.
+3. **BLK-WORKER-01 — Worker business contract (P1):** Durable Jobs runtime is enabled and the worker processor exists, but no authoritative freight-domain event contract was found connecting `freight.status_changed` → outbox → durable job → business handler. No speculative event type/payload/handler will be invented.
+4. **BLK-BACKUP-RUNTIME-01 — Backup execution evidence (P1):** backup worker deployment is SUCCESS, but deployment logs do not prove a completed backup object, checksum, retention result or recurring execution.
+5. **DR-RESTORE-E4 — Independent restore (P1):** isolated schema reconciliation is proven, but an independent restore from the current encrypted backup and its operational timing evidence are not proven.
+6. **AUTH0-REAL-TOKEN-01 — Auth0 production E2E (P1):** source-controlled Action and API authorization contract are coherent, but a real newly issued access token containing `https://tms-platform.io/claims/tenant_id`, accepted by production API and reaching a tenant-scoped DB operation, is not proven.
+7. **BLK-RUNTIME-COVERAGE-01 — Runtime route coverage (P1):** API/Web availability is proven; complete protected-route, permission and tenant-scoped smoke coverage remains pending.
+8. **BLK-DEEP-STRUCTURAL-01 — Deep structural analysis (P2):** file-level orphan/dead-code and circular-dependency analysis remain incomplete.
 
-**CHAT 46/49 → fresh CI evidence → CHAT 50/51 runtime validation → CHAT 38–45 environment ownership/parity → CHAT 32–34 worker/outbox validation → CHAT 55–57 backup/DR → CHAT 23–25 frontend → regression → return to main 109-stage sequence.**
+## Worker gate
 
-The route intentionally jumps to existing P1 blockers rather than repeating already-proven discovery work.
+Durable Jobs runtime was explicitly enabled on Railway `tms-worker`.
+
+Verified runtime evidence on successful deployment `e1db84a3-9e75-4174-8370-104682bc366f`:
+- `durableJobsEnabled=true`
+- `configuredTenants=1`
+- runtime database role verification = `tms_app`
+- tenant verification = 1
+- durable-job batch completed with claimed/completed/failed = 0/0/0
+
+The zero-job result is not a failure; it means no eligible durable job was available.
+
+Current repository source inspection still finds no authoritative freight-status domain event contract. Do not force a worker deployment or fabricate `OUTBOX_TENANT_IDS` merely to create activity.
+
+## Environment parity gate
+
+Read-only Neon evidence:
+
+| Environment | Public tables | schema_migrations | durable_jobs |
+|---|---:|---|---|
+| Production main | 21 | yes | yes |
+| Development | 11 | no | no |
+| Staging | 11 | no | no |
+| Restore-proof-safe | canonical after reconciliation | yes | yes |
+
+Development/staging are therefore materially behind production. No destructive reset, deletion or blind migration has been performed.
+
+## Backup/DR gate
+
+Backup implementation performs encrypted dump, SHA256/manifest verification, upload and retention handling.
+
+Latest verified backup-worker deployment:
+`71784d43-8d6b-49a5-8838-03303438beda`
+Status: SUCCESS.
+
+Deployment logs did not provide execution evidence. Therefore deployment success is not promoted to backup-operation E4.
+
+The isolated restore-proof branch has been reconciled to migration 0031, but this is not equivalent to proving an independent restore from the current encrypted backup.
+
+## Auth0 gate
+
+Source-controlled desired state defines:
+- Post Login Action `TMS — Tenant Claim`
+- claim `https://tms-platform.io/claims/tenant_id`
+- tenant source `event.user.app_metadata.tenant_id`
+- API membership revalidation against Auth0 subject + tenant membership.
+
+This is implementation/source evidence only. The actual Auth0 tenant state and a fresh production token are not independently verified through the available connector surface.
 
 ## Regression loop
 
@@ -106,10 +158,40 @@ For every code/configuration correction:
 6. Record evidence and update blocker status.
 7. Re-enter the 109-stage sequence only after the blocker is cleared or formally documented.
 
-## Release gate
+## Current release-gate matrix
 
-Overall audit remains IN PROGRESS. The historical ~74% metric remains a historical audit metric and is not treated as 74/109 completed stages.
+| Gate | Status | Evidence |
+|---|---|---|
+| CI current application HEAD | PASS | E3 |
+| API runtime | PASS | E2 |
+| Web runtime | PASS | E2 |
+| Production schema/migrations | PASS | E3 |
+| RLS structural controls | PASS | E3 |
+| DR isolated schema reconciliation | PASS | E3 |
+| Environment parity | BLOCKED | E1/E2 |
+| Behavioral production RLS | BLOCKED | E3 structural / E4 pending |
+| Worker runtime | PASS on prior application deployment | E2 |
+| Worker business contract | BLOCKED | contract absent |
+| Backup deployment | PASS | E2 |
+| Backup execution | OPEN | E0/E1 |
+| Independent restore | OPEN | E3 schema proof / E4 pending |
+| Auth0 real-token E2E | OPEN | source/code only |
+| Full protected-route runtime regression | OPEN | partial |
+| Final DoD | BLOCKED | P1 blockers remain |
 
-## FINAL DoD gate
+## Next execution route
+
+Do not repeat Discovery/Inventory.
+
+1. Regression/release-gate verification.
+2. Attempt only safe executable runtime evidence for protected routes.
+3. Keep RLS E4, Auth0 E2E, backup execution and independent restore explicitly open when direct proof is unavailable.
+4. Resolve environment parity only through governed, non-destructive migration/ownership decisions.
+5. Resolve Worker only after an authoritative domain event contract exists.
+6. Update Evidence Ledger and return to the 109-stage sequence only after the affected gate changes state.
+
+## FINAL DoD
+
+FINAL DoD is **NOT REACHED**.
 
 The controller may only enter FINAL DoD after P0/P1 blockers are resolved or formally accepted, critical regression is green, environments are reconciled or explicitly governed, security/tenancy boundaries are evidenced, backup/restore is proven to the required operational target, and documentation/evidence are current.
