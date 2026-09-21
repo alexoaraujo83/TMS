@@ -1,5 +1,6 @@
 export interface RequestContext {
   requestId: string;
+  correlationId: string;
   userId: string;
   tenantId: string;
   roles: readonly string[];
