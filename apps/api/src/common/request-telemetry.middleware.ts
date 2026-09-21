@@ -13,6 +13,8 @@ export interface RequestTelemetryEvent {
   durationMs: number;
   tenantId?: string;
   userId?: string;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 export interface RequestTelemetryMiddlewareOptions {
@@ -33,12 +35,15 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
         tenantId: event.tenantId,
         userId: event.userId,
       };
-      logger.log("INFO", event.event, context, {
+      const details = {
         method: event.method,
         route: event.path,
         status_code: event.statusCode,
         duration_ms: event.durationMs,
-      });
+        ip_address: event.ipAddress,
+        user_agent: event.userAgent,
+      };
+      logger.log("INFO", event.event, context, details);
     });
     this.now = options.now ?? Date.now;
   }
@@ -47,6 +52,9 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
     const startedAt = this.now();
     const requestId = req.header("x-request-id") ?? randomUUID();
     const correlationId = req.header("x-correlation-id") ?? requestId;
+    const requestWithContext = req as Request & { context?: { tenantId?: string; userId?: string } };
+    const clientIp = req.ip;
+    const userAgent = req.header("user-agent") ?? undefined;
 
     if (typeof res.setHeader === "function") {
       res.setHeader("X-Request-Id", requestId);
@@ -67,6 +75,8 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
           durationMs,
           tenantId: context?.tenantId,
           userId: context?.userId,
+          ipAddress: clientIp,
+          userAgent,
         });
       } catch {
         // Observability must never affect request lifecycle.
