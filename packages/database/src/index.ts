@@ -1,5 +1,3 @@
-export const DATABASE_SCHEMA_VERSION = 31;
-
 export interface TenantScopedRecord {
   id: string;
   tenantId: string;

@@ -70,7 +70,7 @@ async function provisionFixtures(
     await client.query(
       `insert into durable_jobs
        (id, tenant_id, job_type, payload, status, attempts, max_attempts, available_at, created_at, updated_at)
-       values ($1, $2, 'system.noop', '{"tenant":"a"}', 'pending', 0, 3, now(), now(), now())`,
+       values ($1, $2, 'test.job', '{"tenant":"a"}', 'pending', 0, 3, now(), now(), now())`,
       [durableJobId, tenantA],
     );
     await client.query("commit");
