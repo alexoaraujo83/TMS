@@ -83,7 +83,15 @@ if (!databaseUrl) {
           }],
           ["external.webhook", createDurableWebhookHandler(webhookPublisher)],
         ]),
-        { onTelemetry: (event) => logger.log("INFO", "durable_job.telemetry", {}, event as Record<string, unknown>) },
+        { onTelemetry: (event) => logger.log("INFO", "durable_job.telemetry", {}, {
+          job_id: event.jobId,
+          job_type: event.jobType,
+          tenant_id: event.tenantId,
+          status: event.status,
+          attempt: event.attempt,
+          duration_ms: event.durationMs,
+          error_code: event.errorCode,
+        }) },
       );
 
       let shuttingDown = false;
