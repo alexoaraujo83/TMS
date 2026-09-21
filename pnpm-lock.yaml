@@ -41,6 +41,9 @@ importers:
       '@tms/matching':
         specifier: workspace:*
         version: link:../../packages/matching
+      '@tms/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@tms/security':
         specifier: workspace:*
         version: link:../../packages/security
@@ -134,6 +137,15 @@ importers:
       tsx:
         specifier: 4.20.3
         version: 4.20.3
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
+  packages/observability:
+    devDependencies:
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
       typescript:
         specifier: 6.0.3
         version: 6.0.3
