@@ -84,6 +84,7 @@ test("uses DB membership instead of JWT permissions", async () => {
   assert.equal(result, true);
   assert.deepEqual(request.context, {
     requestId: "",
+    correlationId: "",
     userId: USER_ID,
     tenantId: TENANT_A,
     roles: ["operator"],
