@@ -11,9 +11,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test test/*.test.ts"
   },
-  "dependencies": {
-    "@tms/shared": "workspace:*"
-  },
   "devDependencies": {
     "typescript": "6.0.3"
   }
