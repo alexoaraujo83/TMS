@@ -144,7 +144,9 @@ export default function HomePage() {
       setFreight({
         ...statusBody,
         id: freightId,
-        eventId:\n          statusBody.eventId ??\n          (typeof statusBody.event_id === "string" ? statusBody.event_id : undefined),
+        eventId:
+          statusBody.eventId ??
+          (typeof statusBody.event_id === "string" ? statusBody.event_id : undefined),
       });
       logFrontendEvent("INFO", "web.freight.runtime_smoke.completed", {}, {
         freight_id: freightId,
