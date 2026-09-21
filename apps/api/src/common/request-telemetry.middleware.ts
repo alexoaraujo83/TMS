@@ -48,8 +48,10 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
     const requestId = req.header("x-request-id") ?? randomUUID();
     const correlationId = req.header("x-correlation-id") ?? requestId;
 
-    res.setHeader("X-Request-Id", requestId);
-    res.setHeader("X-Correlation-Id", correlationId);
+    if (typeof res.setHeader === "function") {
+      res.setHeader("X-Request-Id", requestId);
+      res.setHeader("X-Correlation-Id", correlationId);
+    }
 
     res.once("finish", () => {
       const durationMs = Math.max(0, this.now() - startedAt);
