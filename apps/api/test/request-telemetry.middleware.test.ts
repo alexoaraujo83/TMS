@@ -50,6 +50,10 @@ test("emits completion telemetry with request correlation and duration", () => {
       path: "/health",
       statusCode: 204,
       durationMs: 42,
+      tenantId: undefined,
+      userId: undefined,
+      ipAddress: undefined,
+      userAgent: undefined,
     },
   ]);
 });
