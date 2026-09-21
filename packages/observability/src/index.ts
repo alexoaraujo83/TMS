@@ -1,11 +1,11 @@
 export type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" | "CRITICAL";
 
 export interface LogContext {
-  requestId?: string;
-  correlationId?: string;
-  tenantId?: string;
-  userId?: string;
-  subject?: string;
+  requestId?: string | undefined;
+  correlationId?: string | undefined;
+  tenantId?: string | undefined;
+  userId?: string | undefined;
+  subject?: string | undefined;
   [key: string]: unknown;
 }
 
@@ -39,11 +39,11 @@ export interface StructuredLog {
   event: string;
   service: string;
   environment: string;
-  request_id?: string;
-  correlation_id?: string;
-  tenant_id?: string;
-  user_id?: string;
-  subject?: string;
+  request_id?: string | undefined;
+  correlation_id?: string | undefined;
+  tenant_id?: string | undefined;
+  user_id?: string | undefined;
+  subject?: string | undefined;
   [key: string]: unknown;
 }
 
