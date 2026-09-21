@@ -1,0 +1,55 @@
+name: Database Migrations — Non-Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target GitHub Environment"
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-migrations-nonprod-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      TMS_ALLOW_EXISTING_SCHEMA_BASELINE: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.20.0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.24.0
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify non-production migration secret
+        run: |
+          test -n "${DATABASE_URL}" || {
+            echo "::error::GitHub Environment ${{ inputs.environment }} must define NEON_DATABASE_URL."
+            exit 1
+          }
+
+      - name: Apply database migrations
+        run: pnpm --filter @tms/database migrate
