@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { createLogger } from "@tms/observability";
 import { DurableJobProcessor } from "./durable-jobs-worker.js";
 import { PgDurableJobStore } from "./durable-jobs-store.js";
 import { OutboxProcessor } from "./outbox-worker.js";
@@ -9,82 +10,46 @@ import { normalizeDatabaseUrl } from "./database-url.js";
 import { parseTenantIds, positiveIntegerEnv } from "./config.js";
 import { assertConfiguredTenantsAreActive } from "./tenant-config.js";
 
-async function assertRuntimeRole(pool: Pool): Promise<void> {
-  const result = await pool.query<{ current_user: string }>(
-    "select current_user",
-  );
+const logger = createLogger({ service: process.env.LOG_SERVICE ?? "tms-worker" });
 
-  if (result.rows[0]?.current_user !== "tms_app") {
-    throw new Error("DATABASE_RUNTIME_ROLE_INVALID");
-  }
+async function assertRuntimeRole(pool: Pool): Promise<void> {
+  const result = await pool.query<{ current_user: string }>("select current_user");
+  if (result.rows[0]?.current_user !== "tms_app") throw new Error("DATABASE_RUNTIME_ROLE_INVALID");
 }
 
 const databaseUrl = process.env.DATABASE_URL;
 const tenantIds = parseTenantIds(process.env.OUTBOX_TENANT_IDS);
-const webhookUrls = (process.env.OUTBOX_WEBHOOK_URLS ?? "")
-  .split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
+const webhookUrls = (process.env.OUTBOX_WEBHOOK_URLS ?? "").split(",").map((value) => value.trim()).filter(Boolean);
 const intervalMs = positiveIntegerEnv("OUTBOX_POLL_INTERVAL_MS", 5000);
 const batchSize = positiveIntegerEnv("OUTBOX_BATCH_SIZE", 50);
 const webhookTimeoutMs = positiveIntegerEnv("OUTBOX_WEBHOOK_TIMEOUT_MS", 10000);
 const durableJobsEnabled = process.env.DURABLE_JOBS_ENABLED === "true";
 
-const startedAt = new Date().toISOString();
-console.log(
-  JSON.stringify({
-    service: "tms-worker",
-    status: "started",
-    startedAt,
-    configuredTenants: tenantIds.length,
-    durableJobsEnabled,
-    intervalMs,
-    batchSize,
-    webhookEndpoints: webhookUrls.length,
-  }),
-);
+logger.log("INFO", "service.started", {}, {
+  configured_tenants: tenantIds.length,
+  durable_jobs_enabled: durableJobsEnabled,
+  interval_ms: intervalMs,
+  batch_size: batchSize,
+  webhook_endpoints: webhookUrls.length,
+});
 
 if (!databaseUrl) {
-  console.log(
-    JSON.stringify({
-      service: "tms-worker",
-      status: "idle",
-      reason: "DATABASE_URL is not configured",
-    }),
-  );
+  logger.log("WARN", "worker.idle", {}, { reason: "DATABASE_URL is not configured" });
 } else {
   const pool = new Pool({ connectionString: normalizeDatabaseUrl(databaseUrl) });
 
   const startup = async () => {
     try {
       await assertRuntimeRole(pool);
-      console.log(
-        JSON.stringify({
-          service: "tms-worker",
-          event: "database.runtime_role_verified",
-          role: "tms_app",
-        }),
-      );
+      logger.log("INFO", "database.runtime_role_verified", {}, { role: "tms_app" });
 
       await assertConfiguredTenantsAreActive(pool, tenantIds);
       if (tenantIds.length > 0) {
-        console.log(
-          JSON.stringify({
-            service: "tms-worker",
-            event: "worker.tenants_verified",
-            configuredTenants: tenantIds.length,
-          }),
-        );
+        logger.log("INFO", "worker.tenants_verified", {}, { configured_tenants: tenantIds.length });
       }
 
       if (tenantIds.length === 0) {
-        console.log(
-          JSON.stringify({
-            service: "tms-worker",
-            status: "idle",
-            reason: "OUTBOX_TENANT_IDS is not configured",
-          }),
-        );
+        logger.log("WARN", "worker.idle", {}, { reason: "OUTBOX_TENANT_IDS is not configured" });
         return;
       }
 
@@ -98,39 +63,27 @@ if (!databaseUrl) {
           await webhookPublisher.publish(event);
           return;
         }
-
-        console.log(
-          JSON.stringify({
-            event: "outbox.dispatch",
-            eventId: event.id,
-            eventType: event.eventType,
-            tenantId: event.tenantId,
-          }),
-        );
+        logger.log("INFO", "outbox.dispatch", {}, {
+          event_id: event.id,
+          event_type: event.eventType,
+          tenant_id: event.tenantId,
+        });
       });
 
       const durableJobStore = new PgDurableJobStore(pool);
       const durableJobProcessor = new DurableJobProcessor(
         durableJobStore,
         new Map([
-          [
-            "system.noop",
-            async (job) => {
-              console.log(
-                JSON.stringify({
-                  event: "durable_job.execute",
-                  jobId: job.id,
-                  jobType: job.jobType,
-                  tenantId: job.tenantId,
-                }),
-              );
-            },
-          ],
+          ["system.noop", async (job) => {
+            logger.log("INFO", "durable_job.execute", {}, {
+              job_id: job.id,
+              job_type: job.jobType,
+              tenant_id: job.tenantId,
+            });
+          }],
           ["external.webhook", createDurableWebhookHandler(webhookPublisher)],
         ]),
-        {
-          onTelemetry: (event) => console.log(JSON.stringify(event)),
-        },
+        { onTelemetry: (event) => logger.log("INFO", "durable_job.telemetry", {}, event as Record<string, unknown>) },
       );
 
       let shuttingDown = false;
@@ -138,105 +91,57 @@ if (!databaseUrl) {
 
       const run = async () => {
         if (shuttingDown || activeRun) return;
-
         const execution = (async () => {
           const runStartedAt = Date.now();
           try {
             for (const tenantId of tenantIds) {
               if (shuttingDown) break;
-
-              const outboxResult = await outboxProcessor.process(
-                tenantId,
-                batchSize,
-              );
+              const outboxResult = await outboxProcessor.process(tenantId, batchSize);
               if (outboxResult.claimed > 0) {
-                console.log(
-                  JSON.stringify({
-                    event: "outbox.processed",
-                    tenantId,
-                    durationMs: Date.now() - runStartedAt,
-                    ...outboxResult,
-                  }),
-                );
+                logger.log("INFO", "outbox.processed", { tenantId }, {
+                  duration_ms: Date.now() - runStartedAt,
+                  ...outboxResult,
+                });
               }
-
               if (durableJobsEnabled && !shuttingDown) {
-                const durableJobResult = await durableJobProcessor.process(
-                  tenantId,
-                  batchSize,
-                );
+                const durableJobResult = await durableJobProcessor.process(tenantId, batchSize);
                 if (durableJobResult.claimed > 0) {
-                  console.log(
-                    JSON.stringify({
-                      event: "durable_job.processed",
-                      tenantId,
-                      durationMs: Date.now() - runStartedAt,
-                      ...durableJobResult,
-                    }),
-                  );
+                  logger.log("INFO", "durable_job.processed", { tenantId }, {
+                    duration_ms: Date.now() - runStartedAt,
+                    ...durableJobResult,
+                  });
                 }
               }
             }
           } catch (error) {
-            console.error(
-              JSON.stringify({
-                event: "worker.error",
-                error: error instanceof Error ? error.message : String(error),
-                durationMs: Date.now() - runStartedAt,
-              }),
-            );
+            logger.log("ERROR", "worker.error", {}, {
+              error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+              duration_ms: Date.now() - runStartedAt,
+            });
           }
         })();
-
         activeRun = execution;
-        try {
-          await execution;
-        } finally {
-          activeRun = null;
-        }
+        try { await execution; } finally { activeRun = null; }
       };
 
       const timer = setInterval(() => void run(), intervalMs);
-
       const shutdown = async (signal: string) => {
         if (shuttingDown) return;
         shuttingDown = true;
         clearInterval(timer);
-
-        console.log(
-          JSON.stringify({
-            service: "tms-worker",
-            status: "stopping",
-            signal,
-          }),
-        );
-
-        if (activeRun) {
-          await activeRun;
-        }
-
+        logger.log("INFO", "service.stopping", {}, { signal });
+        if (activeRun) await activeRun;
         await pool.end();
-
-        console.log(
-          JSON.stringify({
-            service: "tms-worker",
-            status: "stopped",
-          }),
-        );
+        logger.log("INFO", "service.stopped");
       };
 
       process.once("SIGINT", () => void shutdown("SIGINT"));
       process.once("SIGTERM", () => void shutdown("SIGTERM"));
-
       await run();
     } catch (error) {
-      console.error(
-        JSON.stringify({
-          service: "tms-worker",
-          event: "worker.startup_failed",
-          error: error instanceof Error ? error.message : String(error),
-        }),
-      );
+      logger.log("CRITICAL", "worker.startup_failed", {}, {
+        error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+      });
       await pool.end();
       process.exitCode = 1;
     }
