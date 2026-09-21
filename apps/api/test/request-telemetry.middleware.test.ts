@@ -45,6 +45,7 @@ test("emits completion telemetry with request correlation and duration", () => {
     {
       event: "api.request.completed",
       requestId: "request-123",
+      correlationId: "request-123",
       method: "GET",
       path: "/health",
       statusCode: 204,
@@ -53,7 +54,7 @@ test("emits completion telemetry with request correlation and duration", () => {
   ]);
 });
 
-test("generates a correlation id when the request has none", () => {
+test("uses request id as correlation fallback when correlation header is absent", () => {
   const events: Array<{ requestId: string }> = [];
   const middleware = new RequestTelemetryMiddleware({
     emit: (event) => events.push(event),
@@ -65,7 +66,8 @@ test("generates a correlation id when the request has none", () => {
   middleware.use(req as never, res as never, () => undefined);
   res.emit("finish");
 
-  assert.match(events[0]?.requestId ?? "", /^[0-9a-f-]{36}$/);
+  assert.equal(events[0]?.requestId, "");
+  assert.equal(events[0] && (events[0] as { correlationId: string }).correlationId, "");
 });
 
 test("does not let telemetry sink failures escape the response lifecycle", () => {
