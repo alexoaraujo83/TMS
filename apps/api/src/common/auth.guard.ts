@@ -30,48 +30,29 @@ export class AuthGuard implements CanActivate {
     const request = executionContext.switchToHttp().getRequest<RequestLike>();
     const authorization = headerValue(request, "authorization");
 
-    if (!authorization?.startsWith("Bearer ")) {
-      throw new UnauthorizedException("Authentication required");
-    }
+    if (!authorization?.startsWith("Bearer ")) throw new UnauthorizedException("Authentication required");
 
     const token = authorization.slice("Bearer ".length).trim();
     const issuer = process.env.AUTH0_ISSUER_BASE_URL;
     const audience = process.env.AUTH0_AUDIENCE;
     const jwksUrl = process.env.AUTH0_JWKS_URL;
-
-    if (!issuer || !audience) {
-      throw new UnauthorizedException("OIDC verification is not configured");
-    }
+    if (!issuer || !audience) throw new UnauthorizedException("OIDC verification is not configured");
 
     try {
-      const claims = await verifyAccessToken(token, {
-        issuer,
-        audience,
-        jwksUrl,
-      });
-
-      if (!claims.tenantId) {
-        throw new UnauthorizedException("Tenant claim is required");
-      }
+      const claims = await verifyAccessToken(token, { issuer, audience, jwksUrl });
+      if (!claims.tenantId) throw new UnauthorizedException("Tenant claim is required");
 
       const requestedTenantId = headerValue(request, "x-tenant-id");
       if (requestedTenantId && requestedTenantId !== claims.tenantId) {
-        throw new ForbiddenException(
-          "Tenant header does not match the authenticated tenant claim",
-        );
+        throw new ForbiddenException("Tenant header does not match the authenticated tenant claim");
       }
 
-      const membership = await verifyTenantMembership(
-        this.pool,
-        claims.sub,
-        claims.tenantId,
-      );
-      if (!membership?.active) {
-        throw new ForbiddenException("Active tenant membership required");
-      }
+      const membership = await verifyTenantMembership(this.pool, claims.sub, claims.tenantId);
+      if (!membership?.active) throw new ForbiddenException("Active tenant membership required");
 
       request.context = {
         requestId: headerValue(request, "x-request-id") ?? "",
+        correlationId: headerValue(request, "x-correlation-id") ?? headerValue(request, "x-request-id") ?? "",
         userId: membership.userId,
         tenantId: membership.tenantId,
         roles: [membership.role],
@@ -79,12 +60,7 @@ export class AuthGuard implements CanActivate {
       };
       return true;
     } catch (error) {
-      if (
-        error instanceof UnauthorizedException ||
-        error instanceof ForbiddenException
-      ) {
-        throw error;
-      }
+      if (error instanceof UnauthorizedException || error instanceof ForbiddenException) throw error;
       throw new UnauthorizedException("Invalid access token");
     }
   }
