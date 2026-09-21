@@ -49,7 +49,7 @@ Current topology:
 - tms-backup-worker — PRESERVE
 - legacy backup-worker — REMOVED
 
-tms-worker current-main deployment parity: PASS for deployment status. Deployment e1db84a3-9e75-4174-8370-104682bc366f is SUCCESS on commit 896a122. Runtime evidence shows durableJobsEnabled=true, configuredTenants=1, runtime role tms_app, and a durable_job.batch_completed observation with claimed=0/completed=0/failed=0. BLK-WORKER-01 remains open only for the missing/unproven business-specific freight event → durable-job contract.
+tms-worker current-main deployment parity: PASS for deployment status. Deployment e1db84a3-9e75-4174-8370-104682bc366f is SUCCESS on commit 896a122. Runtime evidence shows durableJobsEnabled=true, configuredTenants=1, runtime role tms_app, and a durable_job.batch_completed observation with claimed=0/completed=0/failed=0. PR #63 now establishes the source-controlled business flow and idempotency contract; runtime proof remains open until migration 0033 is applied and a real freight status transition is observed end-to-end.
 
 tms-backup-worker latest deployment:
 - Deployment: 71784d43-8d6b-49a5-8838-03303438beda
@@ -181,7 +181,7 @@ Classification:
 | Auth0 Action source/deployment evidence | PASS | E3/E4 historical evidence |
 | Auth0 real-token E2E | OPEN/BLOCKER | AUTH0-REAL-TOKEN-01 |
 | Worker runtime durable jobs | PASS | e1db84a3, durableJobsEnabled=true |
-| Worker business event → durable job contract | OPEN/BLOCKER | BLK-WORKER-01 |
+| Worker business event → durable job contract | IMPLEMENTED / RUNTIME OPEN | PR #63 source path; runtime E3/E4 not yet proven |
 | CI exact-current-HEAD execution | PASS | GitHub Actions run 35554413967 / quality job 106195137392 |
 | Cross-tenant RLS E4 | OPEN/BLOCKER | BLK-RLS-E4-01 |
 | DR schema parity on isolated restore-proof branch | PASS | 31 migrations + validated 0030/0031 constraints |
@@ -192,9 +192,18 @@ Classification:
 
 ## Worker / Outbox gate
 
-Read-only source inspection confirms `FreightService.updateStatus()` records `freight.status_changed` through the freight repository, but no production caller was found that enqueues an outbox event or durable job for this transition. The worker supports `system.noop` and `external.webhook`; no source-of-truth `freight-status-changed` durable-job handler/type/payload was found.
+PR #63 establishes the source-controlled execution contract targeted by `BLK-WORKER-01`:
 
-`BLK-WORKER-01` therefore remains OPEN. Do not invent the event contract; the business event/job type and payload must be established from the authoritative domain contract before implementation.
+`freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`.
+
+Implemented source path:
+1. `FreightService.updateStatus()` passes the status transition through the freight repository.
+2. The freight transaction writes `freight.status_changed` to `outbox_events` atomically with the business change.
+3. The worker consumes the outbox event and creates `freight.status_changed` in `durable_jobs`, keyed idempotently by the outbox event ID.
+4. `freight-status-changed.handler.ts` validates tenant/freight/status and writes an idempotent audit completion record.
+5. Worker telemetry records the handler event and durable-job lifecycle/status/errorCode.
+
+Classification: **IMPLEMENTED / NOT RUNTIME-PROVEN**. Migration `0033_durable_job_idempotency.sql` and a real Neon/Railway execution are still required before E3/E4 promotion.
 
 ## Required next execution order
 
