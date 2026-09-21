@@ -1,9 +1,22 @@
-import { createLogger, type LogContext } from "@tms/observability";
+import {
+  createLogger,
+  type LogContext,
+  type LogLevel,
+} from "@tms/observability";
 
-const logger = createLogger({ service: "tms-web" });
+export function createFrontendLogger(
+  emit?: (line: string) => void,
+) {
+  return createLogger({
+    service: "tms-web",
+    emit,
+  });
+}
+
+const logger = createFrontendLogger();
 
 export function logFrontendEvent(
-  level: "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" | "CRITICAL",
+  level: LogLevel,
   event: string,
   context: LogContext = {},
   details: Record<string, unknown> = {},
