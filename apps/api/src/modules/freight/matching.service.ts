@@ -9,7 +9,6 @@ import type { BodyType, Freight, VehicleType } from "@tms/freight";
 import type { Pool } from "pg";
 import type { RequestContext } from "../../common/request-context.js";
 import { DATABASE_POOL } from "../../common/database.provider.js";
-import { assertMatchingTenant } from "../matching/matching.contracts.js";
 
 function toFreight(row: FreightRow): Freight {
   return {
@@ -102,7 +101,12 @@ export class MatchingService {
       available: record.availability === "available",
     }));
 
-    assertMatchingTenant(context.tenantId, freight, candidates);
+    if (context.tenantId !== freight.tenantId) {
+      throw new Error("Cross-tenant matching is forbidden");
+    }
+    if (candidates.some((candidate) => candidate.tenantId !== context.tenantId)) {
+      throw new Error("Cross-tenant matching candidate is forbidden");
+    }
     return rankCandidates(freight, candidates);
   }
 }
