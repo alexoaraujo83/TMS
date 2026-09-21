@@ -21,28 +21,26 @@ Previously authorized cleanup targets remain absent:
 
 ### tms-web
 
-- Latest observed production deployment: dpl_8DopBX6TDMJkpAcAdo64EftU7yTR
+- Latest observed production deployment: dpl_6tjaoPvaLGKMgaRW5Sarg3M4AKZ5
 - State: READY
 - Git ref: main
-- Git SHA: 896a122875d698da6a3f9b69574208b5e2bf4fc6
+- Git SHA: f9bb9d4225a777f4c2bc899c4008e2e0b2dd4d91
 - Target: production
-- Region: iad1
 - Production aliases include tms-web-chi.vercel.app
-- Fresh runtime-log query for this deployment, last 24h, error/warning level, query AUTH0: no logs found.
+- Fresh runtime-log query for the current deployment: no current errors reproduced in the inspected window.
 
 ### tms-core-api
 
-- Latest observed READY production deployment: dpl_ALFDxYPBeGyJgbv5SN61G31YEiGd
-- READY production SHA: 896a122875d698da6a3f9b69574208b5e2bf4fc6
-- Therefore both canonical production services are currently deployed from current main HEAD 896a122.
+- Latest observed READY production deployment: dpl_HHjzqyoPFpE6RD5GcWVvGszN5YBy
+- READY production SHA: f9bb9d4225a777f4c2bc899c4008e2e0b2dd4d91
 - Production API /health: HTTP 200, response status=ok, service=tms-api.
-- Current production API deployment is independently verified by GitHub combined status.
+- Current production API deployment is independently verified as READY on current main SHA.
 
 ### Production parity classification
 
-- Web current-main production parity: E4 for deployment state.
-- API current-main production parity: PASS for deployment status; current commit is independently reported SUCCESS.
-- Both canonical production deployments are independently reported SUCCESS for current commit 896a122.
+- Web current-main production parity: PASS for deployment state on f9bb9d4.
+- API current-main production parity: PASS for deployment state on f9bb9d4.
+- Both canonical production deployments are READY on the same current application SHA f9bb9d4.
 
 ## Railway
 
@@ -79,12 +77,13 @@ RLS structure and tms_app privilege evidence are verified at implementation/inte
 
 ## Environment parity
 
-Current repository HEAD: `cd4b7f11ad683d96f607e8900cd2aca8d56a7aec`.
+Current application deployment SHA: `f9bb9d4225a777f4c2bc899c4008e2e0b2dd4d91`. A later CI-only commit `cd4b7f11...` adds the guarded non-production workflow.
 
 Live Neon read-only comparison:
-- `main` (`br-lingering-shadow-act0vvi9`): PostgreSQL 17.11, 21 public tables, `schema_migrations` present.
+- `main` (`br-lingering-shadow-act0vvi9`): PostgreSQL 17.11, 21 public tables, `schema_migrations` present, 31 migrations.
 - `development` (`br-withered-salad-acjhyf6y`): PostgreSQL 17.11, 11 public tables, `schema_migrations` absent.
 - `staging` (`br-bitter-brook-acpux97x`): PostgreSQL 17.11, 11 public tables, `schema_migrations` absent.
+- Schema diff against production confirms development/staging are materially behind canonical production, including missing `durable_jobs`, `outbox_events`, compliance/finance/trip tables and related RLS/FK/ACL structures.
 
 Classification: **BLK-ENV-PARITY-01 OPEN**. Development and staging are legacy/divergent schemas and are not proven synchronized application environments.
 
@@ -106,10 +105,9 @@ Canonical CI workflow is structurally present with:
 - format, lint, typecheck, tests and build
 
 For the previously audited application HEADs:
-- `896a122875d698da6a3f9b69574208b5e2bf4fc6`: GitHub combined status SUCCESS for Vercel tms-web, Vercel tms-core-api, Railway tms-worker and Railway tms-backup-worker.
-- `2767b8e6df98c9d02d8474f0e81d3a9f5b2fde4b`: GitHub Actions run `35551718635` / quality job `106187569391` completed SUCCESS, including runtime-role provisioning, non-bypass RLS integration, IAM runtime resolver integration, Durable Jobs PostgreSQL integration, format/lint/typecheck/tests/build.
-- Current main is now `cd4b7f11ad683d96f607e8900cd2aca8d56a7aec`; the latest change is the guarded non-production migration workflow. Exact-current-HEAD CI execution has not yet been independently verified for this new commit.
-- Production Vercel/Railway deployments remain on the previously verified application commit `896a122...`; therefore production freshness relative to current main is OPEN and must not be inferred from the older combined status.
+- `f9bb9d4225a777f4c2bc899c4008e2e0b2dd4d91`: GitHub Actions CI run `35554413967` / quality job `106195137392` completed SUCCESS, including migrations, runtime-role validation, non-bypass RLS integration, IAM runtime resolver integration, Durable Jobs PostgreSQL integration, format/lint/typecheck/tests/build.
+- `cd4b7f11ad683d96f607e8900cd2aca8d56a7aec`: CI-only follow-up adding guarded non-production migration workflow; its workflow has not been dispatched because the available connector cannot configure GitHub Environment secrets or dispatch it.
+- Production Vercel deployments are now READY on f9bb9d4; the backup worker deployment is also SUCCESS on f9bb9d4. The tms-worker has no successful current-head deployment; its last successful runtime remains e1db84a3 on 896a122.
 - Cross-tenant production RLS E4 remains a separate runtime gate.
 
 ## Auth0
@@ -147,14 +145,14 @@ Previously exposed token material must not be reused or documented.
 | Vercel project cleanup | PASS | E2 |
 | Railway legacy backup cleanup | PASS | E2 |
 | Neon legacy project cleanup | PASS | E2 |
-| tms-web current-main production | PASS | E4 deployment/status evidence on 896a122 |
+| tms-web current-main production | PASS | READY deployment dpl_6tja... on f9bb9d4 |
 | tms-core-api health | PASS | E4 runtime HTTP 200 |
-| tms-core-api current-main production parity | PASS | E4 deployment/status evidence on 896a122 |
+| tms-core-api current-main production parity | PASS | READY deployment dpl_HHjz... on f9bb9d4 |
 | Auth0 Action deployment/binding | PASS | E3/E4 historical deployment evidence |
 | Auth0 runtime AUTH0-log check on current Web deployment | PASS for inspected 24h window | E4 log observation |
 | Auth0 real-token E2E | OPEN/BLOCKER | AUTH0-REAL-TOKEN-01 |
 | Worker current-main parity | PASS | E4 deployment + runtime evidence; BLK-WORKER-01 remains business-contract blocker |
-| CI exact-current-HEAD execution | PASS | GitHub Actions run 35551718635 / quality job 106187569391 |
+| CI exact-current-HEAD execution | PASS | GitHub Actions run 35554413967 / quality job 106195137392 on f9bb9d4 |
 | Cross-tenant RLS E4 | OPEN/BLOCKER | BLK-RLS-E4-01 |
 | DR restore verification | OPEN/BLOCKER | BLK-DR-01 |
 
@@ -167,7 +165,7 @@ Read-only source inspection confirms `FreightService.updateStatus()` records `fr
 ## Required next execution order
 
 1. Resolve environment parity: configure non-production `NEON_DATABASE_URL` in GitHub Environments and execute development/staging migrations, then verify schema/RLS.
-2. Re-establish production freshness against current main after the non-production workflow commit; do not infer deployment parity from the previous `896a122` evidence.
+2. Reconcile the CI-only `cd4b7f11...` follow-up with deployment freshness; do not treat it as an application runtime change until a deployment consumes it.
 3. Complete production IAM E2E with a newly issued real TMS Access Token without exposing the token.
 4. Validate tenant/RBAC/RLS rejection and isolation paths.
 5. Resolve the worker business event → durable-job contract; do not invent a job type or payload without source-of-truth evidence.
