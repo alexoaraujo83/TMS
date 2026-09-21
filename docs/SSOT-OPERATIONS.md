@@ -224,3 +224,64 @@ Classification: **E2/E3 CI-PROVEN / E4 RUNTIME OPEN**. The CI integration test p
 - Never mutate production data merely to manufacture evidence.
 - Preserve historical audit records and distinguish them from current state.
 - Do not delete Neon restore/DR branches without branch-level evidence and explicit authorization.
+
+
+## 2026-09-21 Continuation — BLK-WORKER-01 / PR #63
+
+### Repository / merge state
+
+- PR #63: **MERGED** into `main`.
+- Merge commit: `ab5bbd7b5eb7a208d3da010988d4b77e88e425c0`.
+- PR #63 CI head `71bc44047ebc47ad969cbcac72360e18f7964280`: GitHub Actions CI run `35578522056` completed **SUCCESS**.
+- CI status evidence included the worker freight-status integration step and the broader quality chain.
+- PR #62 remains **OPEN / IMPLEMENTED-NOT-VALIDATED-FOR-MERGE**; its Vercel failures are provider deployment-rate-limit evidence, not application build evidence.
+
+### Worker source/runtime reconciliation
+
+Source-controlled path after PR #63:
+`freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`.
+
+CI evidence:
+- Integration path passed: `1 passed, 0 failed, 0 skipped`.
+- Evidence level: **E2/E3 CI integration PROVEN**.
+- This does not promote the path to E4.
+
+Railway production:
+- Service: `tms-worker`.
+- Source: `alexoaraujo83/TMS`, branch `main`.
+- New deployment triggered from merge commit `ab5bbd7b5eb7a208d3da010988d4b77e88e425c0`.
+- Latest observed deployment state at SSOT update: **WAITING**; no deploy log emitted yet for this new deployment.
+- Previous successful deployment `e1db84a3-9e75-4174-8370-104682bc366f` remains the last completed runtime deployment observed before PR #63 merge.
+- Previous worker runtime logs prove the worker is alive and polling durable jobs, but the observed batches had `claimed=0`, `completed=0`, `failed=0`; they do not prove the new freight business event path.
+
+Neon production/main read-only evidence:
+- Branch: `br-lingering-shadow-act0vvi9` (`main`).
+- PostgreSQL 17.
+- `schema_migrations` currently ends at `0031_finance_relationship_invariants.sql`.
+- `0033_durable_job_idempotency.sql` is **not yet applied** to this production/main branch.
+- `outbox_events` exists and is currently empty.
+- `durable_jobs` exists and is currently empty.
+- `audit_events` exists and is currently empty for the inspected business-event path.
+- Therefore there is currently no production/main database row-chain proving `freight.status_changed → outbox → durable job → handler → audit`.
+
+### E4 boundary
+
+**BLK-WORKER-01 remains OPEN at E4.**
+
+Current classification:
+- Source implementation: E1.
+- CI integration execution: E2/E3 PROVEN.
+- Railway runtime service: E2 for worker liveness only.
+- Real production freight-event chain: E0/E1 for runtime evidence until a real, authorized status transition is processed after the required production schema/deployment reconciliation.
+- E4 requires a real runtime trace with tenant isolation and idempotency evidence; it must not be manufactured by direct production SQL.
+
+### New routing
+
+1. Confirm Railway deployment of merge commit `ab5bbd7...` reaches SUCCESS and emits the expected worker startup/telemetry logs.
+2. Reconcile/apply migration `0033_durable_job_idempotency.sql` to the intended runtime through the governed migration path; do not mark E4 before this is verified.
+3. Exercise an authorized real freight status transition through the application path, not by manually inserting outbox/job/audit rows.
+4. Verify the complete runtime chain and tenant/idempotency behavior from Neon + Railway evidence.
+5. Re-run regression/CI after any migration or runtime correction.
+6. Update Evidence Ledger and SSOT again.
+
+This section supersedes earlier statements in this document that treated PR #63 as merely pending source integration; PR #63 is now merged, while E4 runtime proof remains open.
