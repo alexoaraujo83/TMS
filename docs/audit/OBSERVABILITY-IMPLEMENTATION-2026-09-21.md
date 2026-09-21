@@ -2,7 +2,7 @@
 
 ## Scope
 
-Applied against canonical repository alexoaraujo83/TMS, branch feat/centralized-observability.
+Applied against canonical repository alexoaraujo83/TMS, worker follow-up branch fix/blk-worker-01-freight-status-flow-2026-09-21, based on the PR #62 head.
 
 ## Existing baseline reused
 
@@ -24,6 +24,9 @@ The implementation therefore extends existing primitives instead of creating dup
 - Added automated redaction and structured-log tests.
 - Updated request telemetry/auth context tests.
 - Added observability documentation.
+- Added the real `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry` path.
+- Added durable-job idempotency keyed by outbox event ID.
+- Added handler replay protection and automated handler coverage.
 
 ## Evidence level
 
@@ -36,9 +39,9 @@ The implementation therefore extends existing primitives instead of creating dup
 | Access telemetry | INTEGRATED | API completion middleware |
 | Audit persistence | INTEGRATED | existing audit repository + migration |
 | Audit RLS | EXISTING / PRESERVED | migration 0008 |
-| Worker logging | EXISTING / PARTIAL CENTRALIZATION | worker emits JSON but full package migration remains |
-| Frontend logging | NOT YET VALIDATED | no runtime evidence |
-| Runtime production validation | NOT YET PROVEN | CI/runtime execution pending |
+| Worker logging | INTEGRATED / PARTIAL VALIDATION | centralized logger plus durable/outbox telemetry and status handler |
+| Frontend logging | IMPLEMENTED / NOT RUNTIME-VALIDATED | PR #62 source/tests; Vercel preview blocked by provider rate limit |
+| BLK-WORKER-01 | IMPLEMENTED / NOT RUNTIME-PROVEN | PR #63 source path + handler test; real Neon/Railway execution pending |
 
 ## Next validation
 
