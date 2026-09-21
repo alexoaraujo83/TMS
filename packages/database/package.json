@@ -13,7 +13,6 @@
     "migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
-    "@tms/shared": "workspace:*",
     "pg": "8.23.0"
   },
   "devDependencies": {
