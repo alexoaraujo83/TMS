@@ -52,7 +52,6 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
     const startedAt = this.now();
     const requestId = req.header("x-request-id") ?? randomUUID();
     const correlationId = req.header("x-correlation-id") ?? requestId;
-    const requestWithContext = req as Request & { context?: { tenantId?: string; userId?: string } };
     const clientIp = req.ip;
     const userAgent = req.header("user-agent") ?? undefined;
 
