@@ -12,6 +12,10 @@ interface SessionState {
 interface FreightResult {
   id?: string;
   eventId?: string;
+  event_id?: unknown;
+  freightId?: string;
+  message?: unknown;
+  error?: unknown;
   [key: string]: unknown;
 }
 
@@ -140,7 +144,7 @@ export default function HomePage() {
       setFreight({
         ...statusBody,
         id: freightId,
-        eventId: statusBody.eventId ?? statusBody.event_id,
+        eventId:\n          statusBody.eventId ??\n          (typeof statusBody.event_id === "string" ? statusBody.event_id : undefined),
       });
       logFrontendEvent("INFO", "web.freight.runtime_smoke.completed", {}, {
         freight_id: freightId,
