@@ -46,3 +46,7 @@ The implementation therefore extends existing primitives instead of creating dup
 ## Next validation
 
 Run format, lint, typecheck, tests and build through CI. Then perform runtime smoke validation and update the SSOT/evidence ledger.
+
+## CI validation trigger
+
+PR #63 is now targeted at `main` so the canonical GitHub CI workflow can validate the combined observability/worker change set. No CI result is promoted until an actual workflow run is observed.
