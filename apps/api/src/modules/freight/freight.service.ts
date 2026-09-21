@@ -92,6 +92,7 @@ export class FreightService {
           action: "freight.status_changed",
           entityType: "freight",
           requestId: context.requestId,
+          correlationId: context.correlationId,
           beforeState: { status: currentStatus },
           afterState: { status: dto.status },
         },
