@@ -77,6 +77,21 @@ Live main read-only evidence previously observed:
 
 RLS structure and tms_app privilege evidence are verified at implementation/integration level; cross-tenant production E4 remains open (BLK-RLS-E4-01).
 
+## Environment parity
+
+Current repository HEAD: `cd4b7f11ad683d96f607e8900cd2aca8d56a7aec`.
+
+Live Neon read-only comparison:
+- `main` (`br-lingering-shadow-act0vvi9`): PostgreSQL 17.11, 21 public tables, `schema_migrations` present.
+- `development` (`br-withered-salad-acjhyf6y`): PostgreSQL 17.11, 11 public tables, `schema_migrations` absent.
+- `staging` (`br-bitter-brook-acpux97x`): PostgreSQL 17.11, 11 public tables, `schema_migrations` absent.
+
+Classification: **BLK-ENV-PARITY-01 OPEN**. Development and staging are legacy/divergent schemas and are not proven synchronized application environments.
+
+A guarded workflow was added at `.github/workflows/database-migrate-nonprod.yml` in commit `cd4b7f11...`. It accepts only `development` or `staging`, reads `NEON_DATABASE_URL` from the selected GitHub Environment, and runs the canonical database migration command with the existing-schema baseline guard. The workflow has **not** been executed: the available GitHub connector cannot configure/read GitHub Environment secrets or dispatch this workflow. No production secret was reused and no database mutation was performed.
+
+Environment parity therefore remains OPEN until non-production credentials are configured, migrations execute successfully, and both schemas are revalidated.
+
 ## CI/CD
 
 Canonical CI workflow is structurally present with:
@@ -90,11 +105,12 @@ Canonical CI workflow is structurally present with:
 - Durable Jobs PostgreSQL integration
 - format, lint, typecheck, tests and build
 
-For current main SHA 896a122875d698da6a3f9b69574208b5e2bf4fc6:
-- GitHub combined status: SUCCESS for Vercel tms-web, Vercel tms-core-api, Railway tms-worker and Railway tms-backup-worker.
-- GitHub Actions run 35551718635 (run #986) is the exact SHA 2767b8e6df98c9d02d8474f0e81d3a9f5b2fde4b and completed SUCCESS.
-- The quality job completed successfully, including runtime-role provisioning, non-bypass RLS integration, IAM runtime resolver integration, Durable Jobs PostgreSQL integration, format/lint/typecheck/tests/build.
-- Therefore CI execution is now verified for the current HEAD. This does not promote production cross-tenant RLS to E4; that remains a separate runtime gate.
+For the previously audited application HEADs:
+- `896a122875d698da6a3f9b69574208b5e2bf4fc6`: GitHub combined status SUCCESS for Vercel tms-web, Vercel tms-core-api, Railway tms-worker and Railway tms-backup-worker.
+- `2767b8e6df98c9d02d8474f0e81d3a9f5b2fde4b`: GitHub Actions run `35551718635` / quality job `106187569391` completed SUCCESS, including runtime-role provisioning, non-bypass RLS integration, IAM runtime resolver integration, Durable Jobs PostgreSQL integration, format/lint/typecheck/tests/build.
+- Current main is now `cd4b7f11ad683d96f607e8900cd2aca8d56a7aec`; the latest change is the guarded non-production migration workflow. Exact-current-HEAD CI execution has not yet been independently verified for this new commit.
+- Production Vercel/Railway deployments remain on the previously verified application commit `896a122...`; therefore production freshness relative to current main is OPEN and must not be inferred from the older combined status.
+- Cross-tenant production RLS E4 remains a separate runtime gate.
 
 ## Auth0
 
@@ -142,14 +158,22 @@ Previously exposed token material must not be reused or documented.
 | Cross-tenant RLS E4 | OPEN/BLOCKER | BLK-RLS-E4-01 |
 | DR restore verification | OPEN/BLOCKER | BLK-DR-01 |
 
+## Worker / Outbox gate
+
+Read-only source inspection confirms `FreightService.updateStatus()` records `freight.status_changed` through the freight repository, but no production caller was found that enqueues an outbox event or durable job for this transition. The worker supports `system.noop` and `external.webhook`; no source-of-truth `freight-status-changed` durable-job handler/type/payload was found.
+
+`BLK-WORKER-01` therefore remains OPEN. Do not invent the event contract; the business event/job type and payload must be established from the authoritative domain contract before implementation.
+
 ## Required next execution order
 
-1. Complete production IAM E2E with a newly issued real TMS Access Token without exposing the token.
-2. Validate tenant/RBAC/RLS rejection and isolation paths.
-3. Resolve the worker business event → durable-job contract; do not invent a job type or payload without source-of-truth evidence.
-4. Execute isolated backup restore verification against the current encrypted backup.
-5. Run final regression and update the evidence ledger/SSOT.
-6. Only then evaluate Final DoD.
+1. Resolve environment parity: configure non-production `NEON_DATABASE_URL` in GitHub Environments and execute development/staging migrations, then verify schema/RLS.
+2. Re-establish production freshness against current main after the non-production workflow commit; do not infer deployment parity from the previous `896a122` evidence.
+3. Complete production IAM E2E with a newly issued real TMS Access Token without exposing the token.
+4. Validate tenant/RBAC/RLS rejection and isolation paths.
+5. Resolve the worker business event → durable-job contract; do not invent a job type or payload without source-of-truth evidence.
+6. Execute isolated backup restore verification against the current encrypted backup.
+7. Run final regression and update the evidence ledger/SSOT.
+8. Only then evaluate Final DoD.
 
 ## Safety rules
 
