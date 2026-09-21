@@ -21,10 +21,10 @@ Previously authorized cleanup targets remain absent:
 
 ### tms-web
 
-- Latest observed production deployment: dpl_73x4yrEr5ZAaq3HKXWkcSRhAo9Bc
+- Latest observed production deployment: dpl_8DopBX6TDMJkpAcAdo64EftU7yTR
 - State: READY
 - Git ref: main
-- Git SHA: ec67b9879f478eee1f2fd7d19f378113e2c41f61
+- Git SHA: 896a122875d698da6a3f9b69574208b5e2bf4fc6
 - Target: production
 - Region: iad1
 - Production aliases include tms-web-chi.vercel.app
@@ -32,17 +32,17 @@ Previously authorized cleanup targets remain absent:
 
 ### tms-core-api
 
-- Latest observed READY production deployment: dpl_Gmv3sHbNDqdAXoJ7t4QL6dFfnkNN
-- READY production SHA: ec67b9879f478eee1f2fd7d19f378113e2c41f61
-- Therefore both canonical production services are currently deployed from the current main HEAD ec67b987.
+- Latest observed READY production deployment: dpl_ALFDxYPBeGyJgbv5SN61G31YEiGd
+- READY production SHA: 896a122875d698da6a3f9b69574208b5e2bf4fc6
+- Therefore both canonical production services are currently deployed from current main HEAD 896a122.
 - Production API /health: HTTP 200, response status=ok, service=tms-api.
-- This documentation-only Web commit does not itself establish a need for an API redeploy; production API freshness remains separately tracked.
+- Current production API deployment is independently verified by GitHub combined status.
 
 ### Production parity classification
 
 - Web current-main production parity: E4 for deployment state.
-- API current-main production parity: OPEN; latest READY production is one documentation commit behind.
-- Do not claim both production services run the same SHA.
+- API current-main production parity: PASS for deployment status; current commit is independently reported SUCCESS.
+- Both canonical production deployments are independently reported SUCCESS for current commit 896a122.
 
 ## Railway
 
@@ -51,7 +51,7 @@ Current topology:
 - tms-backup-worker — PRESERVE
 - legacy backup-worker — REMOVED
 
-tms-worker current-main deployment parity remains BLOCKED (BLK-WORKER-01): Railway's latest deployment is SKIPPED without a reusable build snapshot. Previous successful deployment evidence remains historical and is not promoted to current-main parity.
+tms-worker current-main deployment parity: PASS for deployment status. Deployment e1db84a3-9e75-4174-8370-104682bc366f is SUCCESS on commit 896a122. Runtime evidence shows durableJobsEnabled=true, configuredTenants=1, runtime role tms_app, and a durable_job.batch_completed observation with claimed=0/completed=0/failed=0. BLK-WORKER-01 remains open only for the missing/unproven business-specific freight event → durable-job contract.
 
 tms-backup-worker latest successful backup evidence remains verified:
 - backup_status=verified
@@ -90,10 +90,10 @@ Canonical CI workflow is structurally present with:
 - Durable Jobs PostgreSQL integration
 - format, lint, typecheck, tests and build
 
-For current main SHA ec67b9879f478eee1f2fd7d19f378113e2c41f61:
-- GitHub Actions CI run 35534534067 (#984): SUCCESS.
-- Event: push to main; workflow: .github/workflows/ci.yml.
-- Therefore current-main CI execution is directly verified for this SHA.
+For current main SHA 896a122875d698da6a3f9b69574208b5e2bf4fc6:
+- GitHub combined status: SUCCESS for Vercel tms-web, Vercel tms-core-api, Railway tms-worker and Railway tms-backup-worker.
+- GitHub workflow-run lookup for this exact SHA returned no workflow-run evidence.
+- Therefore deployment/status checks are verified, but exact-SHA GitHub Actions execution is not promoted to PASS.
 
 ## Auth0
 
@@ -130,21 +130,21 @@ Previously exposed token material must not be reused or documented.
 | Vercel project cleanup | PASS | E2 |
 | Railway legacy backup cleanup | PASS | E2 |
 | Neon legacy project cleanup | PASS | E2 |
-| tms-web current-main production | PASS | E4 deployment evidence on ec67b987 |
+| tms-web current-main production | PASS | E4 deployment/status evidence on 896a122 |
 | tms-core-api health | PASS | E4 runtime HTTP 200 |
-| tms-core-api current-main production parity | PASS | READY production deployment dpl_Gmv3sHbNDqdAXoJ7t4QL6dFfnkNN runs ec67b987 |
+| tms-core-api current-main production parity | PASS | E4 deployment/status evidence on 896a122 |
 | Auth0 Action deployment/binding | PASS | E3/E4 historical deployment evidence |
 | Auth0 runtime AUTH0-log check on current Web deployment | PASS for inspected 24h window | E4 log observation |
 | Auth0 real-token E2E | OPEN/BLOCKER | AUTH0-REAL-TOKEN-01 |
-| Worker current-main parity | OPEN/BLOCKER | BLK-WORKER-01 |
+| Worker current-main parity | PASS | E4 deployment + runtime evidence; BLK-WORKER-01 remains business-contract blocker |
 | Cross-tenant RLS E4 | OPEN/BLOCKER | BLK-RLS-E4-01 |
 | DR restore verification | OPEN/BLOCKER | BLK-DR-01 |
 
 ## Required next execution order
 
-1. Obtain a newly issued real TMS Access Token and perform production IAM E2E without exposing the token.
+1. Complete production IAM E2E with a newly issued real TMS Access Token without exposing the token.
 2. Validate tenant/RBAC/RLS rejection and isolation paths.
-3. Resolve worker current-main deployment parity using a supported Railway deployment path; do not create artificial trigger commits.
+3. Resolve the worker business event → durable-job contract; do not invent a job type or payload without source-of-truth evidence.
 4. Execute isolated backup restore verification against the current encrypted backup.
 5. Run final regression and update the evidence ledger/SSOT.
 6. Only then evaluate Final DoD.
