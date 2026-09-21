@@ -66,8 +66,8 @@ test("uses request id as correlation fallback when correlation header is absent"
   middleware.use(req as never, res as never, () => undefined);
   res.emit("finish");
 
-  assert.equal(events[0]?.requestId, "");
-  assert.equal(events[0] && (events[0] as { correlationId: string }).correlationId, "");
+  assert.match(events[0]?.requestId ?? "", /^[0-9a-f-]{36}$/);
+  assert.equal(events[0] && (events[0] as { correlationId: string }).correlationId, events[0]?.requestId);
 });
 
 test("does not let telemetry sink failures escape the response lifecycle", () => {
