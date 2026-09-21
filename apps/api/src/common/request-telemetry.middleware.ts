@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import type { NestMiddleware } from "@nestjs/common";
 import { createLogger, type LogContext } from "@tms/observability";
@@ -44,9 +45,10 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
 
   use(req: Request, res: Response, next: NextFunction): void {
     const startedAt = this.now();
-    const requestId = req.header("x-request-id") ?? "";
+    const requestId = req.header("x-request-id") ?? randomUUID();
     const correlationId = req.header("x-correlation-id") ?? requestId;
 
+    res.setHeader("X-Request-Id", requestId);
     res.setHeader("X-Correlation-Id", correlationId);
 
     res.once("finish", () => {
@@ -64,7 +66,9 @@ export class RequestTelemetryMiddleware implements NestMiddleware {
           tenantId: context?.tenantId,
           userId: context?.userId,
         });
-      } catch {}
+      } catch {
+        // Observability must never affect request lifecycle.
+      }
     });
     next();
   }
