@@ -1,17 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { logFrontendEvent } from "./logger.ts";
+import { createFrontendLogger } from "./logger.ts";
 
 test("emits frontend events with correlation fields and redacts secrets", () => {
   const lines: string[] = [];
-  const { createLogger } = require("@tms/observability");
-  const sink = createLogger({
-    service: "tms-web",
-    environment: "test",
-    emit: (line: string) => lines.push(line),
-  });
+  const logger = createFrontendLogger((line) => lines.push(line));
 
-  sink.log(
+  logger.log(
     "ERROR",
     "web.api.health.failed",
     { requestId: "req-1", correlationId: "corr-1" },
@@ -25,5 +20,4 @@ test("emits frontend events with correlation fields and redacts secrets", () => 
   assert.equal(record.Authorization, "[REDACTED]");
   assert.equal(record.password, "[REDACTED]");
   assert.equal(typeof record.timestamp, "string");
-  assert.equal(logFrontendEvent, logFrontendEvent);
 });
