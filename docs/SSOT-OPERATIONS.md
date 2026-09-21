@@ -92,8 +92,9 @@ Canonical CI workflow is structurally present with:
 
 For current main SHA 896a122875d698da6a3f9b69574208b5e2bf4fc6:
 - GitHub combined status: SUCCESS for Vercel tms-web, Vercel tms-core-api, Railway tms-worker and Railway tms-backup-worker.
-- GitHub workflow-run lookup for this exact SHA returned no workflow-run evidence.
-- Therefore deployment/status checks are verified, but exact-SHA GitHub Actions execution is not promoted to PASS.
+- GitHub Actions run 35551718635 (run #986) is the exact SHA 2767b8e6df98c9d02d8474f0e81d3a9f5b2fde4b and completed SUCCESS.
+- The quality job completed successfully, including runtime-role provisioning, non-bypass RLS integration, IAM runtime resolver integration, Durable Jobs PostgreSQL integration, format/lint/typecheck/tests/build.
+- Therefore CI execution is now verified for the current HEAD. This does not promote production cross-tenant RLS to E4; that remains a separate runtime gate.
 
 ## Auth0
 
@@ -137,6 +138,7 @@ Previously exposed token material must not be reused or documented.
 | Auth0 runtime AUTH0-log check on current Web deployment | PASS for inspected 24h window | E4 log observation |
 | Auth0 real-token E2E | OPEN/BLOCKER | AUTH0-REAL-TOKEN-01 |
 | Worker current-main parity | PASS | E4 deployment + runtime evidence; BLK-WORKER-01 remains business-contract blocker |
+| CI exact-current-HEAD execution | PASS | GitHub Actions run 35551718635 / quality job 106187569391 |
 | Cross-tenant RLS E4 | OPEN/BLOCKER | BLK-RLS-E4-01 |
 | DR restore verification | OPEN/BLOCKER | BLK-DR-01 |
 
