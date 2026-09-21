@@ -6,18 +6,23 @@ import { logFrontendEvent } from "../lib/logger";
 
 interface SessionState {
   authenticated: boolean;
-  user?: {
-    name?: string;
-    email?: string;
-  } | null;
+  user?: { name?: string; email?: string } | null;
+}
+
+interface FreightResult {
+  id?: string;
+  eventId?: string;
+  [key: string]: unknown;
 }
 
 export default function HomePage() {
   const [health, setHealth] = useState<ApiHealth | null>(null);
   const [session, setSession] = useState<SessionState | null>(null);
   const [freightsStatus, setFreightsStatus] = useState<number | null>(null);
+  const [freight, setFreight] = useState<FreightResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   async function loadHealth(signal?: AbortSignal) {
     const startedAt = performance.now();
@@ -27,34 +32,23 @@ export default function HomePage() {
     try {
       const result = await fetchApiHealth(signal);
       setHealth(result);
-      logFrontendEvent(
-        "INFO",
-        "web.api.health.completed",
-        {
-          requestId: result.requestId,
-          correlationId: result.correlationId ?? result.requestId,
-        },
-        {
-          duration_ms: Math.round(performance.now() - startedAt),
-          status: result.status,
-          service: result.service,
-        },
-      );
+      logFrontendEvent("INFO", "web.api.health.completed", {
+        requestId: result.requestId,
+        correlationId: result.correlationId ?? result.requestId,
+      }, {
+        duration_ms: Math.round(performance.now() - startedAt),
+        status: result.status,
+        service: result.service,
+      });
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
-
       const message = cause instanceof Error ? cause.message : "API request failed";
       setHealth(null);
       setError(message);
-      logFrontendEvent(
-        "ERROR",
-        "web.api.health.failed",
-        {},
-        {
-          duration_ms: Math.round(performance.now() - startedAt),
-          message,
-        },
-      );
+      logFrontendEvent("ERROR", "web.api.health.failed", {}, {
+        duration_ms: Math.round(performance.now() - startedAt),
+        message,
+      });
     } finally {
       setLoading(false);
     }
@@ -68,12 +62,9 @@ export default function HomePage() {
 
       if (!response.ok) {
         setSession({ authenticated: false });
-        logFrontendEvent(
-          "WARN",
-          "web.auth.profile.failed",
-          { requestId, correlationId },
-          { status_code: response.status },
-        );
+        logFrontendEvent("WARN", "web.auth.profile.failed", { requestId, correlationId }, {
+          status_code: response.status,
+        });
         return;
       }
 
@@ -81,59 +72,87 @@ export default function HomePage() {
         authenticated: true,
         user: (await response.json()) as SessionState["user"],
       });
-      logFrontendEvent(
-        "INFO",
-        "web.auth.profile.completed",
-        { requestId, correlationId },
-        { status_code: response.status },
-      );
+      logFrontendEvent("INFO", "web.auth.profile.completed", { requestId, correlationId }, {
+        status_code: response.status,
+      });
     } catch (cause) {
       setSession({ authenticated: false });
-      logFrontendEvent(
-        "ERROR",
-        "web.auth.profile.exception",
-        {},
-        {
-          message:
-            cause instanceof Error ? cause.message : "Session request failed",
-        },
-      );
+      logFrontendEvent("ERROR", "web.auth.profile.exception", {}, {
+        message: cause instanceof Error ? cause.message : "Session request failed",
+      });
     }
   }
 
   async function checkProtectedApi() {
-    const startedAt = performance.now();
-    setFreightsStatus(null);
+    const response = await fetch("/api/tms/freights", { cache: "no-store" });
+    setFreightsStatus(response.status);
+  }
+
+  async function createRuntimeFreight() {
+    setCreating(true);
+    setError(null);
+    setFreight(null);
 
     try {
-      const response = await fetch("/api/tms/freights", { cache: "no-store" });
-      const requestId = response.headers.get("x-request-id") ?? undefined;
-      const correlationId = response.headers.get("x-correlation-id") ?? requestId;
+      const createResponse = await fetch("/api/tms/freights", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          freightType: "dedicated",
+          originCity: "Santos",
+          originState: "SP",
+          destinationCity: "São Paulo",
+          destinationState: "SP",
+          cargoDescription: "E4 Runtime Smoke",
+          quantity: 1,
+          weightKg: 100,
+        }),
+        cache: "no-store",
+      });
 
-      setFreightsStatus(response.status);
-      logFrontendEvent(
-        response.ok ? "INFO" : "WARN",
-        "web.api.freights.completed",
-        { requestId, correlationId },
+      const createBody = (await createResponse.json()) as FreightResult;
+      if (!createResponse.ok) {
+        throw new Error(
+          String(createBody.message ?? createBody.error ?? "Freight creation failed"),
+        );
+      }
+
+      const freightId = String(createBody.id ?? createBody.freightId ?? "");
+      if (!freightId) throw new Error("Freight created but no freight id was returned");
+
+      const statusResponse = await fetch(
+        "/api/tms/freights/" + encodeURIComponent(freightId) + "/status",
         {
-          duration_ms: Math.round(performance.now() - startedAt),
-          status_code: response.status,
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status: "open" }),
+          cache: "no-store",
         },
       );
+
+      const statusBody = (await statusResponse.json()) as FreightResult;
+      if (!statusResponse.ok) {
+        throw new Error(
+          String(statusBody.message ?? statusBody.error ?? "Freight status update failed"),
+        );
+      }
+
+      setFreight({
+        ...statusBody,
+        id: freightId,
+        eventId: statusBody.eventId ?? statusBody.event_id,
+      });
+      logFrontendEvent("INFO", "web.freight.runtime_smoke.completed", {}, {
+        freight_id: freightId,
+        status: "open",
+        http_status: statusResponse.status,
+      });
     } catch (cause) {
-      setFreightsStatus(null);
-      logFrontendEvent(
-        "ERROR",
-        "web.api.freights.exception",
-        {},
-        {
-          duration_ms: Math.round(performance.now() - startedAt),
-          message:
-            cause instanceof Error
-              ? cause.message
-              : "Protected API request failed",
-        },
-      );
+      const message = cause instanceof Error ? cause.message : "Runtime smoke failed";
+      setError(message);
+      logFrontendEvent("ERROR", "web.freight.runtime_smoke.failed", {}, { message });
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -148,9 +167,7 @@ export default function HomePage() {
     new URLSearchParams(window.location.search).get("auth") === "failed";
 
   useEffect(() => {
-    if (authFailed) {
-      logFrontendEvent("WARN", "web.auth.callback.failed");
-    }
+    if (authFailed) logFrontendEvent("WARN", "web.auth.callback.failed");
   }, [authFailed]);
 
   return (
@@ -159,9 +176,7 @@ export default function HomePage() {
       <p>Frontend foundation with Auth0 session and live API integration.</p>
 
       {authFailed && (
-        <p role="alert">
-          Authentication failed. Check the Auth0 callback configuration.
-        </p>
+        <p role="alert">Authentication failed. Check the Auth0 callback configuration.</p>
       )}
 
       <section aria-labelledby="auth-heading">
@@ -170,20 +185,14 @@ export default function HomePage() {
         {session?.authenticated ? (
           <>
             <p role="status">
-              Signed in as{" "}
-              {session.user?.name ??
-                session.user?.email ??
-                "authenticated user"}
-              .
+              Signed in as {session.user?.name ?? session.user?.email ?? "authenticated user"}.
             </p>
             <button type="button" onClick={() => void checkProtectedApi()}>
               Check protected API
             </button>
             <a href="/auth/logout">Log out</a>
             {freightsStatus !== null && (
-              <p role="status">
-                GET /freights via server session: HTTP {freightsStatus}
-              </p>
+              <p role="status">GET /freights via server session: HTTP {freightsStatus}</p>
             )}
           </>
         ) : (
@@ -195,20 +204,28 @@ export default function HomePage() {
         )}
       </section>
 
+      {session?.authenticated && (
+        <section aria-labelledby="freight-heading">
+          <h2 id="freight-heading">Freight Runtime Smoke</h2>
+          <p>
+            Creates one tenant-scoped Freight through the Auth0-backed Web BFF and immediately
+            transitions it to <code>open</code>.
+          </p>
+          <button type="button" onClick={() => void createRuntimeFreight()} disabled={creating}>
+            {creating ? "Creating Freight…" : "Create Freight and set OPEN"}
+          </button>
+          {freight?.id && <p role="status">freight_id: {freight.id}</p>}
+          {freight?.eventId && <p role="status">event_id: {freight.eventId}</p>}
+          {error && <p role="alert">{error}</p>}
+        </section>
+      )}
+
       <section aria-labelledby="api-status-heading">
         <h2 id="api-status-heading">API status</h2>
         {loading && <p role="status">Checking API…</p>}
-        {!loading && health && (
-          <p role="status">
-            {health.service}: {health.status}
-          </p>
-        )}
+        {!loading && health && <p role="status">{health.service}: {health.status}</p>}
         {!loading && error && <p role="alert">{error}</p>}
-        <button
-          type="button"
-          onClick={() => void loadHealth()}
-          disabled={loading}
-        >
+        <button type="button" onClick={() => void loadHealth()} disabled={loading}>
           Refresh API status
         </button>
       </section>
