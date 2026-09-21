@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN corepack enable
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/worker/package.json apps/worker/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/database/package.json packages/database/package.json
