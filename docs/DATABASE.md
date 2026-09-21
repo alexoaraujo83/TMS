@@ -8,7 +8,7 @@ The canonical database is independent from the reference Nexora project. No Nexo
 
 ## 2. Current schema state
 
-The repository currently contains **29 ordered migrations**, from `0001_foundation.sql` through `0029_runtime_app_role.sql`. CI proves that the complete migration chain applies to a fresh PostgreSQL 17 database before the quality chain proceeds.
+The repository currently contains **31 ordered migrations**, from `0001_foundation.sql` through `0031_finance_relationship_invariants.sql`. CI proves that the complete migration chain applies to a fresh PostgreSQL 17 database before the quality chain proceeds.
 
 The migration sequence is:
 
@@ -43,6 +43,8 @@ The migration sequence is:
 | 0027 | Outbox lease tokens |
 | 0028 | Durable Jobs |
 | 0029 | Non-superuser/non-`BYPASSRLS` runtime role `tms_app` |
+| 0030 | Compliance/GR assignment-to-freight composite invariant |
+| 0031 | Finance assignment/trip-to-freight composite invariants |
 
 ## 3. Core entity catalogue
 
@@ -98,7 +100,7 @@ Freight terminal transitions are synchronized with assignment state in the same 
 
 ## 7. Compliance and GR
 
-`compliance_checks` tracks compliance/risk checks with `pending`, `approved`, `rejected` and `expired` states. `gr_requests` tracks GR requests through `pending`, `submitted`, `approved`, `rejected`, `expired` and `cancelled` states, with timestamp constraints tied to each state.
+`compliance_checks` tracks compliance/risk checks with `pending`, `approved`, `rejected` and `expired` states. `gr_requests` tracks GR requests through `pending`, `submitted`, `approved`, `rejected`, `expired` and `cancelled`, with timestamp constraints tied to each state.
 
 Both domains use tenant-scoped composite relationships to freight and assignment and are protected by RLS.
 
@@ -120,7 +122,7 @@ The intended asynchronous boundary is:
 
 `committed transaction -> outbox -> worker claim -> idempotent handler -> external side effect -> completion/failure -> audit`
 
-Long-running Durable Jobs require lease heartbeat/renewal. The current hardening work is tracked separately until CI and integration evidence prove the behavior end-to-end.
+Long-running Durable Jobs require lease heartbeat/renewal. The current hardening work is tracked separately until CI and integration evidence prove the behavior.
 
 ## 10. Tenant isolation and RLS
 
@@ -170,4 +172,4 @@ The external PostgreSQL backup worker is the current backup mechanism. The inten
 
 `PostgreSQL/Neon -> scheduled backup worker -> compressed/encrypted dump -> S3-compatible storage -> checksum/manifest verification -> retention -> isolated restore drill`.
 
-A real backup and isolated restore have been proven according to the open DR issues, but recurring schedule/retention/on-call/RPO/RTO evidence remains an operational gate rather than a schema feature.
+An isolated restore-proof branch has now been reconciled from 0028 to the current 0031 schema and validated for the 0030/0031 relationship invariants. This proves schema-level DR reconciliation. Independent restoration from the current encrypted backup artifact and runtime backup execution remain operational gates.
