@@ -82,6 +82,7 @@ if (!enabled) {
         "drivers",
         "carriers",
         "audit_events",
+        "outbox_events",
         "tenant_memberships",
         "users",
         "freights",
@@ -190,6 +191,9 @@ if (!enabled) {
       await client.query("delete from audit_events where tenant_id = $1", [
         tenantId,
       ]);
+      await client.query("delete from outbox_events where tenant_id = $1", [
+        tenantId,
+      ]);
       await client.query("delete from vehicles where tenant_id = $1", [
         tenantId,
       ]);
@@ -233,6 +237,25 @@ if (!enabled) {
         audit,
       );
       assert.equal(delivered?.status, "delivered");
+
+      const outbox = await tenantQuery<{
+        eventType: string;
+        aggregateType: string;
+        aggregateId: string;
+        payload: { freight_id?: string; to_status?: string };
+      }>(
+        `select event_type as "eventType", aggregate_type as "aggregateType",
+                aggregate_id as "aggregateId", payload
+           from outbox_events
+          where tenant_id = $1 and aggregate_id = $2
+          order by created_at desc limit 1`,
+        [tenantId, deliveredFreightId],
+      );
+      assert.equal(outbox.rows[0]?.eventType, "freight.status_changed");
+      assert.equal(outbox.rows[0]?.aggregateType, "freight");
+      assert.equal(outbox.rows[0]?.aggregateId, deliveredFreightId);
+      assert.equal(outbox.rows[0]?.payload.freight_id, deliveredFreightId);
+      assert.equal(outbox.rows[0]?.payload.to_status, "delivered");
 
       const result = await tenantQuery<{
         status: string;
