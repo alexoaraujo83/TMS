@@ -245,9 +245,7 @@ export class PostgresFreightRepository {
         }
       }
 
-      if (audit) {
-        await appendAuditEvent(client, {
-          ...audit,
+      // Status transitions are persisted with their audit event and outbox event in one transaction.\n      if (audit) {\n        await appendAuditEvent(client, {\n          ...audit,
           tenantId,
           entityId: row.id,
         });
