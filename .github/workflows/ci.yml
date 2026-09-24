@@ -67,6 +67,8 @@ jobs:
         run: pnpm --filter @tms/worker exec tsx --test src/durable-jobs.integration.test.ts
       - name: Validate worker freight status outbox to durable job integration
         run: pnpm --filter @tms/database build && pnpm --filter @tms/worker exec tsx --test src/freight-status-flow.integration.test.ts
+      - name: Validate worker replay and cross-tenant runtime evidence
+        run: pnpm --filter @tms/database build && pnpm --filter @tms/worker exec tsx --test src/runtime-evidence.integration.test.ts
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
