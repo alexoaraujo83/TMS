@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Get,
   Param,
   ParseUUIDPipe,
@@ -9,6 +10,9 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { AuthGuard } from "../../common/auth.guard.js";
+import { DATABASE_POOL } from "../../common/database.provider.js";
+import { withTenantContext } from "@tms/database";
+import type { Pool } from "pg";
 import { CurrentUser } from "../../common/current-user.decorator.js";
 import { PermissionGuard } from "../../common/permission.guard.js";
 import { RequirePermission } from "../../common/permission.decorator.js";
@@ -23,6 +27,7 @@ import { MatchingService } from "./matching.service.js";
 @UseGuards(AuthGuard, PermissionGuard)
 export class FreightController {
   constructor(
+    @Inject(DATABASE_POOL) private readonly pool: Pool,
     private readonly service: FreightService,
     private readonly matching: MatchingService,
     private readonly assignments: AssignmentService,
@@ -53,6 +58,23 @@ export class FreightController {
       roles: context.roles,
       permissions: context.permissions,
     };
+  }
+
+
+  @Get("runtime-db-context")
+  @RequirePermission("freight:read")
+  async runtimeDbContext(@CurrentUser() context: RequestContext) {
+    return withTenantContext(this.pool, context.tenantId, async (client) => {
+      const result = await client.query<{ databaseTenantId: string | null; freightCount: string }>(
+        "select current_setting('app.tenant_id', true) as \"databaseTenantId\", count(*)::text as \"freightCount\" from public.freights",
+      );
+      return {
+        authenticated: true,
+        requestTenantId: context.tenantId,
+        databaseTenantId: result.rows[0]?.databaseTenantId ?? null,
+        freightCount: Number(result.rows[0]?.freightCount ?? 0),
+      };
+    });
   }
 
   @Get(":id")
