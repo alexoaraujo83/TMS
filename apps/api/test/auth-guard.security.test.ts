@@ -89,6 +89,12 @@ test("uses DB membership instead of JWT permissions", async () => {
     tenantId: TENANT_A,
     roles: ["operator"],
     permissions: ["freight:read"],
+    oidc: {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      subject: AUTH0_SUBJECT,
+      expiresAt: (request.context as { oidc: { expiresAt: number } }).oidc.expiresAt,
+    },
   });
 });
 
@@ -193,7 +199,8 @@ test("rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) =>
+      error instanceof Error && error.message === "Invalid access token",
   );
 });
 
