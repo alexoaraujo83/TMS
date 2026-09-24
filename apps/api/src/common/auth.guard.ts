@@ -57,6 +57,12 @@ export class AuthGuard implements CanActivate {
         tenantId: membership.tenantId,
         roles: [membership.role],
         permissions: membership.permissions,
+        oidc: {
+          issuer: claims.issuer,
+          audience: claims.audience,
+          subject: claims.sub,
+          expiresAt: claims.expiresAt,
+        },
       };
       return true;
     } catch (error) {
