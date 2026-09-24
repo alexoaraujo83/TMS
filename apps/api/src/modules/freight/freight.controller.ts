@@ -66,7 +66,7 @@ export class FreightController {
   async runtimeDbContext(@CurrentUser() context: RequestContext) {
     return withTenantContext(this.pool, context.tenantId, async (client) => {
       const result = await client.query<{ databaseTenantId: string | null; freightCount: string }>(
-        'select current_setting("app.tenant_id", true) as "databaseTenantId", count(*)::text as "freightCount" from public.freights',
+        'select current_setting('app.tenant_id', true) as "databaseTenantId", count(*)::text as "freightCount" from public.freights',
       );
       return {
         authenticated: true,
