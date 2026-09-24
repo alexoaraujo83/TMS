@@ -163,7 +163,13 @@ Há evidência de qualidade/integração em CI para o fluxo do worker, mas isso 
 - **PKG-01 — Chave JSON duplicada:** package.json contém architecture:check duas vezes. O JSON é aceito pelo parser com prevalência da última chave, mas a duplicidade é uma inconsistência de manutenção e pode mascarar alterações futuras. **Estado: DÍVIDA TÉCNICA / P2.**
 - **CI-03 — Proteção/promotion gates ainda não auditáveis pelo conector atual:** a leitura do endpoint de branch protection/rulesets de main retornou 403 para a integração disponível. Portanto não há, nesta etapa, prova independente das regras de proteção/required checks da branch. Isso permanece como lacuna de auditoria, não como afirmação de que a branch está desprotegida. **Estado: ABERTO / P1.**
 
-## 8. Definition of Done
+## 8. Novos achados da auditoria de testes
+
+- **API-07 — Cobertura direta da camada HTTP/aplicação:** a inspeção atual não encontrou arquivos de teste dedicados para freight.service, operations.service, compliance.service, finance.service ou controllers de negócio. Existem testes de guards, middleware, health, CORS e integrações do banco/worker, mas a camada de serviço/controller de negócio fica principalmente coberta de forma indireta. **Estado: LACUNA DE COBERTURA / P1.**
+- **WEB-03 — Cobertura de rotas/componentes Web:** não foram encontrados testes dedicados para as rotas proxy TMS, runtime-context, auth-runtime, freight/status ou para page.tsx. O teste existente identificado cobre utilitário de API. **Estado: LACUNA DE COBERTURA / P1-P2.**
+- **TEST-01 — CI atual não deve ser interpretado como cobertura percentual:** o pipeline comprova execução e sucesso da suíte configurada, mas o repositório não apresenta gate de cobertura nem limiar mínimo de cobertura no CI. Isso não prova baixa cobertura, apenas ausência de um controle quantitativo. **Estado: CONTROLE AUSENTE / P2.**
+
+## 9. Definition of Done
 
 Um item só pode virar **FECHADO/COMPROVADO** quando a evidência de encerramento definida na tabela existir.
 
@@ -171,7 +177,7 @@ Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para 
 
 **Estado geral atual:** P0/P1 ainda possuem evidência de runtime aberta. O DoD final **não foi atingido**.
 
-## 9. Histórico de atualizações do tracker
+## 10. Histórico de atualizações do tracker
 
 - 2026-09-24: tracker criado como lista canônica de execução.
 - 2026-09-24: master controller passou a apontar para este tracker como ledger corrente.
@@ -183,3 +189,4 @@ Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para 
 - 2026-09-24: auditoria estrutural encontrou drift documental entre 31 e 33 migrações, referência a packages/contracts inexistente e descrição de Railway como destino do API apesar do API atual observado em Vercel.
 - 2026-09-24: auditoria de toolchain encontrou Dockerfile secundário do worker em Node 22 enquanto o runtime efetivo usa o Dockerfile raiz em Node 24; Vercel mantém --no-frozen-lockfile no install.
 - 2026-09-24: auditoria de governança registrou lacuna de prova sobre branch protection/rulesets porque o endpoint disponível retornou 403.
+- 2026-09-24: auditoria de testes não encontrou testes dedicados para serviços/controllers de negócio da API nem para as rotas proxy/componentes principais do Web; CI comprova execução da suíte existente, mas não possui gate quantitativo de cobertura.
