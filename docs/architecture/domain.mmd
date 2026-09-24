@@ -1,0 +1,36 @@
+%% TMS — Domain / bounded-context diagram
+%% Implemented foundations and architectural targets are intentionally distinguished.
+flowchart LR
+    Platform["Platform / Reliability"]
+    IAM["IAM / Tenancy\nUsers · Memberships · Roles · Permissions"]
+    Master["Master Data\nCarriers · Drivers · Vehicles"]
+    Freight["Freight\nLifecycle · Assignment · Status Events"]
+    Matching["Matching\nCandidates · Ranking · Assignment"]
+    Trip["Trip Operations\nTrips · Occurrences · POD · Timeline"]
+    Compliance["Compliance / GR\nChecks · GR status"]
+    Finance["Finance\nFinancial entries · Settlement"]
+    Audit["Audit / Observability\nAudit events · telemetry"]
+    Reliability["Reliability\nOutbox · Durable Jobs · Webhooks"]
+    Analytics["Analytics / AI\nArchitectural target"]
+
+    IAM --> Freight
+    IAM --> Master
+    Master --> Freight
+    Freight --> Matching
+    Matching --> Trip
+    Freight --> Compliance
+    Trip --> Compliance
+    Freight --> Finance
+    Trip --> Finance
+
+    Freight --> Reliability
+    Reliability --> Audit
+    IAM --> Audit
+    Compliance --> Audit
+    Finance --> Audit
+    Platform --> IAM
+    Platform --> Reliability
+    Audit --> Analytics
+
+    classDef target stroke-dasharray: 5 5;
+    class Analytics target;
