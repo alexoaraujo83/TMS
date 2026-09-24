@@ -85,6 +85,19 @@ test(
       const jobResult = await durable.process(tenantId, 10);
       assert.deepEqual(jobResult, { claimed: 1, completed: 1, failed: 0 });
 
+      const replayJob = {
+        id: randomUUID(),
+        tenantId,
+        jobType: "freight.status_changed",
+        payload: {
+          event_id: eventId,
+          freight_id: freightId,
+          from_status: "assigned",
+          to_status: "in_transit",
+        },
+      };
+      await handler(replayJob);
+
       const state = await withTenantContext(runtimePool, tenantId, async (client) => {
         const outboxRow = await client.query(
           "select status from outbox_events where id = $1",
@@ -102,6 +115,7 @@ test(
           outbox: outboxRow.rows[0],
           job: jobRow.rows[0],
           audit: auditRow.rows[0],
+          auditCount: auditRow.rowCount,
         };
       });
 
@@ -111,9 +125,13 @@ test(
       assert.equal(state.audit?.action, "freight.status_changed.processed");
       assert.equal(state.audit?.outcome, "success");
       assert.equal(state.audit?.event_id, eventId);
+      assert.equal(state.auditCount, 1);
       assert.equal(telemetry[0]?.event, "freight.status_changed.handled");
       assert.equal(telemetry[0]?.details.event_id, eventId);
       assert.equal(telemetry[0]?.details.idempotent_replay, false);
+      assert.equal(telemetry[1]?.event, "freight.status_changed.handled");
+      assert.equal(telemetry[1]?.details.event_id, eventId);
+      assert.equal(telemetry[1]?.details.idempotent_replay, true);
     } finally {
       await adminPool.query("delete from audit_events where tenant_id = $1", [tenantId]);
       await adminPool.query("delete from outbox_events where tenant_id = $1", [tenantId]);
