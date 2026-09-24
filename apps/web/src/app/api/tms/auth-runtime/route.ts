@@ -28,10 +28,10 @@ function classifyAccessTokenError(error: unknown): Record<string, string> {
 }
 
 export async function GET(request: Request) {
-  const apiBaseUrl = process.env.TMS_API_BASE_URL?.trim().replace(/\/+$/, "");
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/+$/, "");
   if (!apiBaseUrl) {
     return NextResponse.json(
-      { error: "TMS_API_BASE_URL is not configured" },
+      { error: "NEXT_PUBLIC_API_BASE_URL is not configured" },
       { status: 500 },
     );
   }
