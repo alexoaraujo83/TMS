@@ -14,6 +14,7 @@
     "format": "prettier --write .",
     "format:fix": "prettier --write . && prettier --check .",
     "format:check": "prettier --check .",
+    "architecture:check": "node scripts/check-architecture-docs.mjs",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test --concurrency=1",
     "check": "pnpm format:fix && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
