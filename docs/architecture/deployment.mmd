@@ -1,0 +1,31 @@
+%% TMS — Deployment diagram
+%% Effective production components may advance independently in a monorepo.
+flowchart TB
+    GH["GitHub\nRepository + CI"]
+    VercelWeb["Vercel\ntms-web"]
+    VercelAPI["Vercel\ntms-core-api"]
+    Railway["Railway\ntms-worker / backup worker"]
+    Auth0["Auth0\nTenant-aware OIDC"]
+    Neon["Neon PostgreSQL\nProduction branch"]
+    S3["S3-compatible object store\nBackup artifacts"]
+    User["Browser / Operator"]
+
+    GH -->|Build / deploy web| VercelWeb
+    GH -->|Build / deploy API| VercelAPI
+    GH -->|Build / deploy worker| Railway
+
+    User -->|HTTPS| VercelWeb
+    VercelWeb -->|OIDC / API access token| Auth0
+    VercelWeb -->|HTTPS API| VercelAPI
+    VercelAPI -->|JWT verification| Auth0
+    VercelAPI -->|PostgreSQL TLS| Neon
+    Railway -->|PostgreSQL TLS| Neon
+    Railway -->|Encrypted backup| S3
+
+    subgraph ReleaseControl["Release control"]
+      Manifest["Versioned release manifest\nGit SHA + effective component SHAs + migration head"]
+      DocsCheck["Architecture documentation check\nCI verifies diagram set + index links"]
+    end
+
+    GH --> Manifest
+    GH --> DocsCheck
