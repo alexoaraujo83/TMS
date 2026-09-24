@@ -5,6 +5,7 @@
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
 > **HEAD da aplicação auditada:** `fb0025aea93aed9ad134a3266f2e7274fb9bcda5`  
+**HEAD de controle/documentação atual:** `9c0d786386bb129c57cd2bd7b92458fc4ce35365`  
 > **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
 
 ## 1. Escopo e leitura cruzada da auditoria
@@ -28,7 +29,7 @@ A regra de evidência é:
 | Vercel Web | Deployment do SHA atual `dpl_DMPxo75ykyS3E4xucZjs1Bj4ZesN` foi CANCELED com indicação de projeto não afetado; deployment READY anterior está em `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | DRIFT DE COMPONENTE ESPERADO / NÃO É FALHA POR SI SÓ | Registrar SHA efetivo de cada componente em manifesto de release. |
 | Railway worker | Deployment do SHA atual `74c88ebf-7046-4d01-836b-c72847e08255` foi SKIPPED; último worker principal conhecido como SUCCESS é `9d938334-b80c-4064-bd40-683620f950a2`, SHA `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | SHA EFETIVO ANTERIOR | Verificar regras de watch/build e registrar o SHA efetivo. Não forçar deploy apenas para igualar SHAs. |
 | Railway backup worker | Deployment `21278249-58dc-4121-85de-d866a71a1003` está SUCCESS no SHA atual | ATUAL / EXECUÇÃO DE BACKUP NÃO PROVADA | Obter evidência de artefato real, checksum e retenção. |
-| CI | O commit atual possui status externos de Vercel/Railway; a consulta de workflow associada ao SHA retornou zero runs | EVIDÊNCIA PARCIAL | Confirmar execução do CI de main e registrar run/job IDs antes de declarar CI atual como E3/E4. |
+| CI | Run `36074378568` no HEAD de controle `9c0d786386bb129c57cd2bd7b92458fc4ce35365` concluiu `success`; job `107882428713` executou architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build | COMPROVADO NO HEAD DE CONTROLE | Manter CI atual e ainda separar CI de prova operacional de produção |
 
 ## 3. Tabela mestre de execução
 
@@ -61,8 +62,8 @@ A regra de evidência é:
 | WEB-01 | Estrutura frontend | `apps/web/src/app/page.tsx` continua monolítico e concentra sessão, health, freight, formulário, erro e estado | DÍVIDA TÉCNICA | Extrair hooks/components/libs sem mudar comportamento primeiro | Mesmo comportamento com unidades testáveis menores | P2 |
 | WEB-02 | Modelo de deploy Web/API | Vercel pulou o Web no commit API-only; isso é comportamento esperado de monorepo, não defeito automático | ACEITO / PRECISA DOCUMENTAÇÃO | Formalizar promoção por componente | Manifesto explica SHA efetivo por componente | P1 |
 | DOC-01 | Fonte de verdade da auditoria | Existem documentos datados com estados históricos diferentes | PARCIAL | Manter históricos imutáveis e usar este tracker como estado corrente | Todo finding atual aparece aqui; históricos ficam explicitamente datados | P1 |
-| DOC-02 | Diagramas | Conjunto versionado de Mermaid criado em `docs/architecture/`: contexto, deployment e domínio; índice e check estrutural entram no CI | IMPLEMENTADO NO REPOSITÓRIO / VALIDAÇÃO PENDENTE | Revisar os três diagramas contra runtime efetivo e, se necessário, ampliar para ERD/event-flow | Diagramas coincidem com runtime e relações de banco; CI verde no HEAD auditado | P2 |
-| CI-01 | CI do HEAD atual | Status externos estão verdes, mas a consulta de workflow do SHA atual retornou zero runs | ABERTO | Confirmar execução de main e registrar run/job IDs | format/lint/typecheck/test/build verdes no SHA atual | P0 |
+| DOC-02 | Diagramas | Conjunto versionado de Mermaid criado em `docs/architecture/`: contexto, deployment e domínio; índice e check estrutural entram no CI; CI atual passou no SHA de controle | IMPLEMENTADO NO REPOSITÓRIO / CI COMPROVADO / RUNTIME PENDENTE | Revisar os três diagramas contra runtime efetivo e, se necessário, ampliar para ERD/event-flow | Diagramas coincidem com runtime e relações de banco; CI verde no HEAD auditado | P2 |
+| CI-01 | CI do HEAD atual | Run `36074378568` / job `107882428713` no SHA `9c0d786386bb129c57cd2bd7b92458fc4ce35365` terminou com sucesso e todos os passos do job passaram | COMPROVADO | Preservar evidência e repetir no próximo HEAD de aplicação/control plane relevante | format/lint/typecheck/test/build + architecture check verdes no SHA auditado | P0 |
 | CI-02 | Gates de promoção | Web/API/Worker podem ser promovidos separadamente | ABERTO | Definir gates explícitos por componente e release | Componente desatualizado/falho não é confundido com release completa | P1 |
 | SEC-03 | Replay sensível | Replay é mutação de produção que cria durable job e auditoria | PRECISA HARDENING | Permissão dedicada, motivo estruturado, rate/approval quando aplicável e auditoria | Replay controlado + testes negativos + trilha de auditoria | P1 |
 | FINAL-01 | DoD final | P0/P1 ainda têm evidência operacional aberta | BLOQUEADO | Fechar P0, depois P1, executar regressão e reconciliar documentação | Gates finais verdes ou aceitos formalmente com evidência | P0 |
@@ -170,3 +171,4 @@ Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para 
 - 2026-09-24: `WORK-02` corrigido de “contrato ausente” para “E2/E3 comprovado, E4 aberto”, após confirmação do fluxo e testes do worker.
 - 2026-09-24: adicionados `API-06` e `SEC-03` para revisão da superfície de diagnóstico e endurecimento do replay.
 - 2026-09-24: adicionados diagramas Mermaid versionados de contexto, deployment e domínio; índice e `architecture:check` passaram a fazer parte do CI. DOC-02 permanece pendente de validação contra runtime efetivo.
+- 2026-09-24: CI run `36074378568` / job `107882428713` comprovou no HEAD de controle `9c0d786...` architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build.
