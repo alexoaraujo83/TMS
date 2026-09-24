@@ -84,13 +84,27 @@ export async function GET() {
     sessionTokenExpiresAt = session.tokenSet?.expiresAt;
     sessionTokenAudience = session.tokenSet?.audience;
 
-    const accessToken = await auth0.getAccessToken();
+    const sessionAccessToken = session.tokenSet?.accessToken;
+    const sessionAccessTokenExpiresAt = session.tokenSet?.expiresAt;
+    const sessionAccessTokenUsable =
+      Boolean(sessionAccessToken) &&
+      (typeof sessionAccessTokenExpiresAt !== "number" ||
+        sessionAccessTokenExpiresAt > Math.floor(Date.now() / 1000));
+
+    const accessToken = sessionAccessTokenUsable
+      ? {
+          token: sessionAccessToken as string,
+          expiresAt: sessionAccessTokenExpiresAt as number,
+          audience: session.tokenSet?.audience,
+        }
+      : await auth0.getAccessToken();
 
     if (!accessToken) {
       return NextResponse.json(
         {
           error: "Access token unavailable",
           code: "NO_ACCESS_TOKEN",
+          runtimeConfig: getRuntimeConfigDiagnostics(),
           sessionTokenPresent,
           sessionTokenExpiresAt,
           sessionTokenAudience,
