@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import test from "node:test";
 import { DurableJobsRepository, withTenantContext } from "@tms/database";
 import { createFreightStatusChangedHandler } from "./freight-status-changed.handler.js";
+import type { DurableJob } from "./durable-jobs-worker.js";
 import { PgDurableJobStore } from "./durable-jobs-store.js";
 import { DurableJobProcessor } from "./durable-jobs-worker.js";
 import { OutboxProcessor } from "./outbox-worker.js";
@@ -85,7 +86,7 @@ test(
       const jobResult = await durable.process(tenantId, 10);
       assert.deepEqual(jobResult, { claimed: 1, completed: 1, failed: 0 });
 
-      const replayJob = {
+      const replayJob: DurableJob = {
         id: randomUUID(),
         tenantId,
         jobType: "freight.status_changed",
@@ -95,6 +96,15 @@ test(
           from_status: "assigned",
           to_status: "in_transit",
         },
+        status: "completed",
+        attempts: 1,
+        maxAttempts: 5,
+        availableAt: new Date(),
+        leaseToken: null,
+        lastError: null,
+        completedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
       await handler(replayJob);
 
