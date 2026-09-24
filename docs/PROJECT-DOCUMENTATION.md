@@ -153,6 +153,18 @@ Nexora has a mature engineering baseline including the same Node/pnpm/Turborepo 
 | Backup/restore                 | Restore mechanism proven; recurring DR policy not proven |
 | Production hardening           | Roadmap / gates still open |
 
+## 14. Versioned architecture diagrams
+
+The repository now versions the minimum architectural diagram set as Mermaid sources under `docs/architecture/`:
+
+- `context.mmd`: system context and external/runtime relationships.
+- `deployment.mmd`: GitHub/CI, Vercel, Railway, Auth0, Neon and backup object-store topology, including independent component promotion.
+- `domain.mmd`: bounded contexts and the principal domain relationships; architectural targets are explicitly distinguished from implemented foundations.
+
+CI runs `pnpm architecture:check` and fails when any required diagram is missing, empty, malformed at the repository-header level, or omitted from the architecture index. This check validates documentation presence and indexing; it does not claim that production runtime has been independently reconciled with the diagrams. Runtime reconciliation remains part of the audit/release evidence process.
+
+Any change to topology, bounded contexts, persistence or external integration must update the relevant Mermaid diagram in the same change.
+
 ## 13. Documentation rule
 
 Whenever implementation changes, update the corresponding documentation in the same change. Never describe a planned module as production functionality. Architectural changes require an ADR.
