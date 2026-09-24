@@ -1,6 +1,44 @@
 import { auth0 } from "../../../../lib/auth0";
 import { NextResponse } from "next/server";
 
+function classifyUrl(value: string | undefined, expectedProtocol?: string): Record<string, string | boolean | null> {
+  if (!value) {
+    return { present: false, valid: false, protocol: null, hostname: null };
+  }
+
+  try {
+    const url = new URL(value);
+    return {
+      present: true,
+      valid: expectedProtocol ? url.protocol === expectedProtocol : true,
+      protocol: url.protocol,
+      hostname: url.hostname,
+    };
+  } catch {
+    return { present: true, valid: false, protocol: null, hostname: null };
+  }
+}
+
+function getRuntimeConfigDiagnostics() {
+  const appBaseUrl = classifyUrl(process.env.APP_BASE_URL, "https:");
+  const auth0IssuerBaseUrl = classifyUrl(process.env.AUTH0_ISSUER_BASE_URL, "https:");
+  const auth0Domain = process.env.AUTH0_DOMAIN;
+
+  return {
+    appBaseUrl,
+    auth0IssuerBaseUrl,
+    auth0Domain: {
+      present: Boolean(auth0Domain),
+      hasScheme: Boolean(auth0Domain?.includes("://")),
+      validHost: Boolean(
+        auth0Domain &&
+          !auth0Domain.includes("://") &&
+          /^[A-Za-z0-9.-]+$/.test(auth0Domain),
+      ),
+    },
+  };
+}
+
 function classifyAccessTokenError(error: unknown): Record<string, string> {
   if (!(error instanceof Error)) {
     return { errorType: "UNKNOWN_ERROR" };
@@ -77,6 +115,7 @@ export async function GET() {
       {
         error: "Access token unavailable",
         ...classifyAccessTokenError(error),
+        runtimeConfig: getRuntimeConfigDiagnostics(),
         sessionTokenPresent,
         sessionTokenExpiresAt,
         sessionTokenAudience,
