@@ -25,11 +25,11 @@ A regra de evidência é:
 | Componente | Evidência concreta | Estado efetivo | Próxima ação |
 |---|---|---|---|
 | GitHub / main | HEAD da aplicação auditada é `fb0025aea93aed9ad134a3266f2e7274fb9bcda5` | CANÔNICO | Usar este SHA como referência da aplicação neste ciclo. |
-| Vercel API | `tms-core-api`, deployment `dpl_616VFpHGy2w5Xs3kU3W4TM2PK2j2`, READY, production, main, SHA atual | ATUAL | Manter como referência da API desta release. |
-| Vercel Web | Deployment do SHA atual `dpl_DMPxo75ykyS3E4xucZjs1Bj4ZesN` foi CANCELED com indicação de projeto não afetado; deployment READY anterior está em `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | DRIFT DE COMPONENTE ESPERADO / NÃO É FALHA POR SI SÓ | Registrar SHA efetivo de cada componente em manifesto de release. |
+| Vercel API | tms-core-api, deployment dpl_CExsdt8aHv7DRhZvQwdJoou1AbSp, READY, production, SHA 20ff155544c99e587100fa17aedeeeb6eda5a284; aplicação funcional auditada permanece fb0025... | CONTROLE/DOCUMENTAÇÃO ATUAL / CÓDIGO DE APP INALTERADO | Separar SHA de controle/documentação do HEAD funcional da aplicação no manifesto. |
+| Vercel Web | tms-web, deployment dpl_9zSdC58f8hhwg1ejaURTyGRLznbK, READY, production, SHA 20ff155544c99e587100fa17aedeeeb6eda5a284; código funcional auditado permanece fb0025... | CONTROLE/DOCUMENTAÇÃO ATUAL / CÓDIGO DE APP INALTERADO | Registrar SHA efetivo e diferenciar deploy de controle de mudança funcional. |
 | Railway worker | Deployment do SHA atual `74c88ebf-7046-4d01-836b-c72847e08255` foi SKIPPED; último worker principal conhecido como SUCCESS é `9d938334-b80c-4064-bd40-683620f950a2`, SHA `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | SHA EFETIVO ANTERIOR | Verificar regras de watch/build e registrar o SHA efetivo. Não forçar deploy apenas para igualar SHAs. |
 | Railway backup worker | Deployment `21278249-58dc-4121-85de-d866a71a1003` está SUCCESS no SHA atual | ATUAL / EXECUÇÃO DE BACKUP NÃO PROVADA | Obter evidência de artefato real, checksum e retenção. |
-| CI | Run `36074378568` no HEAD de controle `9c0d786386bb129c57cd2bd7b92458fc4ce35365` concluiu `success`; job `107882428713` executou architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build | COMPROVADO NO HEAD DE CONTROLE | Manter CI atual e ainda separar CI de prova operacional de produção |
+| CI | Run `36074378568` no HEAD de controle `9c0d786386bb129c57cd2bd7b92458fc4ce35365` concluiu `success`; job `107882428713` executou architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build | COMPROVADO NO HEAD DE CONTROLE | Repetir no próximo HEAD relevante e manter CI separado da prova operacional de produção |
 
 ## 3. Tabela mestre de execução
 
@@ -155,7 +155,15 @@ Há evidência de qualidade/integração em CI para o fluxo do worker, mas isso 
 17. Refatorar `page.tsx` sem alterar comportamento.
 18. Revisar os diagramas Mermaid versionados contra runtime efetivo e relações de banco; adicionar ERD/event-flow somente se a reconciliação da auditoria demonstrar necessidade.
 
-## 7. Definition of Done
+## 7. Novos achados da auditoria estrutural
+
+- **DOC-03 — Drift documental concreto:** docs/PROJECT-DOCUMENTATION.md e docs/architecture/FOUNDATION.md ainda descrevem packages/contracts, mas esse diretório não existe no repositório atual e não há pacote @tms/contracts. A documentação corrente também afirma 31 migrações como estado atual, enquanto o repositório contém 0032_observability_audit_context.sql e 0033_durable_job_idempotency.sql. docs/INTEGRATIONS-OPERATIONS.md ainda descreve Railway como destino pretendido do API, enquanto a infraestrutura observada mantém tms-core-api em Vercel. **Estado: DRIFT DOCUMENTAL / P1.**
+- **CONFIG-01 — Boundary de configuração incompleta:** packages/config implementa loadConfig, mas a busca estrutural não encontrou consumidores runtime; API, Web, Worker, observability e migration script continuam lendo process.env diretamente. Isso reforça SEC-02: o pacote de configuração hoje funciona mais como biblioteca isolada/testada do que como fonte efetiva de configuração do runtime. **Estado: DÍVIDA TÉCNICA / P2.**
+- **BUILD-01 — Toolchain/runtime duplicado e parcialmente divergente:** o repositório fixa Node 24.20.0, CI usa Node 24 e o Dockerfile raiz usado pelo Railway usa Node 24.20.0; porém existe um apps/worker/Dockerfile paralelo com Node 22. O serviço Railway observado usa o Dockerfile raiz, portanto o arquivo Node 22 é uma fonte potencial de drift e deve ser classificado/limpo posteriormente. Além disso, vercel.json/apps/api/vercel.json usam --no-frozen-lockfile, reduzindo a reprodutibilidade do deploy frente ao lockfile versionado. **Estado: PRECISA REVISÃO / P1-P2.**
+- **PKG-01 — Chave JSON duplicada:** package.json contém architecture:check duas vezes. O JSON é aceito pelo parser com prevalência da última chave, mas a duplicidade é uma inconsistência de manutenção e pode mascarar alterações futuras. **Estado: DÍVIDA TÉCNICA / P2.**
+- **CI-03 — Proteção/promotion gates ainda não auditáveis pelo conector atual:** a leitura do endpoint de branch protection/rulesets de main retornou 403 para a integração disponível. Portanto não há, nesta etapa, prova independente das regras de proteção/required checks da branch. Isso permanece como lacuna de auditoria, não como afirmação de que a branch está desprotegida. **Estado: ABERTO / P1.**
+
+## 8. Definition of Done
 
 Um item só pode virar **FECHADO/COMPROVADO** quando a evidência de encerramento definida na tabela existir.
 
@@ -163,7 +171,7 @@ Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para 
 
 **Estado geral atual:** P0/P1 ainda possuem evidência de runtime aberta. O DoD final **não foi atingido**.
 
-## 8. Histórico de atualizações do tracker
+## 9. Histórico de atualizações do tracker
 
 - 2026-09-24: tracker criado como lista canônica de execução.
 - 2026-09-24: master controller passou a apontar para este tracker como ledger corrente.
@@ -172,3 +180,6 @@ Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para 
 - 2026-09-24: adicionados `API-06` e `SEC-03` para revisão da superfície de diagnóstico e endurecimento do replay.
 - 2026-09-24: adicionados diagramas Mermaid versionados de contexto, deployment e domínio; índice e `architecture:check` passaram a fazer parte do CI. DOC-02 permanece pendente de validação contra runtime efetivo.
 - 2026-09-24: CI run `36074378568` / job `107882428713` comprovou no HEAD de controle `9c0d786...` architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build.
+- 2026-09-24: auditoria estrutural encontrou drift documental entre 31 e 33 migrações, referência a packages/contracts inexistente e descrição de Railway como destino do API apesar do API atual observado em Vercel.
+- 2026-09-24: auditoria de toolchain encontrou Dockerfile secundário do worker em Node 22 enquanto o runtime efetivo usa o Dockerfile raiz em Node 24; Vercel mantém --no-frozen-lockfile no install.
+- 2026-09-24: auditoria de governança registrou lacuna de prova sobre branch protection/rulesets porque o endpoint disponível retornou 403.
