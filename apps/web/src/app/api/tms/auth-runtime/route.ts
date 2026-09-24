@@ -1,5 +1,5 @@
-import { auth0 } from "../../../../lib/auth0";
 import { NextResponse } from "next/server";
+import { auth0 } from "../../../../lib/auth0";
 
 function classifyAccessTokenError(error: unknown): Record<string, string> {
   if (!(error instanceof Error)) {
@@ -27,28 +27,22 @@ function classifyAccessTokenError(error: unknown): Record<string, string> {
   return result;
 }
 
-export async function GET() {
-  try {
-    const accessToken = await auth0.getAccessToken();
-
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: "Access token unavailable", code: "NO_ACCESS_TOKEN" },
-        { status: 401 },
-      );
-    }
-
-    const response = await fetch(
-      `${process.env.TMS_API_BASE_URL}/freights/runtime-auth-claims`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken.token}`,
-        },
-        cache: "no-store",
-      },
+export async function GET(request: Request) {
+  const apiBaseUrl = process.env.TMS_API_BASE_URL?.trim().replace(/\/+$/, "");
+  if (!apiBaseUrl) {
+    return NextResponse.json(
+      { error: "TMS_API_BASE_URL is not configured" },
+      { status: 500 },
     );
+  }
 
+  try {
+    const fetcher = await auth0.createFetcher(request, { baseUrl: apiBaseUrl });
+    const response = await fetcher.fetchWithAuth("/freights/runtime-auth-claims", {
+      cache: "no-store",
+    });
     const body = await response.text();
+
     return new NextResponse(body, {
       status: response.status,
       headers: {
