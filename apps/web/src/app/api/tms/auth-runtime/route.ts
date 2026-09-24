@@ -1,15 +1,30 @@
 import { auth0 } from "../../../../lib/auth0";
 import { NextResponse } from "next/server";
 
-function classifyAccessTokenError(error: unknown): string {
-  if (error instanceof Error) {
-    if (error.name === "AccessTokenError") return "ACCESS_TOKEN_ERROR";
-    if (error.name === "ConfigurationError") return "CONFIGURATION_ERROR";
-    if (error.name === "MissingSessionError") return "MISSING_SESSION";
-    if (error.name === "InvalidSessionError") return "INVALID_SESSION";
-    return "SDK_ERROR";
+function classifyAccessTokenError(error: unknown): Record<string, string> {
+  if (!(error instanceof Error)) {
+    return { errorType: "UNKNOWN_ERROR" };
   }
-  return "UNKNOWN_ERROR";
+
+  const result: Record<string, string> = {
+    errorType: error.name,
+  };
+
+  const errorCode = "code" in error && typeof error.code === "string" ? error.code : undefined;
+  if (errorCode) result.errorCode = errorCode;
+
+  const cause = "cause" in error && error.cause instanceof Error ? error.cause : undefined;
+  if (cause) {
+    result.causeType = cause.name;
+    const causeCode =
+      "code" in cause && typeof cause.code === "string" ? cause.code : undefined;
+    if (causeCode) result.causeCode = causeCode;
+    const causeError =
+      "error" in cause && typeof cause.error === "string" ? cause.error : undefined;
+    if (causeError) result.causeError = causeError;
+  }
+
+  return result;
 }
 
 export async function GET() {
@@ -44,7 +59,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Access token unavailable",
-        code: classifyAccessTokenError(error),
+        ...classifyAccessTokenError(error),
       },
       { status: 503 },
     );
