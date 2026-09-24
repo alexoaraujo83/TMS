@@ -6,13 +6,6 @@ interface RouteContext {
 }
 
 export async function PATCH(request: Request, { params }: RouteContext) {
-  let token: string;
-  try {
-    ({ token } = await auth0.getAccessToken());
-  } catch {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
-
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/+$/, "");
   if (!apiBaseUrl) {
     return NextResponse.json(
@@ -24,21 +17,30 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const body = await request.text();
 
-  const response = await fetch(apiBaseUrl + "/freights/" + encodeURIComponent(id) + "/status", {
-    method: "PATCH",
-    headers: {
-      authorization: "Bearer " + token,
-      "content-type": "application/json",
-    },
-    body,
-    cache: "no-store",
-  });
+  try {
+    const fetcher = await auth0.createFetcher(request, { baseUrl: apiBaseUrl });
+    const response = await fetcher.fetchWithAuth(
+      "/freights/" + encodeURIComponent(id) + "/status",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body,
+        cache: "no-store",
+      },
+    );
 
-  const responseBody = await response.text();
-  return new NextResponse(responseBody, {
-    status: response.status,
-    headers: {
-      "content-type": response.headers.get("content-type") ?? "application/json",
-    },
-  });
+    const responseBody = await response.text();
+    return new NextResponse(responseBody, {
+      status: response.status,
+      headers: {
+        "content-type": response.headers.get("content-type") ?? "application/json",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Authentication required";
+    return NextResponse.json(
+      { error: "Authentication required", detail: message },
+      { status: 401 },
+    );
+  }
 }
