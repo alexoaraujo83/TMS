@@ -9,6 +9,7 @@ export interface AuthClaims {
   tenantId?: string;
   issuer: string;
   audience: string | string[];
+  expiresAt?: number;
 }
 
 export interface AuthenticatedRequestContext extends TenantContext {
@@ -61,5 +62,6 @@ export async function verifyAccessToken(
     tenantId: extractTenantId(payload),
     issuer: typeof payload.iss === "string" ? payload.iss : issuer,
     audience: payload.aud ?? config.audience,
+    expiresAt: payload.exp,
   };
 }
