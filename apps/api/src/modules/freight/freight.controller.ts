@@ -43,6 +43,18 @@ export class FreightController {
     return this.service.list(context);
   }
 
+  @Get("runtime-context")
+  @RequirePermission("freight:read")
+  runtimeContext(@CurrentUser() context: RequestContext) {
+    return {
+      authenticated: true,
+      tenantId: context.tenantId,
+      userId: context.userId,
+      roles: context.roles,
+      permissions: context.permissions,
+    };
+  }
+
   @Get(":id")
   @RequirePermission("freight:read")
   get(
