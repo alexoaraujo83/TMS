@@ -1,99 +1,171 @@
-# TMS — Audit & Execution Tracker (Current)
+# TMS — Rastreador de Auditoria e Execução
 
-> **Status:** LIVE / canonical working list  
-> **Last updated:** 2026-09-24  
-> **Repository:** `alexoaraujo83/TMS`  
+> **Status:** VIVO / lista de trabalho canônica  
+> **Última atualização:** 2026-09-24  
+> **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
-> **Current HEAD:** `fb0025aea93aed9ad134a3266f2e7274fb9bcda5`  
-> **Rule:** this file records only concrete evidence already observed, the current state, what I would do next, and the acceptance evidence required to close each item. Unverified items remain OPEN/BLOCKED.
+> **HEAD da aplicação auditada:** `fb0025aea93aed9ad134a3266f2e7274fb9bcda5`  
+> **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
 
-## 1. Current release snapshot
+## 1. Escopo e leitura cruzada da auditoria
 
-| Component | Concrete evidence now | Effective production state | What I would do |
+Esta versão consolida a auditoria técnica cruzada entre código, banco/migrações, autenticação/autorização, worker/outbox/durable jobs, CI/CD, Vercel, Railway, documentação e recuperação/DR.
+
+A regra de evidência é:
+
+- **Comprovado:** existe evidência direta e reproduzível no código, CI ou runtime observado.
+- **Parcial:** parte do requisito está comprovada, mas falta evidência operacional ou de integração.
+- **Aberto/Bloqueado:** a conclusão depende de uma verificação ainda não executada ou de acesso que não está disponível.
+- **Dívida técnica:** não bloqueia necessariamente a operação atual, mas deve ser tratada para reduzir risco.
+- **Não inferir:** sucesso de deploy não equivale a sucesso funcional; SHA diferente entre componentes não equivale a defeito; documentação histórica não equivale a estado atual.
+
+## 2. Snapshot atual da release
+
+| Componente | Evidência concreta | Estado efetivo | Próxima ação |
 |---|---|---|---|
-| GitHub / main | HEAD is `fb0025aea93aed9ad134a3266f2e7274fb9bcda5` | CANONICAL | Keep this as the source commit for the audit cycle. |
-| Vercel API | `tms-core-api` deployment `dpl_616VFpHGy2w5Xs3kU3W4TM2PK2j2` is READY and targets `main` at the current HEAD | CURRENT | Keep as the API production reference for this release. |
-| Vercel Web | Current-HEAD deployment `dpl_DMPxo75ykyS3E4xucZjs1Bj4ZesN` is CANCELED with Vercel error link indicating **skipping unaffected projects**. Previous production READY deployment is `6348d2926f0b0cac120ff9350bb77bc0fce0903d`. | EXPECTED COMPONENT DRIFT / NOT A FAILURE | Treat component-specific SHA as intentional. Add an explicit release manifest so Web/API/Worker effective SHAs are always recorded together. |
-| Railway worker | Current-HEAD deployment `74c88ebf-7046-4d01-836b-c72847e08255` is SKIPPED. Previous successful worker deployment is `9d938334-b80c-4064-bd40-683620f950a2` at SHA `6348d2926f0b0cac120ff9350bb77bc0fce0903d`. | EFFECTIVE SHA STILL PREVIOUS | Verify Railway watch/build rules and record the effective worker SHA. Do not force a redeploy merely to align SHAs if no worker code changed. |
-| Railway backup worker | Deployment `21278249-58dc-4121-85de-d866a71a1003` is SUCCESS at current HEAD | CURRENT | Keep deployment evidence, but separately prove an actual backup execution. |
-| CI | Current HEAD has Vercel/Railway status checks reporting success; commit workflow-run wrapper returned no PR workflow runs for this SHA | PARTIAL EVIDENCE | Verify the actual main-branch CI run and record run/job IDs before declaring current-HEAD CI E3. |
+| GitHub / main | HEAD da aplicação auditada é `fb0025aea93aed9ad134a3266f2e7274fb9bcda5` | CANÔNICO | Usar este SHA como referência da aplicação neste ciclo. |
+| Vercel API | `tms-core-api`, deployment `dpl_616VFpHGy2w5Xs3kU3W4TM2PK2j2`, READY, production, main, SHA atual | ATUAL | Manter como referência da API desta release. |
+| Vercel Web | Deployment do SHA atual `dpl_DMPxo75ykyS3E4xucZjs1Bj4ZesN` foi CANCELED com indicação de projeto não afetado; deployment READY anterior está em `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | DRIFT DE COMPONENTE ESPERADO / NÃO É FALHA POR SI SÓ | Registrar SHA efetivo de cada componente em manifesto de release. |
+| Railway worker | Deployment do SHA atual `74c88ebf-7046-4d01-836b-c72847e08255` foi SKIPPED; último worker principal conhecido como SUCCESS é `9d938334-b80c-4064-bd40-683620f950a2`, SHA `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | SHA EFETIVO ANTERIOR | Verificar regras de watch/build e registrar o SHA efetivo. Não forçar deploy apenas para igualar SHAs. |
+| Railway backup worker | Deployment `21278249-58dc-4121-85de-d866a71a1003` está SUCCESS no SHA atual | ATUAL / EXECUÇÃO DE BACKUP NÃO PROVADA | Obter evidência de artefato real, checksum e retenção. |
+| CI | O commit atual possui status externos de Vercel/Railway; a consulta de workflow associada ao SHA retornou zero runs | EVIDÊNCIA PARCIAL | Confirmar execução do CI de main e registrar run/job IDs antes de declarar CI atual como E3/E4. |
 
-## 2. Master execution table
+## 3. Tabela mestre de execução
 
-| ID | Area | Concrete today | State | What I would do | Closure evidence | Priority |
+| ID | Área | Concreto hoje | Estado | O que fazer | Evidência de encerramento | Prioridade |
 |---|---|---|---|---|---|---|
-| REL-01 | Release manifest | API is on HEAD; Web and Worker may legitimately remain on previous SHAs because their projects were skipped as unaffected | OPEN | Create a machine-readable release manifest with repo SHA + effective Web/API/Worker SHAs + migration head + config/version references | One release record reconciles all production components | P0 |
-| DB-01 | Neon migration head | Repository contains migrations through `0033_durable_job_idempotency.sql`; last independently recorded Neon evidence was migration 0031 | BLOCKED | Re-run live Neon verification when the connector can execute authoritative read-only SQL; verify `schema_migrations` and 0032/0033 checksums | Live DB proves expected migration head and checksums | P0 |
-| DB-02 | Migration pipeline | `.github/workflows/database-migrate.yml` runs on migration changes and production environment, but `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` is always set | REVIEW | Keep baseline capability but restrict it to an explicit bootstrap/baseline operation, or prove why permanent production enablement is safe | Normal production migration path no longer silently treats an empty `schema_migrations` as canonical baseline, unless explicitly approved | P1 |
-| DB-03 | Runtime DB role | Prior production evidence proves API readiness only with `tms_app`; worker role adoption remains pending | PARTIAL | Prove worker connection identity and required grants separately from backup/restore credentials | Worker runtime check shows approved least-privilege role | P1 |
-| DB-04 | Behavioral RLS | Structural RLS/FORCE RLS and `NOBYPASSRLS` are documented/proven; direct production cross-tenant behavior under runtime role is still open | BLOCKED | Execute a controlled production-safe cross-tenant read/write denial test using the real runtime role | Cross-tenant operations are denied in production under runtime credentials | P0 |
-| AUTH-01 | Auth0 tenant claim | Source-controlled Action defines `https://tms-platform.io/claims/tenant_id`; API revalidates subject + membership | OPEN | Perform fresh Auth0 login/token issuance and trace the real token through Web → API → DB | Fresh token with tenant claim accepted; tenant-scoped operation succeeds; wrong tenant is denied | P0 |
-| AUTH-02 | Auth0 configuration parity | Required env vars are consumed by Web/API; exact production values were not independently verified through an Auth0 connector | OPEN | Reconcile production Auth0 tenant/application/API/Action settings with repository contract without exposing secrets | Documented config fingerprint/version + successful E2E token test | P1 |
-| API-01 | Protected route coverage | Freight controller has protected business routes; current replay route is also protected | PARTIAL | Build a route/permission matrix and execute smoke tests for each protected family | Every production route has auth, permission, validation and tenant-scope evidence | P1 |
-| API-02 | Replay permission | New `POST :id/status-events/:eventId/replay` uses broad `freight:update` permission | NEEDS HARDENING | Introduce a dedicated permission such as `freight:replay`, assign only to explicitly approved roles, and document it | 403 for ordinary update-only users; approved replay role succeeds | P1 |
-| API-03 | Replay semantics | Replay creates `replay:<eventId>:<randomUUID>`, so each manual request creates a distinct durable job | NEEDS DECISION | Define whether replay is intentionally repeatable or should be idempotent; preserve audit reason and actor | Documented semantics + tests for repeated replay behavior | P1 |
-| API-04 | Replay tests | Source search finds controller/service implementation but no dedicated replay test | OPEN | Add unit/integration tests for success, nonexistent event, aggregate mismatch, payload inconsistency, permission denial, tenant isolation and repeated replay | Targeted test suite passes and is included in CI | P1 |
-| API-05 | Replay documentation | Existing project docs list freight status update but not the new replay operation | DOC DRIFT | Update API/operations documentation and state that replay is production capability only after runtime gate is closed | Docs match route, permission and operational controls | P1 |
-| WORK-01 | Worker deployment | Current HEAD deployment is SKIPPED; prior successful worker is at 6348; worker process/runtime exists | PARTIAL | Verify why watch rules skip this commit and record effective worker SHA; no forced redeploy unless required | Effective worker version is known and intentional | P1 |
-| WORK-02 | Worker business contract | Prior audit found no authoritative contract connecting `freight.status_changed` → outbox → durable job → business handler | BLOCKED | Define the domain event contract before adding speculative handlers or tenant IDs | Source + test + runtime evidence for one real freight event end-to-end | P1 |
-| WORK-03 | Worker operational readiness | Worker can be alive with zero configured tenants; metrics are currently insufficient to distinguish idle from broken | OPEN | Add explicit readiness/telemetry for process, DB, role, tenants, outbox, durable jobs and last successful cycle | Dashboard/log evidence distinguishes healthy-idle from unhealthy | P1 |
-| WORK-04 | Durable Jobs idempotency | Lease fencing and deterministic external idempotency-key propagation are implemented; receiver-side atomic dedup remains external dependency | PARTIAL / CORRECT | Keep TMS-side key deterministic and collect destination-side proof when real integrations are enabled | Destination proves atomic deduplication for same idempotency key | P1 |
-| BAK-01 | Backup execution | Backup worker deployment is SUCCESS, but deployment success does not prove a backup object/checksum/retention run | OPEN | Execute or capture one real scheduled/manual backup and verify artifact, checksum, manifest and retention | Actual backup artifact + verification evidence | P1 |
-| DR-01 | Independent restore | Restore-proof branch was reconciled to migration 0031, but this is not an independent restore from the current encrypted backup | OPEN | Restore a real current backup into isolated infrastructure and measure restore steps/time | Restore completes from real artifact with recorded RPO/RTO evidence | P1 |
-| ENV-01 | Environment parity | Prior evidence shows development/staging materially behind production and without canonical `schema_migrations` | BLOCKED | Define ownership/consumer intent first; then migrate or retire environments non-destructively | Approved environment matrix + schema/version evidence | P1 |
-| ENV-02 | Environment variable contract | Several runtime vars are proven consumers; `.env.example` remains incomplete and some historical vars lack consumers | PARTIAL | Reconcile every variable as required/optional/legacy/documentation-only/indirect | Complete env contract per environment, without secrets | P1 |
-| SEC-01 | Tenant isolation architecture | AuthZ + tenant membership + transaction tenant context + PostgreSQL RLS are implemented as defense in depth | STRONG / E3 STRUCTURAL | Preserve architecture; focus on runtime proof instead of rewrite | Production behavioral test closes DB-04 and AUTH-01 | P0 |
-| SEC-02 | Runtime config centralization | `packages/config` exists, but API/Auth0/Web/Worker still contain direct `process.env` reads | TECHNICAL DEBT | Centralize operational env parsing and validation, keeping bootstrap exceptions explicit | No uncontrolled runtime env reads outside approved config boundaries | P2 |
-| DB-05 | Repository typing | Outbox/Durable Jobs repositories still use `any` for pool/client/row in inspected paths | TECHNICAL DEBT | Replace with `Pool`, `PoolClient` and explicit row interfaces | Typecheck passes with those paths free of `any` | P2 |
-| WEB-01 | Frontend structure | `apps/web/src/app/page.tsx` remains monolithic and owns session, health, freight list/form/status/error state | TECHNICAL DEBT | Split into hooks/components/libs without changing behavior first | Same runtime behavior with smaller testable units | P2 |
-| WEB-02 | Web/API deployment model | Vercel correctly skipped current Web deploy because the commit is API-only | ACCEPTED / NEEDS DOCUMENTATION | Make component promotion semantics explicit rather than forcing all services onto identical SHAs | Release manifest explains effective SHA per component | P1 |
-| DOC-01 | Audit source of truth | Multiple dated audit documents exist; several contain historical states that no longer match current HEAD | PARTIAL | Keep historical records immutable and use this file as the current execution tracker | Every current finding is maintained here; historical docs are labeled by date | P1 |
-| DOC-02 | Architecture diagrams | Architecture docs exist, but current audit still benefits from a single C4/context + deployment + ERD + event-flow set | OPEN | Consolidate/refresh diagrams from actual current topology | Diagrams match deployed topology and DB relationships | P2 |
-| CI-01 | Current-head CI | Current commit status has external deployment checks; the workflow-run lookup did not return a PR run for HEAD | OPEN | Verify main push CI directly and record exact run/job IDs | Current HEAD format/lint/typecheck/test/build are green | P0 |
-| CI-02 | Promotion gates | Web/API/Worker are not necessarily promoted together; component-specific deploy behavior is already observable | OPEN | Define explicit promotion matrix and release gate rules per app | A failed/stale component cannot be mistaken for a complete release | P1 |
-| SEC-03 | Security-sensitive replay | Replay is a production mutation that creates durable work and audit records | NEEDS HARDENING | Require dedicated permission, structured reason, rate/approval policy if warranted, and audit coverage | Operationally controlled replay with negative tests and audit evidence | P1 |
-| FINAL-01 | Final DoD | Final DoD is not reached while P0/P1 runtime evidence remains open | BLOCKED | Close P0 first, then P1, then rerun regression and documentation reconciliation | All release gates green or formally accepted with evidence | P0 |
+| REL-01 | Manifesto de release | API está no HEAD; Web/Worker podem permanecer em SHA anterior porque foram pulados como não afetados | ABERTO | Criar manifesto versionado com SHA do repositório, SHA efetivo de Web/API/Worker, head de migração e referências de configuração | Um único registro reconcilia todos os componentes de produção | P0 |
+| DB-01 | Head de migração Neon | Repositório contém até `0033_durable_job_idempotency.sql`; evidência independente de produção/main continua em 31 migrações / 0031 | BLOQUEADO | Executar verificação read-only autoritativa do `schema_migrations` e dos checksums 0032/0033 | Banco live comprova head e checksums esperados | P0 |
+| DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
+| DB-03 | Papel de banco em runtime | Worker verifica em código que o usuário atual deve ser `tms_app`; adoção em runtime de produção ainda não foi comprovada | PARCIAL | Provar identidade do worker e grants efetivos em runtime | Worker em produção confirma papel aprovado e least privilege | P1 |
+| DB-04 | RLS comportamental | RLS/FORCE RLS e `NOBYPASSRLS` estão implementados; teste E4 cross-tenant em produção ainda não foi executado | BLOQUEADO | Executar teste controlado de leitura/escrita cross-tenant com a credencial real de runtime | Operação cross-tenant é negada em produção | P0 |
+| AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; API valida token, subject e membership | ABERTO | Emitir novo token real e rastrear Auth0 → Web → API → DB | Token real com claim de tenant é aceito e operação tenant-scoped funciona; tenant incorreto é negado | P0 |
+| AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
+| API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e permissões específicas por operação | PARCIAL | Criar matriz rota × permissão × validação × tenant e executar smoke tests | Todas as rotas de negócio possuem evidência de proteção e isolamento | P1 |
+| API-02 | Permissão de replay | `POST :id/status-events/:eventId/replay` usa `freight:update` | PRECISA HARDENING | Criar permissão dedicada, por exemplo `freight:replay`, com concessão explícita | Usuário de update comum recebe 403; papel autorizado executa replay | P1 |
+| API-03 | Semântica de replay | Cada replay gera `replay:<eventId>:<randomUUID>`; chamadas repetidas criam jobs distintos | DECISÃO NECESSÁRIA | Definir se replay manual é deliberadamente repetível ou deve ser idempotente | Semântica documentada + teste de chamadas repetidas | P1 |
+| API-04 | Testes do replay | Busca no repositório não encontrou teste dedicado do endpoint/service de replay | ABERTO | Testar sucesso, evento inexistente, aggregate divergente, payload inconsistente, 403, isolamento tenant e repetição | Suite direcionada passa e entra no CI | P1 |
+| API-05 | Documentação do replay | Documentação geral de freight não reflete claramente a nova operação de replay | DRIFT DOCUMENTAL | Atualizar API/ops e controles operacionais | Docs, permissão e operação coincidem | P1 |
+| API-06 | Endpoints de diagnóstico em produção | Existem `runtime-context`, `runtime-db-context`, `runtime-rls-isolation` e `runtime-auth-claims`, protegidos apenas por `freight:read` | PRECISA REVISÃO DE SEGURANÇA | Restringir a diagnóstico/admin, remover de produção ou definir explicitamente o contrato de exposição | Evidência de que dados de contexto/tenant não ficam disponíveis a usuários comuns | P1 |
+| WORK-01 | Deploy do worker | SHA atual foi SKIPPED; worker anterior permanece como versão efetiva | PARCIAL | Confirmar regras de watch e registrar SHA efetivo | Versão do worker é conhecida, intencional e observável | P1 |
+| WORK-02 | Contrato de negócio do worker | Agora existe caminho fonte-controlado: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; há teste de integração CI | E2/E3 COMPROVADO / E4 ABERTO | Reconciliar contrato com Neon/Railway de produção e processar evento real | Evento real percorre todo o fluxo em runtime de produção | P1 |
+| WORK-03 | Prontidão operacional | Worker valida `tms_app` e tenants ativos, mas ainda pode ficar idle quando `OUTBOX_TENANT_IDS` está vazio; métricas de ciclo/último sucesso ainda são insuficientes | ABERTO | Expor readiness/telemetria para processo, DB, role, tenants, outbox, durable jobs e último ciclo | É possível distinguir healthy-idle de unhealthy | P1 |
+| WORK-04 | Idempotência Durable Jobs | TMS usa chave determinística do evento no fluxo normal; handler tem proteção de replay; deduplicação atômica no destino externo continua dependência externa | PARCIAL / CORRETO | Preservar chave e obter prova do destino quando integrações externas forem ativadas | Destino comprova deduplicação atômica pela mesma chave | P1 |
+| BAK-01 | Execução de backup | Deploy do backup worker foi SUCCESS; isso não prova objeto, checksum, retenção ou execução recorrente | ABERTO | Capturar/realizar uma execução real e verificar artefato, checksum, manifesto e retenção | Artefato real + verificação independente | P1 |
+| DR-01 | Restore independente | Branch isolada foi reconciliada até 0031; isso não prova restore do backup criptografado atual | ABERTO | Restaurar backup atual em infraestrutura isolada e medir execução | Restore real com RPO/RTO registrados | P1 |
+| ENV-01 | Paridade de ambientes | Evidência histórica mostra development/staging atrás de produção e sem `schema_migrations` canônico | BLOQUEADO | Definir ownership/uso e então migrar ou aposentar de modo não destrutivo | Matriz aprovada + evidência de schema/version | P1 |
+| ENV-02 | Contrato de variáveis | Há consumidores conhecidos, mas ainda existem variáveis diretas e históricas sem reconciliação completa | PARCIAL | Classificar cada variável como obrigatória, opcional, legada, documental ou indireta | Contrato completo por ambiente, sem segredos | P1 |
+| SEC-01 | Isolamento tenant | AuthZ + membership + contexto transacional + RLS formam defesa em profundidade | FORTE / E3 ESTRUTURAL | Preservar arquitetura e fechar prova comportamental | DB-04 + AUTH-01 comprovados em runtime | P0 |
+| SEC-02 | Centralização de configuração | `packages/config` existe, mas ainda há `process.env` direto em API/Auth0/Web/Worker | DÍVIDA TÉCNICA | Centralizar parsing/validação, mantendo exceções de bootstrap explícitas | Leituras de env restritas às fronteiras aprovadas | P2 |
+| DB-05 | Tipagem dos repositórios | Outbox/Durable Jobs ainda usam `any` em pool/client/row nos caminhos auditados | DÍVIDA TÉCNICA | Substituir por `Pool`, `PoolClient` e interfaces de row | Typecheck sem `any` nesses caminhos | P2 |
+| WEB-01 | Estrutura frontend | `apps/web/src/app/page.tsx` continua monolítico e concentra sessão, health, freight, formulário, erro e estado | DÍVIDA TÉCNICA | Extrair hooks/components/libs sem mudar comportamento primeiro | Mesmo comportamento com unidades testáveis menores | P2 |
+| WEB-02 | Modelo de deploy Web/API | Vercel pulou o Web no commit API-only; isso é comportamento esperado de monorepo, não defeito automático | ACEITO / PRECISA DOCUMENTAÇÃO | Formalizar promoção por componente | Manifesto explica SHA efetivo por componente | P1 |
+| DOC-01 | Fonte de verdade da auditoria | Existem documentos datados com estados históricos diferentes | PARCIAL | Manter históricos imutáveis e usar este tracker como estado corrente | Todo finding atual aparece aqui; históricos ficam explicitamente datados | P1 |
+| DOC-02 | Diagramas | Há documentação arquitetural, mas a auditoria pede conjunto único atualizado de contexto, deployment, ERD e event-flow | ABERTO | Consolidar diagramas a partir da topologia atual | Diagramas coincidem com produção e relações de banco | P2 |
+| CI-01 | CI do HEAD atual | Status externos estão verdes, mas a consulta de workflow do SHA atual retornou zero runs | ABERTO | Confirmar execução de main e registrar run/job IDs | format/lint/typecheck/test/build verdes no SHA atual | P0 |
+| CI-02 | Gates de promoção | Web/API/Worker podem ser promovidos separadamente | ABERTO | Definir gates explícitos por componente e release | Componente desatualizado/falho não é confundido com release completa | P1 |
+| SEC-03 | Replay sensível | Replay é mutação de produção que cria durable job e auditoria | PRECISA HARDENING | Permissão dedicada, motivo estruturado, rate/approval quando aplicável e auditoria | Replay controlado + testes negativos + trilha de auditoria | P1 |
+| FINAL-01 | DoD final | P0/P1 ainda têm evidência operacional aberta | BLOQUEADO | Fechar P0, depois P1, executar regressão e reconciliar documentação | Gates finais verdes ou aceitos formalmente com evidência | P0 |
 
-## 3. Concrete facts that must not be lost
+## 4. Correções importantes feitas nesta auditoria cruzada
 
-1. **Do not call Web/Worker SHA drift a defect by itself.** Vercel explicitly reported the current Web deployment as canceled because the project was unaffected; Railway likewise skipped the worker deployment for the API-only commit. The correct control is an effective-component-SHA manifest.
-2. **Do not claim Neon is at migration 0033 yet.** Repository HEAD contains 0033; the last recorded live Neon evidence is 0031, and the current connector has not supplied fresh authoritative migration-head evidence.
-3. **Do not claim Auth0 production E2E is proven.** Source configuration is evidence of intended behavior, not proof of a freshly issued production token traversing the full chain.
-4. **Do not claim backup/DR E4 from deployment success or schema reconciliation alone.** A real backup artifact and independent restore are separate gates.
-5. **Do not invent a worker event contract.** If `freight.status_changed` is not the authoritative production contract, define it before implementing a handler.
-6. **Do not force deployment merely to align component SHAs.** First determine whether the changed files actually require that component to redeploy.
-7. **Do not perform destructive development/staging database synchronization.** Establish environment ownership and consumer intent first.
-8. **Do not remove historical audit documents just because they are old.** Mark them historical and maintain this tracker as the current operational state.
+### 4.1 Contrato do worker não está mais “sem fonte de verdade”
 
-## 4. Recommended execution order
+A auditoria anterior marcava `WORK-02` como bloqueado porque não havia contrato autoritativo suficiente. A leitura cruzada do HEAD atual encontrou:
 
-### P0 — close these first
+`freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`
 
-1. Current-head CI evidence.
-2. Live Neon migration head + 0032/0033 verification.
-3. Production behavioral RLS under the real runtime role.
-4. Real Auth0 token → Web → API → tenant-scoped DB operation.
-5. Effective Web/API/Worker SHA release manifest.
+Evidências de código:
+1. A transição de freight grava `freight.status_changed` no outbox na mesma transação.
+2. O worker consome esse evento e cria `durable_jobs` com `idempotencyKey: event.id`.
+3. O worker registra handler para `freight.status_changed`.
+4. O handler grava conclusão idempotente em `audit_events`.
+5. Existe teste do handler e teste de integração do fluxo completo.
+6. A documentação operacional também registra esse fluxo.
 
-### P1 — then execute
+**Nova classificação:** E2/E3 comprovado por código + CI; **E4 de produção continua aberto** até execução real no ambiente Neon/Railway atual.
 
-6. Dedicated replay permission + replay semantics + replay tests.
-7. Worker runtime identity and worker business-event contract.
-8. Real backup execution.
-9. Independent restore from current encrypted backup.
-10. Environment parity governance.
-11. Full protected-route runtime matrix.
-12. Documentation reconciliation.
+### 4.2 O fluxo normal do Durable Job é diferente do replay manual
 
-### P2 — after runtime closure
+No fluxo normal, a chave de idempotência é determinística pelo ID do evento de outbox. No endpoint de replay, a chave contém UUID aleatório. Portanto:
 
-13. Centralize environment configuration.
-14. Remove repository `any` debt.
-15. Refactor monolithic Web page.
-16. Refresh C4/ERD/deployment/event-flow diagrams.
+- processamento normal: pode deduplicar o mesmo evento;
+- replay manual: cada solicitação é uma nova intenção de replay.
 
-## 5. Definition of done for this tracker
+Isso não é necessariamente um defeito; é uma decisão semântica que precisa ser explícita e testada.
 
-An item may move to **CLOSED/PROVEN** only when the stated closure evidence exists. Source code, a successful deployment, or a document alone is not enough for an operational E3/E4 claim.
+### 4.3 Há endpoints de diagnóstico que merecem revisão antes do fechamento
 
-**Current overall state: P0/P1 runtime evidence still open. Final DoD not reached.**
+O controller de Freight contém endpoints de diagnóstico de contexto, banco, RLS e claims. Eles estão protegidos por `freight:read`, mas alguns retornam dados de contexto operacional e fazem probes de isolamento.
+
+Antes do DoD final, decidir se esses endpoints:
+- ficam disponíveis somente para operadores/admin;
+- ficam condicionados a feature flag/ambiente não produtivo; ou
+- permanecem em produção com contrato explícito e testes de exposição.
+
+### 4.4 CI e runtime devem continuar separados
+
+Há evidência de qualidade/integração em CI para o fluxo do worker, mas isso não substitui:
+- migration head do Neon;
+- versão efetiva do worker em Railway;
+- execução real de um evento em produção;
+- prova comportamental de RLS;
+- E2E Auth0 real.
+
+## 5. Fatos concretos que não podem ser perdidos
+
+1. **Não tratar diferença de SHA do Web/Worker como defeito por si só.** Vercel/Railway podem pular componentes não afetados. O controle correto é o SHA efetivo por componente.
+2. **Não afirmar que Neon está em 0033.** O repositório contém 0033; a evidência live independente disponível continua em 0031.
+3. **Não afirmar E2E Auth0 de produção.** Configuração em código/Action é intenção e evidência estrutural, não prova de token real recém-emitido.
+4. **Não afirmar backup/DR E4 a partir de deploy SUCCESS ou reconciliação de schema.** É necessário artefato de backup e restore independente.
+5. **O contrato `freight.status_changed` agora existe no código e nos testes.** O que falta é prova E4 no runtime produtivo atual.
+6. **Não forçar deploy apenas para alinhar SHAs.** Primeiro confirmar se o componente foi realmente afetado.
+7. **Não executar sincronização destrutiva de development/staging.** Definir ownership e consumidores antes.
+8. **Não apagar documentos históricos.** Eles continuam úteis como trilha temporal; este tracker é o estado corrente.
+9. **Não confundir replay manual com idempotência do fluxo normal.** O replay atual gera uma nova chave por solicitação.
+10. **Não considerar endpoints de diagnóstico automaticamente seguros só porque possuem `freight:read`.** A superfície de exposição precisa ser decidida e testada.
+
+## 6. Ordem recomendada de execução
+
+### P0 — fechar primeiro
+
+1. Confirmar CI real do HEAD atual e registrar run/job.
+2. Confirmar head de migração Neon e checksums de 0032/0033.
+3. Executar prova comportamental de RLS com o papel de runtime real.
+4. Executar E2E Auth0: token real → Web → API → DB tenant-scoped.
+5. Criar manifesto de release com SHA efetivo de Web/API/Worker e migration head.
+
+### P1 — executar depois
+
+6. Criar permissão dedicada de replay.
+7. Definir semântica de replay e adicionar testes dedicados.
+8. Revisar e restringir endpoints de diagnóstico.
+9. Provar runtime do worker e executar evento real `freight.status_changed`.
+10. Provar backup real.
+11. Fazer restore independente do backup criptografado atual.
+12. Resolver governança de development/staging.
+13. Executar matriz de rotas protegidas.
+14. Reconciliar documentação operacional.
+
+### P2 — após fechamento operacional
+
+15. Centralizar configuração de ambiente.
+16. Remover `any` dos repositórios auditados.
+17. Refatorar `page.tsx` sem alterar comportamento.
+18. Atualizar C4, ERD, deployment e event-flow.
+
+## 7. Definition of Done
+
+Um item só pode virar **FECHADO/COMPROVADO** quando a evidência de encerramento definida na tabela existir.
+
+Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para uma afirmação operacional E3/E4.
+
+**Estado geral atual:** P0/P1 ainda possuem evidência de runtime aberta. O DoD final **não foi atingido**.
+
+## 8. Histórico de atualizações do tracker
+
+- 2026-09-24: tracker criado como lista canônica de execução.
+- 2026-09-24: master controller passou a apontar para este tracker como ledger corrente.
+- 2026-09-24: auditoria cruzada atualizada para português.
+- 2026-09-24: `WORK-02` corrigido de “contrato ausente” para “E2/E3 comprovado, E4 aberto”, após confirmação do fluxo e testes do worker.
+- 2026-09-24: adicionados `API-06` e `SEC-03` para revisão da superfície de diagnóstico e endurecimento do replay.
