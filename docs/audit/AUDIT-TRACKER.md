@@ -61,7 +61,7 @@ A regra de evidência é:
 | WEB-01 | Estrutura frontend | `apps/web/src/app/page.tsx` continua monolítico e concentra sessão, health, freight, formulário, erro e estado | DÍVIDA TÉCNICA | Extrair hooks/components/libs sem mudar comportamento primeiro | Mesmo comportamento com unidades testáveis menores | P2 |
 | WEB-02 | Modelo de deploy Web/API | Vercel pulou o Web no commit API-only; isso é comportamento esperado de monorepo, não defeito automático | ACEITO / PRECISA DOCUMENTAÇÃO | Formalizar promoção por componente | Manifesto explica SHA efetivo por componente | P1 |
 | DOC-01 | Fonte de verdade da auditoria | Existem documentos datados com estados históricos diferentes | PARCIAL | Manter históricos imutáveis e usar este tracker como estado corrente | Todo finding atual aparece aqui; históricos ficam explicitamente datados | P1 |
-| DOC-02 | Diagramas | Há documentação arquitetural, mas a auditoria pede conjunto único atualizado de contexto, deployment, ERD e event-flow | ABERTO | Consolidar diagramas a partir da topologia atual | Diagramas coincidem com produção e relações de banco | P2 |
+| DOC-02 | Diagramas | Conjunto versionado de Mermaid criado em `docs/architecture/`: contexto, deployment e domínio; índice e check estrutural entram no CI | IMPLEMENTADO NO REPOSITÓRIO / VALIDAÇÃO PENDENTE | Revisar os três diagramas contra runtime efetivo e, se necessário, ampliar para ERD/event-flow | Diagramas coincidem com runtime e relações de banco; CI verde no HEAD auditado | P2 |
 | CI-01 | CI do HEAD atual | Status externos estão verdes, mas a consulta de workflow do SHA atual retornou zero runs | ABERTO | Confirmar execução de main e registrar run/job IDs | format/lint/typecheck/test/build verdes no SHA atual | P0 |
 | CI-02 | Gates de promoção | Web/API/Worker podem ser promovidos separadamente | ABERTO | Definir gates explícitos por componente e release | Componente desatualizado/falho não é confundido com release completa | P1 |
 | SEC-03 | Replay sensível | Replay é mutação de produção que cria durable job e auditoria | PRECISA HARDENING | Permissão dedicada, motivo estruturado, rate/approval quando aplicável e auditoria | Replay controlado + testes negativos + trilha de auditoria | P1 |
@@ -152,7 +152,7 @@ Há evidência de qualidade/integração em CI para o fluxo do worker, mas isso 
 15. Centralizar configuração de ambiente.
 16. Remover `any` dos repositórios auditados.
 17. Refatorar `page.tsx` sem alterar comportamento.
-18. Atualizar C4, ERD, deployment e event-flow.
+18. Revisar os diagramas Mermaid versionados contra runtime efetivo e relações de banco; adicionar ERD/event-flow somente se a reconciliação da auditoria demonstrar necessidade.
 
 ## 7. Definition of Done
 
@@ -169,3 +169,4 @@ Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para 
 - 2026-09-24: auditoria cruzada atualizada para português.
 - 2026-09-24: `WORK-02` corrigido de “contrato ausente” para “E2/E3 comprovado, E4 aberto”, após confirmação do fluxo e testes do worker.
 - 2026-09-24: adicionados `API-06` e `SEC-03` para revisão da superfície de diagnóstico e endurecimento do replay.
+- 2026-09-24: adicionados diagramas Mermaid versionados de contexto, deployment e domínio; índice e `architecture:check` passaram a fazer parte do CI. DOC-02 permanece pendente de validação contra runtime efetivo.
