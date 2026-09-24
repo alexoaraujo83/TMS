@@ -160,6 +160,16 @@ export class FreightController {
     return this.assignments.assign(context, id, dto.driverId, dto.vehicleId);
   }
 
+  @Post(":id/status-events/:eventId/replay")
+  @RequirePermission("freight:update")
+  replayStatusChangedEvent(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Param("eventId", new ParseUUIDPipe()) eventId: string,
+  ) {
+    return this.service.replayStatusChangedEvent(context, id, eventId);
+  }
+
   @Patch(":id/status")
   @RequirePermission("freight:update")
   updateStatus(
