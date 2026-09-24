@@ -12,10 +12,16 @@ async function proxyJson(request: Request, path: string, init: RequestInit = {})
 
   try {
     const fetcher = await auth0.createFetcher(request, { baseUrl: apiBaseUrl });
-    const response = await fetcher.fetchWithAuth(path, {
+    const fetchInit: RequestInit = {
       ...init,
       cache: "no-store",
-    });
+    };
+
+    if (init.method === "POST") {
+      fetchInit.body = await request.text();
+    }
+
+    const response = await fetcher.fetchWithAuth(path, fetchInit);
     const body = await response.text();
 
     return new NextResponse(body, {
@@ -40,7 +46,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return proxyJson(request, "/freights", {
     method: "POST",
-    body: await request.text(),
     headers: { "content-type": "application/json" },
   });
 }
