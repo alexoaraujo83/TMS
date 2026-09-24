@@ -119,6 +119,19 @@ export class FreightController {
     });
   }
 
+  @Get("runtime-auth-claims")
+  @RequirePermission("freight:read")
+  runtimeAuthClaims(@CurrentUser() context: RequestContext) {
+    return {
+      authenticated: true,
+      issuer: context.oidc?.issuer ?? null,
+      audience: context.oidc?.audience ?? null,
+      subject: context.oidc?.subject ?? null,
+      expiresAt: context.oidc?.expiresAt ?? null,
+      tenantId: context.tenantId,
+    };
+  }
+
   @Get(":id")
   @RequirePermission("freight:read")
   get(
