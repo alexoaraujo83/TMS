@@ -15,10 +15,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   }
 
   const { id } = await params;
-  const body = await request.text();
 
   try {
     const fetcher = await auth0.createFetcher(request, { baseUrl: apiBaseUrl });
+    const body = await request.text();
     const response = await fetcher.fetchWithAuth(
       "/freights/" + encodeURIComponent(id) + "/status",
       {
