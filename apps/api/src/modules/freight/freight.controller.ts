@@ -60,7 +60,6 @@ export class FreightController {
     };
   }
 
-
   @Get("runtime-db-context")
   @RequirePermission("freight:read")
   async runtimeDbContext(@CurrentUser() context: RequestContext) {
@@ -73,48 +72,6 @@ export class FreightController {
         requestTenantId: context.tenantId,
         databaseTenantId: result.rows[0]?.databaseTenantId ?? null,
         freightCount: Number(result.rows[0]?.freightCount ?? 0),
-      };
-    });
-  }
-
-  @Get("runtime-rls-isolation")
-  @RequirePermission("freight:read")
-  async runtimeRlsIsolation(@CurrentUser() context: RequestContext) {
-    return withTenantContext(this.pool, context.tenantId, async (client) => {
-      const tenantA = context.tenantId;
-      const tenantB = randomUUID();
-      const probe = await client.query<{ id: string }>(
-        "select id from public.freights order by created_at asc limit 1",
-      );
-      const probeFreightId = probe.rows[0]?.id ?? null;
-
-      if (!probeFreightId) {
-        return {
-          authenticated: true,
-          tenantA,
-          syntheticTenantB: tenantB,
-          probeFreightId: null,
-          tenantAVisible: false,
-          tenantBVisible: false,
-          rlsIsolation: false,
-          reason: "No freight available for the production RLS probe",
-        };
-      }
-
-      await client.query("select set_config($1, $2, true)", ["app.tenant_id", tenantB]);
-      const hidden = await client.query(
-        "select id from public.freights where id = $1",
-        [probeFreightId],
-      );
-
-      return {
-        authenticated: true,
-        tenantA,
-        syntheticTenantB: tenantB,
-        probeFreightId,
-        tenantAVisible: true,
-        tenantBVisible: hidden.rowCount === 1,
-        rlsIsolation: hidden.rowCount === 0,
       };
     });
   }
