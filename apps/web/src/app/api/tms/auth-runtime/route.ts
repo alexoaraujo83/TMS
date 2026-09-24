@@ -6,9 +6,7 @@ function classifyAccessTokenError(error: unknown): Record<string, string> {
     return { errorType: "UNKNOWN_ERROR" };
   }
 
-  const result: Record<string, string> = {
-    errorType: error.name,
-  };
+  const result: Record<string, string> = { errorType: error.name };
 
   const errorCode = "code" in error && typeof error.code === "string" ? error.code : undefined;
   if (errorCode) result.errorCode = errorCode;
@@ -16,11 +14,9 @@ function classifyAccessTokenError(error: unknown): Record<string, string> {
   const cause = "cause" in error && error.cause instanceof Error ? error.cause : undefined;
   if (cause) {
     result.causeType = cause.name;
-    const causeCode =
-      "code" in cause && typeof cause.code === "string" ? cause.code : undefined;
+    const causeCode = "code" in cause && typeof cause.code === "string" ? cause.code : undefined;
     if (causeCode) result.causeCode = causeCode;
-    const causeError =
-      "error" in cause && typeof cause.error === "string" ? cause.error : undefined;
+    const causeError = "error" in cause && typeof cause.error === "string" ? cause.error : undefined;
     if (causeError) result.causeError = causeError;
   }
 
@@ -28,12 +24,35 @@ function classifyAccessTokenError(error: unknown): Record<string, string> {
 }
 
 export async function GET() {
+  let sessionTokenPresent = false;
+  let sessionTokenExpiresAt: number | undefined;
+  let sessionTokenAudience: string | undefined;
+
   try {
+    const session = await auth0.getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "Authentication required", session: "MISSING_SESSION" },
+        { status: 401 },
+      );
+    }
+
+    sessionTokenPresent = Boolean(session.tokenSet?.accessToken);
+    sessionTokenExpiresAt = session.tokenSet?.expiresAt;
+    sessionTokenAudience = session.tokenSet?.audience;
+
     const accessToken = await auth0.getAccessToken();
 
     if (!accessToken) {
       return NextResponse.json(
-        { error: "Access token unavailable", code: "NO_ACCESS_TOKEN" },
+        {
+          error: "Access token unavailable",
+          code: "NO_ACCESS_TOKEN",
+          sessionTokenPresent,
+          sessionTokenExpiresAt,
+          sessionTokenAudience,
+        },
         { status: 401 },
       );
     }
@@ -41,9 +60,7 @@ export async function GET() {
     const response = await fetch(
       `${process.env.TMS_API_BASE_URL}/freights/runtime-auth-claims`,
       {
-        headers: {
-          Authorization: `Bearer ${accessToken.token}`,
-        },
+        headers: { Authorization: `Bearer ${accessToken.token}` },
         cache: "no-store",
       },
     );
@@ -60,6 +77,9 @@ export async function GET() {
       {
         error: "Access token unavailable",
         ...classifyAccessTokenError(error),
+        sessionTokenPresent,
+        sessionTokenExpiresAt,
+        sessionTokenAudience,
       },
       { status: 503 },
     );
