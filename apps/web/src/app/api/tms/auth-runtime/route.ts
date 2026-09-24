@@ -71,7 +71,11 @@ export async function GET() {
 
     if (!session) {
       return NextResponse.json(
-        { error: "Authentication required", session: "MISSING_SESSION" },
+        {
+          error: "Authentication required",
+          session: "MISSING_SESSION",
+          runtimeConfig: getRuntimeConfigDiagnostics(),
+        },
         { status: 401 },
       );
     }
