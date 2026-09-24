@@ -17,7 +17,7 @@ export async function GET() {
     );
   }
 
-  const response = await fetch(apiBaseUrl + "/freights/runtime-db-context", {
+  const response = await fetch(apiBaseUrl + "/freights/runtime-rls-isolation", {
     headers: { authorization: "Bearer " + token },
     cache: "no-store",
   });
