@@ -76,29 +76,23 @@ test("REAL cross-tenant negative: tenant B cannot read, insert, update, or delet
       values ($1,$2,'open','dedicated','Santos','SP','Campinas','SP','rls evidence',1,100)`,
       [freightA,tenantA]);
 
-    const client = await runtime.connect();
-    try {
-      await client.query("begin");
-      await client.query("select set_config('app.tenant_id',$1,true)",[tenantB]);
-
+    await withTenantContext(runtime, tenantB, async (client) => {
       const read = await client.query("select id from freights where id=$1",[freightA]);
       assert.equal(read.rowCount,0);
+    });
 
-      await assertDenied(client.query(`insert into freights
-        (id,tenant_id,status,freight_type,origin_city,origin_state,destination_city,destination_state,cargo_description,quantity,weight_kg)
-        values ($1,$2,'open','dedicated','Santos','SP','Campinas','SP','blocked',1,100)`,
-        [randomUUID(),tenantA]));
+    await assertRlsDeniedInFreshSession(runtime, tenantB, `insert into freights
+      (id,tenant_id,status,freight_type,origin_city,origin_state,destination_city,destination_state,cargo_description,quantity,weight_kg)
+      values ($1,$2,'open','dedicated','Santos','SP','Campinas','SP','blocked',1,100)`,
+      [randomUUID(),tenantA]);
 
+    await withTenantContext(runtime, tenantB, async (client) => {
       const update = await client.query("update freights set cargo_description='blocked' where id=$1",[freightA]);
       assert.equal(update.rowCount,0);
-
       const del = await client.query("delete from freights where id=$1",[freightA]);
       assert.equal(del.rowCount,0);
+    });
 
-      await client.query("rollback");
-    } finally {
-      client.release();
-    }
   } finally {
     await admin.query("delete from freights where id=$1",[freightA]);
     await admin.query("delete from tenants where id in ($1,$2)",[tenantA,tenantB]);
@@ -107,12 +101,28 @@ test("REAL cross-tenant negative: tenant B cannot read, insert, update, or delet
   }
 });
 
-async function assertDenied(query: Promise<{ rowCount: number | null }>): Promise<void> {
+async function assertRlsDeniedInFreshSession(
+  pool: Pool,
+  tenantId: string,
+  sql: string,
+  params: unknown[],
+): Promise<void> {
+  const client = await pool.connect();
   try {
-    await query;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && (error as { code?: string }).code === "42501") return;
-    throw error;
+    await client.query("begin");
+    await client.query("select set_config('app.tenant_id',$1,true)", [tenantId]);
+    try {
+      await client.query(sql, params);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && (error as { code?: string }).code === "42501") {
+        await client.query("rollback");
+        return;
+      }
+      throw error;
+    }
+    await client.query("rollback");
+  } finally {
+    client.release();
   }
   throw new Error("cross-tenant insert was accepted");
 }
