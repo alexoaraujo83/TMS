@@ -1,0 +1,21 @@
+%% TMS — C4-style system context
+%% Source of truth for the repository-level system context.
+flowchart TB
+    User["TMS User / Operator"]
+    Auth0["Auth0\nAuthentication / Tenant Claim"]
+    Web["TMS Web\nNext.js / Vercel"]
+    API["TMS API\nNestJS / Vercel"]
+    DB["PostgreSQL / Neon\nTenant-scoped persistence"]
+    Worker["TMS Worker\nRailway"]
+    ObjectStore["S3-compatible Object Store\nBackup artifacts"]
+    External["External Webhook / Business Systems"]
+
+    User -->|HTTPS / OIDC session| Web
+    Web -->|OIDC / access token| Auth0
+    Web -->|Authenticated API requests| API
+    API -->|Verify issuer / audience / JWKS| Auth0
+    API -->|Tenant context + transactions| DB
+    API -->|Transactional outbox| DB
+    Worker -->|Claim / process outbox and durable jobs| DB
+    Worker -->|Signed webhook delivery| External
+    Worker -->|Encrypted dump + checksum + manifest| ObjectStore
