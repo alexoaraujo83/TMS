@@ -4,7 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { PostgresFreightRepository, type FreightRow } from "@tms/database";
+import { randomUUID } from "node:crypto";
+import {
+  PostgresFreightRepository,
+  type FreightRow,
+  withTenantContext,
+} from "@tms/database";
 import { canTransitionFreightStatus, type FreightStatus } from "@tms/freight";
 import type { Pool } from "pg";
 import { DATABASE_POOL } from "../../common/database.provider.js";
@@ -20,7 +25,10 @@ export class FreightService {
 
   constructor(@Inject(DATABASE_POOL) pool: Pool) {
     this.repository = new PostgresFreightRepository(pool);
+    this.pool = pool;
   }
+
+  private readonly pool: Pool;
 
   async create(
     context: RequestContext,
@@ -113,5 +121,83 @@ export class FreightService {
       }
       throw error;
     }
+  }
+
+  async replayStatusChangedEvent(
+    context: RequestContext,
+    freightId: string,
+    eventId: string,
+  ): Promise<{
+    eventId: string;
+    durableJobId: string;
+    idempotencyKey: string;
+    status: string;
+  }> {
+    return withTenantContext(this.pool, context.tenantId, async (client) => {
+      const eventResult = await client.query<{
+        id: string;
+        tenant_id: string;
+        aggregate_id: string | null;
+        event_type: string;
+        payload: Record<string, unknown>;
+      }>(
+        `select id, tenant_id, aggregate_id, event_type, payload
+         from outbox_events
+         where tenant_id = $1
+           and id = $2
+           and aggregate_type = 'freight'
+         limit 1`,
+        [context.tenantId, eventId],
+      );
+
+      const event = eventResult.rows[0];
+      if (!event || event.aggregate_id !== freightId || event.event_type !== "freight.status_changed") {
+        throw new NotFoundException("Freight status-change event not found");
+      }
+
+      const payload = event.payload;
+      if (payload.event_id !== eventId || payload.freight_id !== freightId) {
+        throw new ConflictException("Freight status-change event payload is inconsistent");
+      }
+
+      const idempotencyKey = `replay:${eventId}:${randomUUID()}`;
+      const jobResult = await client.query<{ id: string; status: string }>(
+        `insert into durable_jobs
+          (tenant_id, job_type, payload, available_at, max_attempts, idempotency_key)
+         values ($1, 'freight.status_changed', $2::jsonb, now(), 5, $3)
+         returning id, status`,
+        [context.tenantId, JSON.stringify(payload), idempotencyKey],
+      );
+
+      const job = jobResult.rows[0];
+      if (!job) throw new Error("DURABLE_JOB_REPLAY_ENQUEUE_FAILED");
+
+      await client.query(
+        `insert into audit_events (
+          tenant_id, actor_user_id, action, entity_type, entity_id,
+          request_id, correlation_id, outcome, metadata
+        ) values ($1,$2,'durable_job.replay_requested','freight',$3,$4,$5,'success',$6::jsonb)`,
+        [
+          context.tenantId,
+          context.userId,
+          freightId,
+          context.requestId || null,
+          context.correlationId || null,
+          JSON.stringify({
+            event_id: eventId,
+            durable_job_id: job.id,
+            idempotency_key: idempotencyKey,
+            reason: "controlled_production_replay",
+          }),
+        ],
+      );
+
+      return {
+        eventId,
+        durableJobId: job.id,
+        idempotencyKey,
+        status: job.status,
+      };
+    });
   }
 }
