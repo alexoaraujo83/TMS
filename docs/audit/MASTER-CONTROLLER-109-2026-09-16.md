@@ -7,6 +7,11 @@ Controller mode: ACTIVE
 
 ## Control chain
 
+## Current tracker
+
+The live execution list is maintained in [docs/audit/AUDIT-TRACKER.md](./AUDIT-TRACKER.md). This controller remains the 109-stage sequence; the tracker is the current evidence/status ledger and must be updated whenever a finding changes state.
+
+
 MASTER CONTROLLER → 109 ETAPAS → EVIDENCE LEDGER → BLOCKER ROUTING → REGRESSION LOOP → FINAL DoD
 
 ## Operating rule
