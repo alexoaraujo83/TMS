@@ -655,3 +655,42 @@ Se houver requisito explícito posterior de Data API, deverá ser aberto um find
 Nenhuma dependência foi adicionada, nenhuma rota foi migrada para Data API, nenhuma policy RLS foi alterada e nenhuma configuração Auth0/Neon foi modificada neste avanço.
 
 Próximo alvo P0 permanece **DB-01**, seguido de **DB-04** e **AUTH-01** quando as capacidades operacionais necessárias estiverem disponíveis.
+
+
+## 36. FASE 2 — Evidência de schema fornecida e DB-01
+
+### 36.1 Artefato recebido
+
+Foi fornecido um DDL contendo o schema TMS com 21 tabelas públicas, incluindo `public.schema_migrations`, e nove tabelas em `neon_auth`. O artefato também contém os campos adicionados pelas migrations `0032_observability_audit_context.sql` (`correlation_id`, `actor_subject`, `ip_address`, `user_agent`, `outcome`) e `0033_durable_job_idempotency.sql` (`durable_jobs.idempotency_key`). O arquivo recebido é evidência do **formato estrutural** do schema, não da sequência de migrations aplicadas em produção. fileciteturn54file0L5-L23
+
+### 36.2 Lacunas do artefato
+
+O DDL fornecido não contém:
+- linhas de dados de `schema_migrations` com versão/checksum;
+- `CREATE POLICY` das tabelas RLS;
+- `FORCE ROW LEVEL SECURITY`;
+- grants/atributos da role `tms_app`;
+- funções/triggers de suporte ao runtime.
+
+Portanto, ele **não pode fechar DB-01 nem DB-04**. Em particular, a presença de `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` demonstra intenção/estado estrutural parcial, mas sem policies e sem prova da role não demonstra isolamento efetivo. fileciteturn54file0L23-L34
+
+### 36.3 Sinal adicional sobre Neon Auth/Data API
+
+O artefato cria os schemas `auth`, `neon_auth` e `pgrst`, e contém as nove tabelas de `neon_auth`. Isso é consistente com objetos de plataforma/integração Neon presentes no banco, mas **não prova que o aplicativo utiliza Neon Auth ou Neon Data API**. O código do TMS continua sem integração `@neondatabase/neon-js`, conforme registrado em NEO-01..NEO-05.
+
+### 36.4 DB-01 permanece bloqueado
+
+A tentativa read-only de usar o conector Neon continua impedida por incompatibilidade entre o schema exposto da ferramenta e a validação do backend: o backend exige `project_id`, enquanto o contrato exposto dos métodos testados não o aceita. O projeto/branch canônicos já estão identificados documentalmente como `shiny-hall-34679912 / br-lingering-shadow-act0vvi9`, mas isso não substitui a consulta live.
+
+**Estado:** DB-01 = **BLOQUEADO POR TOOLING**.
+
+**Regra:** não marcar 0033 como aplicada em produção somente porque o DDL contém a coluna `idempotency_key`; não executar migration corretiva por inferência.
+
+### 36.5 Próximo alvo P0
+
+1. Desbloquear consulta read-only de `schema_migrations`/checksums.
+2. Depois executar DB-04 com role de runtime.
+3. Depois AUTH-01 com token Auth0 real.
+4. Somente então consolidar SEC-01 e REL-01.
+
+Nenhuma alteração funcional, migration, RLS policy, Auth0 ou infraestrutura foi executada neste avanço.
