@@ -5,7 +5,7 @@
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
 > **HEAD da aplicação auditada:** `fb0025aea93aed9ad134a3266f2e7274fb9bcda5`  
-> **HEAD de controle/documentação anterior:** `9c0d786386bb129c57cd2bd7b92458fc4ce35365`  
+> **HEAD de controle/documentação anterior:** `c4fcb3ba598a0218142c11911b52d7a032eb24a4`  
 > **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
 
 ## 1. Escopo e leitura cruzada da auditoria
@@ -424,3 +424,46 @@ A conexão atual não disponibiliza uma capacidade operacional Auth0 específica
 A partir deste ponto, o trabalho pode mudar de natureza para **FASE 2 — EVIDÊNCIAS OPERACIONAIS E CORREÇÕES**, mas os P0 devem ser tratados primeiro e toda alteração deve continuar sendo registrada no tracker.
 
 **Regra preservada nesta consolidação:** nenhuma correção funcional, refatoração, limpeza, alteração de permissões, alteração de banco ou mudança de infraestrutura foi realizada durante a auditoria. O único conteúdo alterado nesta fase foi documentação do tracker.
+
+
+## 31. Início da FASE 2 — evidências operacionais e correções
+
+### 31.1 Roadmap priorizado criado
+
+Foi criado o arquivo `docs/audit/CORRECTIONS-ROADMAP.md`, derivado deste tracker, com a ordem estruturada de execução para:
+
+1. evidência/correção funcional P0;
+2. segurança e infraestrutura P1;
+3. refatoração, limpeza e hardening P2.
+
+O roadmap não altera a prioridade canônica do tracker; ele organiza a execução por dependência e risco.
+
+### 31.2 P0 — DB-01: primeira tentativa de evidência live
+
+Foi iniciada uma consulta read-only em Neon usando o branch de produção previamente registrado (`br-lingering-shadow-act0vvi9`) para consultar `schema_migrations`. A ferramenta Neon disponível nesta sessão exige adicionalmente o `project_id` e rejeitou a chamada sem esse identificador.
+
+**Estado:** DB-01 permanece BLOQUEADO.  
+**Não houve mutation, migration, alteração de branch ou alteração de produção.**
+
+A evidência histórica continua válida apenas como histórico: `schema_migrations` anteriormente observado em 31 migrações não é usado para afirmar o estado atual.
+
+### 31.3 P0 — AUTH-01: capacidade operacional Auth0
+
+A capacidade específica do plugin Auth0 solicitada para esta etapa não está exposta entre as ferramentas disponíveis nesta conexão. Portanto não foi possível executar emissão/validação de token real, nem inferir que a Action esteja implantada/associada em produção.
+
+**Estado:** AUTH-01 permanece ABERTO/BLOQUEADO para E4.  
+**Nenhum segredo, token ou configuração sensível foi exposto ou alterado.**
+
+### 31.4 P0 — CI-01: atualização da evidência
+
+O run `36080140034` / #1135, SHA `c4fcb3ba598a0218142c11911b52d7a032eb24a4`, terminou posteriormente com **conclusion=cancelled**. Portanto ele não pode ser tratado como CI verde.
+
+O último run verde explicitamente consolidado continua sendo `36077970795` no SHA `c6606af28861e05f14c80bc50c89192907d02378`.
+
+**Estado:** CI-01 permanece aberto para um HEAD relevante com conclusão final verde.
+
+### 31.5 Regra operacional desta fase
+
+Nenhuma correção funcional, migration, alteração de RLS, alteração de Auth0, mudança de infraestrutura ou refatoração foi executada nesta primeira entrada da Fase 2. O único write funcional/documental desta etapa foi a criação do roadmap de execução.
+
+Próximo alvo P0: obter o `project_id` Neon necessário para a consulta read-only de DB-01; em seguida executar DB-04 e AUTH-01 somente com credenciais/ambientes operacionais apropriados, sem fabricar evidência.
