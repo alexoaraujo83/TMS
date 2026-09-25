@@ -1146,3 +1146,34 @@ Não disparar workflow CI nem redeploy como atalho para produzir evidência: dep
 - **DB-03 API:** COMPROVADO operacionalmente pelo `/ready`.
 - **Worker runtime role:** PENDENTE.
 - **Harness RLS:** COMPROVADO E2/E3; não confundir com produção E4.
+
+
+## 16. Avanço da Fase 2 — 2026-09-25 — auditoria do contrato real de emissão do outbox
+
+A leitura cruzada do fluxo encontrou uma distinção importante entre o contrato documentado e a API pública do repositório:
+
+- `FreightService.updateStatus()` chama explicitamente `updateStatusWithAudit(...)`, portanto a transição HTTP normal grava a alteração e o evento `freight.status_changed` na mesma transação.
+- `PostgresFreightRepository.updateStatus()` é uma API pública que delega para `updateStatusWithAudit()` **sem** argumento de auditoria.
+- Em `updateStatusWithAudit()`, a emissão do evento para `outbox_events` está condicionada a `if (audit)`.
+- Portanto, uma chamada direta ao método `PostgresFreightRepository.updateStatus()` pode alterar o status sem produzir o evento/outbox esperado pelo contrato operacional.
+- A busca de referências confirmou que o caminho de produção do serviço usa a variante com auditoria; os testes de ciclo de assignment também usam `updateStatusWithAudit()`.
+
+### Classificação
+
+**WORK-02 permanece E2/E3 COMPROVADO / E4 ABERTO**, mas foi identificado um **P1 de robustez de contrato interno**: a garantia “toda mudança de status gera outbox” atualmente depende do chamador escolher a variante `WithAudit`.
+
+Isso não prova um defeito de produção no endpoint atual. É uma fragilidade de API interna que pode permitir divergência futura se outro consumidor usar `updateStatus()` diretamente.
+
+### Evidência complementar
+
+O teste `freight-status-flow.integration.test.ts` começa inserindo manualmente um `outbox_events` via conexão administrativa. Assim, ele comprova a cadeia **outbox → durable job → handler → audit/telemetry**, mas não comprova sozinho que uma chamada real de `updateStatus()` cria o outbox. A prova da emissão atômica está atualmente no código do repositório + cobertura de lifecycle, não em um teste E2E que inicia pela transição de status do serviço.
+
+### Ação recomendada
+
+P1, sem alteração de produção nesta etapa:
+
+1. adicionar um teste de integração que execute a transição de status pela API/repositório canônico e verifique a criação atômica do outbox;
+2. decidir se `updateStatus()` deve sempre exigir os metadados de auditoria ou se deve ser removido/renomeado para impedir uso sem evento;
+3. somente depois avaliar refatoração para tornar impossível, por construção, uma mudança de status sem emissão do evento.
+
+Nenhuma mutation de produção foi executada neste avanço.
