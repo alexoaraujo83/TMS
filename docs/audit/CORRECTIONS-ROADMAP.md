@@ -220,3 +220,30 @@ O artefato não contém os registros de `schema_migrations`, policies RLS, `FORC
 ### 9.4 Regra de execução
 
 Não criar migration corretiva, não alterar RLS e não migrar o acesso do TMS para Data API com base apenas neste DDL. O próximo avanço continua sendo desbloquear a consulta read-only autoritativa do Neon.
+
+
+## 10. Avanço Fase 2 — 2026-09-25 — DB-01 revalidado
+
+### Evidência
+
+Nova execução da auditoria tentou novamente resolver o projeto Neon e preparar a consulta read-only de `schema_migrations`. O backend continua exigindo `project_id`, enquanto o contrato exposto dos métodos usados não aceita esse parâmetro. A tentativa com `project_id` em `list_branches` foi rejeitada pelo schema local; `describe_project({})` foi rejeitado pelo backend por ausência do mesmo identificador.
+
+### Estado
+
+- **DB-01: BLOQUEADO POR TOOLING.**
+- Projeto canônico: `tms / shiny-hall-34679912`.
+- Nenhuma leitura live de `schema_migrations` foi obtida.
+- Nenhuma migration ou mutation de produção foi executada.
+- Nenhum segredo/connection string privilegiado foi usado para contornar o bloqueio.
+
+### Baseline confirmado
+
+O diretório `packages/database/migrations/` do repositório contém 0001–0033, incluindo 0032 e 0033. Isso confirma apenas o baseline de código. Os checksums versionados de 0032/0033 continuam sendo referência de comparação, não evidência do banco live.
+
+### Regra de execução
+
+Não marcar DB-01 como concluído por DDL, contagem histórica, backup, CI ou presença de arquivos. Não executar migration corretiva para “alinhar” produção enquanto o estado live não estiver comprovado.
+
+### Próximo passo
+
+Resolver a incompatibilidade da integração Neon e obter consulta read-only autoritativa de `schema_migrations`. Depois: DB-04 → AUTH-01 → SEC-01 → REL-01.
