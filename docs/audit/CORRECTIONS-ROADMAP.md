@@ -395,3 +395,12 @@ Branches divergentes com commits exclusivos permanecem preservadas até reconcil
 
 ### Próximo passo
 Resolver o bloqueio de DB-04 com uma sessão real tms_app; em paralelo, concluir a reconciliação de PRs/refs das branches ahead_by=0 antes de qualquer exclusão.
+
+
+## 12. Avanço da Fase 2 — 2026-09-25 — reconciliação das branches candidatas
+
+As cinco branches inicialmente candidatas foram reconciliadas com seus PRs: #34, #44, #63, #27 e #25 estão merged, e as branches estão `ahead_by=0` em relação a `main`.
+
+Isso transforma a limpeza de hipótese em **candidatura tecnicamente fundamentada**, mas não em exclusão realizada. A conexão GitHub disponível não expõe uma operação de delete branch/ref nesta sessão.
+
+Nenhuma branch divergente foi removida.
