@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TMS",
-  description: "Transportation Management System",
+  title: "TMS — Gestão de Fretes",
+  description: "Plataforma de gestão e operação de fretes.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
