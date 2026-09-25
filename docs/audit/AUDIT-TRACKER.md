@@ -573,3 +573,85 @@ O método `get_connection_string` também não é um substituto adequado para es
 ### 34.4 Próximo alvo
 
 Continuar buscando uma capacidade Neon compatível com o identificador do projeto ou uma correção de integração que preserve consulta read-only. Se isso não for possível nesta sessão, o finding deve permanecer BLOQUEADO e nenhuma evidência live deve ser inferida de contagens históricas, logs de backup ou sucesso de CI.
+
+
+## 35. FASE 2 — Reconciliação Neon Data API / Auth / RLS
+
+### 35.1 Objetivo
+
+Foi realizada a comparação da implementação atual do TMS com o quickstart oficial do Neon Data API fornecido para esta auditoria, cobrindo Neon Auth, Auth0 como provedor externo, `@neondatabase/neon-js`, Data API e PostgreSQL RLS.
+
+### 35.2 Evidência do repositório
+
+A implementação atual do TMS **não utiliza Neon Data API nem `@neondatabase/neon-js`**.
+
+Não foram encontrados no código/lockfile:
+- `@neondatabase/neon-js`;
+- `createClient({ dataApi: ... })`;
+- `VITE_NEON_DATA_API_URL`;
+- `VITE_NEON_AUTH_URL`;
+- `BetterAuthReactAdapter`;
+- chamadas ao endpoint `apirest.*.neon.tech/neondb/rest/v1`.
+
+A arquitetura comprovada permanece:
+
+`Auth0 → NestJS API → pg → PostgreSQL/Neon → PostgreSQL RLS`.
+
+### 35.3 Autenticação atual
+
+O Web utiliza `@auth0/nextjs-auth0`. O pacote `@tms/auth` define o claim `https://tms-platform.io/claims/tenant_id`, enquanto a API valida identidade/token e resolve membership no PostgreSQL antes de anexar o tenant ao contexto da requisição.
+
+A documentação arquitetural estabelece explicitamente que o claim de tenant não substitui membership, que `X-Tenant-Id` é apenas seleção de contexto e que PostgreSQL RLS permanece a barreira final.
+
+### 35.4 RLS atual
+
+A camada de banco utiliza conexão PostgreSQL direta com `pg`. Transações tenant-aware executam `set_config('app.tenant_id', tenantId, true)` dentro da transação. As migrations habilitam/forçam RLS e o runtime role é configurado sem `BYPASSRLS`.
+
+Os testes de segurança e integração existentes cobrem isolamento cross-tenant no runtime de CI. A prova equivalente com a credencial real de produção permanece DB-04/P0 aberto.
+
+### 35.5 Neon Auth
+
+Há evidência histórica de nove tabelas `neon_auth` no banco Neon de produção observado anteriormente, porém **não existe integração do SDK Neon Auth no aplicativo**. A presença de objetos `neon_auth` no banco não é tratada como prova de que Neon Auth seja o IdP ativo do TMS.
+
+### 35.6 Comparação com o quickstart
+
+O quickstart apresenta duas arquiteturas possíveis:
+
+1. Neon Auth + `createClient({ auth, dataApi })`.
+2. Provedor externo, como Auth0, + `createClient({ dataApi: { getToken } })`.
+
+A segunda opção é conceitualmente compatível com o Auth0 existente, mas sua adoção exigiria preservar ou redesenhar explicitamente as regras atuais de membership, RBAC, seleção de tenant, auditoria e RLS.
+
+### 35.7 Decisão de auditoria
+
+**Não migrar para Neon Data API nesta etapa.**
+
+A ausência de `neon-js` é classificada como **arquitetura alternativa não adotada**, e não como defeito funcional. Introduzir Data API agora criaria uma segunda superfície de acesso ao banco antes do fechamento dos P0 operacionais (DB-01, DB-04 e AUTH-01).
+
+Se houver requisito explícito posterior de Data API, deverá ser aberto um finding arquitetural próprio com matriz de equivalência de:
+- autenticação;
+- membership;
+- RBAC;
+- tenant context;
+- RLS;
+- auditoria;
+- transações;
+- operações administrativas;
+- observabilidade;
+- performance/limites da Data API.
+
+### 35.8 Classificação
+
+| ID | Finding | Estado | Prioridade |
+|---|---|---|---|
+| NEO-01 | Neon Data API não integrada | ARQUITETURA NÃO ADOTADA | P2 / sob demanda |
+| NEO-02 | Neon Auth SDK não integrado | ARQUITETURA NÃO ADOTADA | P2 / sob demanda |
+| NEO-03 | Auth0 + Neon Data API é tecnicamente compatível em princípio | NÃO IMPLEMENTADO | P2 / decisão arquitetural |
+| NEO-04 | PostgreSQL RLS existente e tenant-aware | ESTRUTURALMENTE COMPROVADO; E4 produção pendente | P0 via DB-04 |
+| NEO-05 | Neon Auth objects presentes historicamente no banco | EVIDÊNCIA HISTÓRICA, NÃO PROVA DE IdP ATIVO | P1/P2 documental |
+
+### 35.9 Regra preservada
+
+Nenhuma dependência foi adicionada, nenhuma rota foi migrada para Data API, nenhuma policy RLS foi alterada e nenhuma configuração Auth0/Neon foi modificada neste avanço.
+
+Próximo alvo P0 permanece **DB-01**, seguido de **DB-04** e **AUTH-01** quando as capacidades operacionais necessárias estiverem disponíveis.
