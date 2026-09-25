@@ -421,3 +421,23 @@ Estado: DB-04 BLOQUEADO / E4 PENDENTE.
 ### Próxima ação
 
 Obter uma sessão real autorizada como tms_app através do runtime existente ou de um cliente PostgreSQL autorizado. Não compartilhar credenciais. Executar own-tenant read, cross-tenant read, cross-tenant INSERT e cross-tenant UPDATE, registrando current_user e rolbypassrls na mesma evidência.
+
+
+## 14. Avanço da Fase 2 — 2026-09-25 — prova operacional do API runtime role
+
+Foi obtida evidência E4 adicional para a API de produção: `GET /ready` no domínio de produção respondeu HTTP 200 com `status=ready`. O código do controller executa `select current_user` e só retorna sucesso quando o papel é exatamente `tms_app`.
+
+Isso permite elevar a evidência de adoção do papel runtime da API de estrutural para **operacionalmente comprovada**. A evidência não fecha DB-04 porque não demonstra `rolbypassrls=false` na mesma sessão nem as quatro operações de isolamento tenant.
+
+As rotas autenticadas de diagnóstico `runtime-db-context` e `runtime-rls-isolation` também foram chamadas sem credencial e retornaram HTTP 401. Isso confirma a exigência de autenticação, mas não substitui o teste autenticado tenant-scoped.
+
+### Estado / gates
+
+- DB-03 (API runtime): **COMPROVADO operacionalmente**.
+- DB-04: **BLOQUEADO / E4 PENDENTE**.
+- Worker runtime role: **PENDENTE** por limitação de acesso ao Railway atual.
+- AUTH-01: **PENDENTE** por ausência de token Auth0 real nesta sessão.
+
+### Próxima ação
+
+Priorizar uma sessão PostgreSQL real como `tms_app` para a matriz DB-04, ou evidência runtime equivalente que exponha `current_user` e `rolbypassrls` na mesma sessão e permita os testes own-tenant/cross-tenant de leitura e escrita. Manter schema/RLS imutados durante a prova.
