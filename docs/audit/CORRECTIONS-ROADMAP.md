@@ -160,6 +160,24 @@ Somente após estabilização P0/P1:
 - Fase 1: concluída.
 - Fase 2: iniciada.
 - Primeiro alvo: P0.
-- DB-01: tentativa de consulta live iniciada, mas a ferramenta Neon disponível nesta sessão exige `project_id`; o identificador não está disponível na conexão atual. Nenhuma mutation foi executada.
+- DB-01: tentativa de consulta live iniciada, mas a ferramenta Neon disponível nesta sessão exige `project_id`; o identificador não está disponível no contrato exposto. Nenhuma mutation foi executada.
 - AUTH-01: capacidade Auth0 específica solicitada não está disponível nesta sessão; nenhuma inferência E4 será feita.
 - CI run 36080140034 do HEAD `c4fcb3ba...`: concluído como `cancelled`, portanto não deve ser tratado como CI verde.
+- Avanço posterior: run `36081162875` / #1139 no SHA `2eb43e87...` terminou `success`, fechando CI-01 para esse HEAD de controle/documentação.
+
+
+## 7. Avanço da Fase 2 — CI-01 fechado
+
+### 7.1 Evidência
+
+O run GitHub Actions `36081162875` / #1139 no SHA `2eb43e87bb8005cbfb6d65c7808e34dde725cca4` terminou `success`. O job `107903222930` passou architecture check, migration, runtime role/RLS/IAM, integrações outbox/durable jobs/replay, format, lint, typecheck, test e build.
+
+### 7.2 Interpretação operacional
+
+CI-01 pode ser marcado **FECHADO/COMPROVADO** para o HEAD de controle/documentação atual. A evidência não fecha DB-01, DB-04 ou AUTH-01, pois esses itens exigem runtime/credenciais externos ao CI.
+
+Os quatro status externos observados no mesmo commit — tms-worker, tms-backup-worker, tms-web e tms-core-api — também retornaram `success`. Eles permanecem evidência de deploy/integridade do pipeline externo, não prova dos P0 operacionais.
+
+### 7.3 Próximo passo
+
+Manter DB-01 como primeiro bloqueador: resolver a incompatibilidade do conector Neon para executar a consulta read-only de `schema_migrations`. Nenhuma migration ou alteração de produção deve ser executada para contornar essa ausência de evidência.
