@@ -49,3 +49,4 @@ export async function POST(request: Request) {
     headers: { "content-type": "application/json" },
   });
 }
+\nexport async function DELETE(request: Request) {\n  const url = new URL(request.url);\n  const id = url.searchParams.get("id")?.trim();\n  if (!id) return NextResponse.json({ error: "Freight id is required" }, { status: 400 });\n  return proxyJson(request, `/freights/${encodeURIComponent(id)}`, { method: "DELETE" });\n}\n
