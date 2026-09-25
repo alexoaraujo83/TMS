@@ -341,3 +341,39 @@ A evidência deve omitir senhas, tokens e connection strings completas.
 ### Próxima ação
 
 Executar o teste no Neon SQL Editor ou em cliente PostgreSQL já autenticado como `tms_app`, devolver somente os resultados não sensíveis, e então reconciliar DB-04 no tracker. Sem esse resultado, não avançar para AUTH-01.
+
+
+## 11. Continuação Fase 2 — Auth0, Data API e superfície HTTP
+
+### AUTH-01
+
+A auditoria confirmou novamente que o TMS implementa autenticação via **Auth0 externo**, com issuer/audience/JWKS e claim namespaced de tenant. Testes sintéticos/CI cobrem o contrato, mas não substituem token real e execução E4.
+
+**Estado: ABERTO / E4 PENDENTE.**
+
+A capacidade Neon Auth/Data API disponível no conector não deve ser usada como substituta do Auth0 real. As leituras de configuração Neon também permanecem bloqueadas pelo parâmetro `project_id` não exposto no contrato das ferramentas.
+
+### API-11 / API-06
+
+Endpoints de diagnóstico continuam sob `freight:read`:
+`runtime-context`, `runtime-db-context`, `runtime-rls-isolation`, `runtime-auth-claims`.
+
+**Estado: P1 — CONTROLE DE EXPOSIÇÃO.** Decisão operacional pendente antes de alteração.
+
+### API-02 / SEC-03
+
+Replay continua autorizado por `freight:update`, sem permissão dedicada.
+
+**Estado: P1 — HARDENING PENDENTE.**
+
+### CONFIG-01
+
+O pacote `packages/config` centraliza definições, mas o AuthGuard continua consumindo `process.env` diretamente.
+
+**Estado: P2 — DÍVIDA TÉCNICA**, a tratar somente após estabilização P0/P1.
+
+### DB-03 / WORK
+
+O worker verifica `current_user = tms_app` no startup, mas a prova da identidade efetiva e do fluxo de negócio em runtime continua pendente.
+
+Nenhuma alteração funcional foi feita.
