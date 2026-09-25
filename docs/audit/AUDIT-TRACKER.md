@@ -694,3 +694,52 @@ A tentativa read-only de usar o conector Neon continua impedida por incompatibil
 4. Somente então consolidar SEC-01 e REL-01.
 
 Nenhuma alteração funcional, migration, RLS policy, Auth0 ou infraestrutura foi executada neste avanço.
+
+
+## 40. FASE 2 — 2026-09-25: DB-01 permanece bloqueado após nova reprodução
+
+### 40.1 Evidência operacional
+
+Nesta continuação foram repetidas as tentativas read-only de acessar o projeto Neon canônico e consultar `schema_migrations`.
+
+- `list_branches({limit:100})` foi rejeitado pelo backend porque `project_id` é obrigatório.
+- O contrato exposto de `list_branches` não aceita `project_id`; uma chamada com esse campo é rejeitada localmente como propriedade adicional.
+- `describe_project({})` também foi rejeitado pelo backend por ausência de `project_id`.
+- A identificação versionada do projeto continua `tms / shiny-hall-34679912`.
+- Nenhuma leitura live de `schema_migrations` foi obtida nesta sessão.
+
+### 40.2 Classificação
+
+**DB-01 = BLOQUEADO POR TOOLING.** A evidência continua insuficiente para afirmar que Neon de produção está em migration 0033 ou que os checksums 0032/0033 estão aplicados.
+
+### 40.3 Integridade operacional
+
+Nenhuma migration, mutation, criação/reset/exclusão de branch ou alteração de dados/configuração de produção foi executada. Não foi usado connection string privilegiado como workaround.
+
+### 40.4 Próximo alvo
+
+Desbloquear a integração Neon para obter uma consulta read-only autoritativa de `schema_migrations`; somente depois fechar DB-01, executar DB-04 e avançar para AUTH-01/SEC-01.
+
+## 41. FASE 2 — baseline de código das migrations confirmado
+
+A inspeção de `packages/database/migrations/` confirmou no repositório canônico as migrations 0001–0033, incluindo:
+
+- `0032_observability_audit_context.sql`
+- `0033_durable_job_idempotency.sql`
+
+Os checksums SHA-256 de baseline já registrados para 0032 e 0033 permanecem os mesmos. Eles representam o conteúdo versionado no Git; não representam observação do banco live.
+
+**Estado DB-01:** E1 para o baseline do repositório; ainda BLOQUEADO para evidência E2/E3/E4 do banco de produção.
+
+## 42. FASE 2 — matriz P0 atualizada
+
+| ID | Estado atual | Evidência | Dependência para fechamento |
+|---|---|---|---|
+| CI-01 | FECHADO / COMPROVADO | Run 36081162875 / #1139 = success | Repetir após mudanças funcionais relevantes |
+| DB-01 | BLOQUEADO POR TOOLING | Projeto identificado; consulta live indisponível | `schema_migrations` + checksums live |
+| DB-04 | BLOQUEADO | RLS estrutural e testes CI existentes | Role real de runtime + teste cross-tenant |
+| AUTH-01 | ABERTO/BLOQUEADO | Auth0 implementado no código; token E4 não observado | Capacidade operacional Auth0 + E2E |
+| SEC-01 | BLOQUEADO | Defesa em profundidade estrutural | DB-04 + AUTH-01 |
+| REL-01 | ABERTO | Manifesto depende de head de migration e SHAs efetivos | DB-01 + reconciliação de release |
+
+**Próximo passo único de maior dependência:** desbloquear DB-01 sem alterar produção.
