@@ -199,3 +199,24 @@ Não usar `get_connection_string` como workaround: a ferramenta informa que ele 
 ### 8.4 Próximo passo
 
 Continuar o desbloqueio por capacidade de consulta read-only compatível com o projeto `shiny-hall-34679912`. Enquanto o contrato permanecer incompatível, DB-01 não será fechado por inferência.
+
+
+## 9. Avanço da Fase 2 — DDL recebido não fecha DB-01/DB-04
+
+### 9.1 Evidência
+
+O DDL recebido contém a estrutura atual do domínio e demonstra a presença estrutural de `schema_migrations`, dos campos de 0032/0033 e de nove tabelas `neon_auth`. fileciteturn54file0L226-L239 fileciteturn54file0L327-L413
+
+### 9.2 Limite da evidência
+
+O artefato não contém os registros de `schema_migrations`, policies RLS, `FORCE ROW LEVEL SECURITY` nem grants da role de runtime. Assim, ele não prova migration head/checksum nem isolamento comportamental.
+
+### 9.3 Estado
+
+- **DB-01:** BLOQUEADO por tooling; DDL estrutural não substitui consulta live.
+- **DB-04:** BLOQUEADO; RLS habilitado no DDL, mas a evidência fornecida não contém policies/role/grants. fileciteturn54file0L23-L34
+- **NEO-01..NEO-05:** nenhuma mudança de classificação; a presença de `auth`/`neon_auth`/`pgrst` não prova adoção da Data API.
+
+### 9.4 Regra de execução
+
+Não criar migration corretiva, não alterar RLS e não migrar o acesso do TMS para Data API com base apenas neste DDL. O próximo avanço continua sendo desbloquear a consulta read-only autoritativa do Neon.
