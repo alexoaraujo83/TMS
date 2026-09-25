@@ -404,3 +404,20 @@ As cinco branches inicialmente candidatas foram reconciliadas com seus PRs: #34,
 Isso transforma a limpeza de hipótese em **candidatura tecnicamente fundamentada**, mas não em exclusão realizada. A conexão GitHub disponível não expõe uma operação de delete branch/ref nesta sessão.
 
 Nenhuma branch divergente foi removida.
+
+
+## 13. Avanço da Fase 2 — 2026-09-25 — DB-04: arquitetura runtime reconciliada
+
+### DB-04 / runtime role
+
+A sessão administrativa do Neon confirmou a postura completa de tms_app: LOGIN, NOSUPERUSER, NOBYPASSRLS e sem privilégios de criação de role/database ou replicação. A única membership observada é neondb_owner → tms_app.
+
+A revisão do código confirma que API e worker usam conexão PostgreSQL direta via DATABASE_URL e validam current_user = tms_app; Neon Data API/Neon Auth não é o caminho efetivo do TMS. Não criar membership com authenticator sem requisito arquitetural.
+
+A tentativa de obter a sessão runtime pela integração Railway não foi concluída porque a conexão disponível só lista tms-backup e não possui permissão de viewer para o recurso necessário. Portanto, o bloqueio restante é exclusivamente a observação/execução da sessão runtime e da matriz RLS.
+
+Estado: DB-04 BLOQUEADO / E4 PENDENTE.
+
+### Próxima ação
+
+Obter uma sessão real autorizada como tms_app através do runtime existente ou de um cliente PostgreSQL autorizado. Não compartilhar credenciais. Executar own-tenant read, cross-tenant read, cross-tenant INSERT e cross-tenant UPDATE, registrando current_user e rolbypassrls na mesma evidência.
