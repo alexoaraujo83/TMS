@@ -317,3 +317,27 @@ Usar `tms_app` em conexão real e demonstrar:
 6. nenhum resultado positivo de cross-tenant é tolerado.
 
 **Estado: BLOQUEADO / E4 PENDENTE.** Não executar alterações de schema ou relaxamento de RLS para viabilizar o teste.
+
+
+## 10. Avanço da Fase 2 — DB-04: credenciais identificadas, E4 ainda pendente
+
+As referências de conexão fornecidas para `neondb` permitem identificar as roles de runtime/infraestrutura e o endpoint do banco, mas os segredos foram redigidos. Isso é suficiente para planejar o teste, não para abrir uma sessão autenticada como `tms_app` nesta sessão.
+
+O conector Neon continua rejeitando `run_sql` por exigir `project_id` não exposto no schema da ferramenta. Não será usado `neondb_owner` como substituto de `tms_app`, pois isso invalidaria a prova de `NOBYPASSRLS`/least privilege.
+
+### Critério mantido
+
+DB-04 só fecha com evidência executada sob `tms_app` contendo, no mínimo:
+
+- `current_user = tms_app`;
+- `rolbypassrls = false`;
+- leitura do próprio tenant funcionando;
+- leitura cross-tenant impedida;
+- INSERT cross-tenant impedido;
+- UPDATE cross-tenant impedido.
+
+A evidência deve omitir senhas, tokens e connection strings completas.
+
+### Próxima ação
+
+Executar o teste no Neon SQL Editor ou em cliente PostgreSQL já autenticado como `tms_app`, devolver somente os resultados não sensíveis, e então reconciliar DB-04 no tracker. Sem esse resultado, não avançar para AUTH-01.
