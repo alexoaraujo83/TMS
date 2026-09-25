@@ -1121,3 +1121,28 @@ Esta prova fecha a adoção do papel no **API runtime**, mas não fecha DB-04. O
 ### Próximo passo sequencial
 
 Obter a mesma evidência para o worker ou, preferencialmente, uma sessão PostgreSQL real como `tms_app` capaz de executar a matriz DB-04 completa sem expor credenciais. Não alterar RLS, grants ou schema para viabilizar o teste.
+
+
+## 53. FASE 2 — 2026-09-25 — RLS E4: harness real confirmado, produção ainda não executada
+
+A auditoria encontrou e leu o harness `apps/worker/src/runtime-evidence.integration.test.ts`. Ele possui dois cenários explicitamente marcados como REAL quando `RUN_DB_INTEGRATION=true` e existem `DATABASE_ADMIN_URL` + `RUNTIME_DATABASE_URL`/ `DATABASE_URL`:
+
+- replay idempotente com duas execuções do mesmo `event_id` e uma única linha de auditoria;
+- negativo cross-tenant: tenant B não consegue ler, inserir, atualizar ou excluir freight de tenant A.
+
+O teste usa uma conexão administrativa somente para fixtures/cleanup e uma conexão runtime separada para as asserções. O cenário cross-tenant executa a sessão runtime com contexto de tenant e usa sessão fresca para o INSERT negativo.
+
+Isso aumenta a evidência **E2/E3 do controle e do harness de produção**, mas **não fecha DB-04 E4**, porque o teste não foi executado nesta sessão contra o Neon de produção e não há saída runtime atual demonstrando `current_user` + `rolbypassrls=false` na mesma execução.
+
+Também foi confirmado que a integração Railway disponível nesta sessão continua expondo somente o projeto `tms-backup`; não há acesso observacional ao serviço `tms-worker` do projeto produtivo.
+
+### Decisão
+
+Não disparar workflow CI nem redeploy como atalho para produzir evidência: dependendo dos secrets/configuração, isso poderia criar ou alterar fixtures em banco. DB-04 deve permanecer fechado somente após execução controlada contra alvo explicitamente autorizado.
+
+### Estado
+
+- **DB-04:** BLOQUEADO / E4 PENDENTE.
+- **DB-03 API:** COMPROVADO operacionalmente pelo `/ready`.
+- **Worker runtime role:** PENDENTE.
+- **Harness RLS:** COMPROVADO E2/E3; não confundir com produção E4.
