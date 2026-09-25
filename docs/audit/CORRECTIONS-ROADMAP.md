@@ -441,3 +441,23 @@ As rotas autenticadas de diagnóstico `runtime-db-context` e `runtime-rls-isolat
 ### Próxima ação
 
 Priorizar uma sessão PostgreSQL real como `tms_app` para a matriz DB-04, ou evidência runtime equivalente que exponha `current_user` e `rolbypassrls` na mesma sessão e permita os testes own-tenant/cross-tenant de leitura e escrita. Manter schema/RLS imutados durante a prova.
+
+
+## 15. Avanço da Fase 2 — 2026-09-25 — harness E4 de RLS confirmado sem promoção indevida
+
+Foi identificado o harness `apps/worker/src/runtime-evidence.integration.test.ts`, que contém cenários reais para replay idempotente e isolamento cross-tenant. O cenário de isolamento cobre leitura, INSERT, UPDATE e DELETE negativos usando a conexão runtime separada da conexão administrativa de fixtures/cleanup.
+
+A existência desse harness melhora a evidência de implementação/integrabilidade do controle, mas não substitui a execução no Neon de produção. Não foi disparado CI/redeploy para tentar fabricar evidência, pois a configuração de secrets poderia resultar em mutação de dados de ambiente.
+
+Acesso Railway continua limitado ao projeto `tms-backup`, impedindo a observação direta do worker produtivo.
+
+### Estado / gates
+
+- DB-04: **BLOQUEADO / E4 PENDENTE**.
+- DB-03 API: **COMPROVADO operacionalmente**.
+- Worker runtime role: **PENDENTE**.
+- Harness RLS: **E2/E3 COMPROVADO**.
+
+### Próxima ação
+
+Executar o harness somente em ambiente explicitamente autorizado, ou obter uma sessão `tms_app` equivalente no Neon de produção, preservando fixtures isoladas e sem compartilhar credenciais.
