@@ -1,10 +1,10 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-09-24  
+> **Última atualização:** 2026-09-25 19:11 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
-> **HEAD da aplicação auditada:** `fb0025aea93aed9ad134a3266f2e7274fb9bcda5`  
+> **HEAD da aplicação auditada:** `17ffdd26f36ae8baf3862294f83ceff179de171d`  
 > **HEAD de controle/documentação anterior:** `c4fcb3ba598a0218142c11911b52d7a032eb24a4`  
 > **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
 
@@ -976,3 +976,50 @@ A evidência operacional do worker continua separada: a auditoria precisa reconc
 ### 48.7 Regra preservada
 
 Nenhuma migration, alteração de RLS, configuração Auth0, configuração Neon Auth/Data API ou alteração de produção foi executada nesta etapa.
+
+
+## 49. FASE 2 — 2026-09-25 — DB-04: bloqueio de tooling reproduzido novamente e auditoria de branches
+
+### 49.1 DB-04 — executor SQL continua incompatível
+
+Foi repetida a tentativa read-only de abrir a evidência comportamental sob o branch Neon canônico br-lingering-shadow-act0vvi9 / banco neondb, consultando a identidade efetiva da sessão.
+
+O contrato exposto de run_sql aceita sql, branch_id e database_name, porém o backend rejeita a chamada antes da execução exigindo project_id. O project_id correto do projeto tms é conhecido (shiny-hall-34679912), mas não pode ser encaminhado pelo schema exposto da ferramenta.
+
+**Resultado:** nenhuma sessão tms_app foi aberta por esta via e nenhum teste cross-tenant foi executado. **DB-04 permanece BLOQUEADO POR TOOLING / E4 PENDENTE.**
+
+Não houve migration, mutation, alteração de RLS, branch ou dado de produção.
+
+### 49.2 DB-04 — critério de fechamento preservado
+
+O fechamento continua condicionado a evidência executada como tms_app demonstrando, no mínimo:
+
+1. current_user = tms_app;
+2. rolbypassrls = false;
+3. leitura do tenant próprio funciona;
+4. leitura cross-tenant não retorna dados;
+5. INSERT cross-tenant é rejeitado;
+6. UPDATE cross-tenant é rejeitado.
+
+CI/RLS estrutural e configuração de NOBYPASSRLS não substituem esse teste comportamental.
+
+### 49.3 Auditoria de branches — classificação inicial, sem exclusões
+
+A lista atual do GitHub contém múltiplas linhas históricas de auditoria, hardening, stage, feature, fix e teste. A comparação contra main mostrou exemplos de branches já totalmente absorvidos/sem commits exclusivos (ahead_by=0), além de branches divergentes que ainda carregam commits e arquivos exclusivos.
+
+Exemplos já candidatos a remoção após confirmação de ausência de PR aberto/referência operacional:
+- hardening/p0-iam-tenant-20260915 — ahead_by=0;
+- hardening/durable-jobs-tenant-lifecycle-current-main — ahead_by=0;
+- fix/blk-worker-01-freight-status-flow-2026-09-21 — ahead_by=0;
+- stage10.11-dr-safe-drill-evidence — ahead_by=0;
+- stage10.10-backup-restore-readiness-v2 — ahead_by=0.
+
+Branches como audit/chat-07-technical-diagrams, audit/chat-08-operational-routing-2026-09-20, audit/p0-database-rls-2026-09-15, hardening/p0-rls-runtime-20260916, feat/e4-freight-runtime-bff-rebased e refactor/cleanup-residue-01-rebased não devem ser removidas por simples idade: ainda possuem commits/arquivos exclusivos em relação a main e exigem reconciliação com PRs, tags ou valor histórico antes de qualquer exclusão.
+
+**Regra:** nenhuma branch foi excluída nesta etapa. A limpeza permanece separada da auditoria funcional até que a linhagem e os consumidores sejam comprovados.
+
+### 49.4 Próximo gate
+
+**P0:** DB-04 → AUTH-01 → SEC-01 → REL-01.
+
+**Limpeza de branches:** primeiro reconciliar PRs/refs das candidatas ahead_by=0; somente depois executar exclusões autorizadas e registrar a evidência de cada remoção.
