@@ -367,3 +367,60 @@ A auditoria de infraestrutura avançou até o runtime efetivo Railway. O serviç
 O HEAD atual do tracker agora possui CI verde comprovado (36077970795) e a auditoria de configuração confirmou que o contrato de ambiente ainda está fragmentado: o .env.example, packages/config, worker e infraestrutura não compartilham uma única fonte de verdade para todas as variáveis. A observabilidade possui logging estruturado, correlação e redaction, mas não há evidência versionada suficiente de métricas/alertas nem readiness externo do worker. O contrato Auth0 está fonte-controlado, porém continua sem prova E4 de deployment/trigger/token real.
 
 Regra preservada: nenhuma correção, limpeza, refatoração ou mudança funcional foi iniciada. Com esta etapa, os eixos estruturais principais de código, banco, Auth0, API, Web, worker, CI/CD, Vercel, Railway, backup, configuração, observabilidade e documentação já foram percorridos. A próxima etapa deve ser uma consolidação final da auditoria, separando P0/P1/P2 e explicitando o que ainda depende de evidência operacional externa antes da transição para a fase de evidências/correções.
+
+
+## 30. Consolidação final da fase de auditoria estrutural
+
+### 30.1 Controle de HEAD e governança Git
+
+- O HEAD atual de main é `c4fcb3ba598a0218142c11911b52d7a032eb24a4`.
+- O CI correspondente é o run `36080140034` (#1135), disparado pelo próprio commit do tracker e ainda `in_progress` no momento desta coleta. Portanto, **não fechar CI-01 como verde neste SHA ainda**. O último HEAD de tracker com resultado final é `c6606af...`, run `36077970795`, `success`.
+- A API de branch protection agora forneceu evidência direta: `main` está **sem proteção habilitada**, sem required status checks. Isso converte a limitação anterior de acesso a branch protection em finding concreto. **CI-10 — GOVERNANÇA DE MAIN / P1:** o branch principal atualmente não exige checks antes de merge/push. Não significa que todo push seja inseguro por si só; significa que não existe enforcement GitHub versionado/efetivo impedindo avanço sem CI.
+- Não foi criada proteção durante a auditoria. Este é um finding para a fase de correção/governança.
+
+### 30.2 Matriz consolidada de P0
+
+| ID | Finding | Evidência atual | Fechamento exigido |
+|---|---|---|---|
+| DB-01 | Migration head/checksum de produção não reconciliado independentemente | Repo até 0033; logs de backup indicam migration_count=33, mas não identificam independentemente a conexão alvo | Consulta read-only live em schema_migrations + checksums 0032/0033 |
+| DB-04 | RLS comportamental em produção | Código/RLS/runtime role estruturalmente fortes; teste cross-tenant produtivo não executado | Teste controlado com credencial runtime real |
+| AUTH-01 | E2E Auth0 tenant claim | Action/guards/membership existem no repo; token real e trigger não foram comprovados | Token novo + Web→API→DB + negativo cross-tenant |
+| SEC-01 | Isolamento tenant E4 | Defesa em profundidade comprovada estruturalmente | Fechar com DB-04 + AUTH-01 |
+| REL-01 | Manifesto de release | SHAs efetivos e migration head ainda estão dispersos entre evidências | Manifesto versionado após reconciliação operacional |
+| FINAL-01 | DoD final | P0 acima permanecem abertos | Só fechar após evidências P0 e regressão |
+
+### 30.3 Matriz consolidada de P1
+
+- **DB:** DB-02 baseline permissivo permanente; DB-03 role runtime; DB-06 validação incompleta de baseline/checksums.
+- **Auth/API:** AUTH-02 paridade Auth0; API-01 matriz de rotas; API-02/03/04/05 replay; API-06 diagnóstico; SEC-03 replay hardening.
+- **Worker:** WORK-01/02/03/04; WORK-06/07/14/15 e RAIL-02/05; falta prova E4 do processamento completo.
+- **Backup/DR:** BAK-01/02 parcial; DR-01; BAK-04 RPO/RTO; BAK-05 hardening criptográfico.
+- **Ambientes/build/deploy:** ENV-01/02/03; BUILD-01/02/03; CI-02/05/06/07/10; WEB-02/10/13; DEPLOY-09.
+- **Observabilidade:** OBS-01 e readiness/alerting do worker.
+- **Documentação:** DOC-01/03/04 e reconciliação dos documentos históricos.
+- **Segurança de build:** SEC-04 revisão de segredos declarados no ambiente do Turbo build.
+
+### 30.4 Matriz consolidada de P2
+
+- SEC-02 / CONFIG-01: centralização efetiva de configuração.
+- DB-05 / PKG-08: tipagem e limpeza de código/repositórios órfãos.
+- PKG-01/02/05/06/07/08: higiene do monorepo, dependências e build graph.
+- WEB-01/03/11/12: refatoração frontend, testes e mensagens de erro/configuração.
+- TEST-01: cobertura/gates adicionais.
+- DOC-02: reconciliação runtime dos diagramas Mermaid.
+- BUILD-03: Dockerfile secundário Node 22.
+- OBS-02: revisão de sinks/retention dos logs.
+
+### 30.5 Limites da auditoria
+
+A auditoria estrutural percorreu código, banco/migrações, RLS, Auth0 fonte-controlado, API/AuthZ, Web, worker/outbox/durable jobs, CI, Vercel, Railway, backup/restore, configuração, observabilidade, documentação e governança Git. Os itens restantes não são “desconhecidos”: estão classificados como evidência operacional externa pendente, decisão de arquitetura/governança ou dívida técnica.
+
+A conexão atual não disponibiliza uma capacidade operacional Auth0 específica, portanto não foi simulada nem inferida prova E4 de Auth0. Da mesma forma, o CI do novo commit do tracker estava em andamento no instante da coleta e permanece aberto até resultado final.
+
+### 30.6 Fronteira de fase
+
+**FASE 1 — AUDITORIA ESTRUTURAL: CONCLUÍDA.**
+
+A partir deste ponto, o trabalho pode mudar de natureza para **FASE 2 — EVIDÊNCIAS OPERACIONAIS E CORREÇÕES**, mas os P0 devem ser tratados primeiro e toda alteração deve continuar sendo registrada no tracker.
+
+**Regra preservada nesta consolidação:** nenhuma correção funcional, refatoração, limpeza, alteração de permissões, alteração de banco ou mudança de infraestrutura foi realizada durante a auditoria. O único conteúdo alterado nesta fase foi documentação do tracker.
