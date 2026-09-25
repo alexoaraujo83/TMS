@@ -299,3 +299,21 @@ Executar **DB-04**: prova comportamental de isolamento cross-tenant com a creden
 - não executar migration apenas para “confirmar” o estado já comprovado;
 - não considerar DB-01 como evidência de RLS comportamental;
 - não antecipar correções funcionais antes da prova DB-04.
+
+
+## 46. DB-04 — E4 cross-tenant ainda bloqueado
+
+A auditoria avançou do DB-01 para DB-04. A leitura do repositório confirma a intenção de least privilege do papel `tms_app` e as policies tenant-scoped, mas isso é evidência estrutural, não prova comportamental.
+
+A tentativa de consultar diretamente o papel/runtime no Neon foi bloqueada pela mesma incompatibilidade de contrato do conector: o backend requer `project_id`, enquanto o schema exposto da operação não aceita esse parâmetro.
+
+### Critério de fechamento DB-04
+Usar `tms_app` em conexão real e demonstrar:
+1. tenant A lê seus próprios registros;
+2. tenant A não lê registros do tenant B;
+3. tenant A não insere registro com `tenant_id` de B;
+4. tenant A não atualiza registro de B;
+5. `current_user = 'tms_app'` e `rolbypassrls = false` na mesma evidência;
+6. nenhum resultado positivo de cross-tenant é tolerado.
+
+**Estado: BLOQUEADO / E4 PENDENTE.** Não executar alterações de schema ou relaxamento de RLS para viabilizar o teste.
