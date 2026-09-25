@@ -1023,3 +1023,28 @@ Branches como audit/chat-07-technical-diagrams, audit/chat-08-operational-routin
 **P0:** DB-04 → AUTH-01 → SEC-01 → REL-01.
 
 **Limpeza de branches:** primeiro reconciliar PRs/refs das candidatas ahead_by=0; somente depois executar exclusões autorizadas e registrar a evidência de cada remoção.
+
+
+## 50. FASE 2 — 2026-09-25 — branches candidatas reconciliadas com PRs
+
+A verificação de linhagem das cinco branches candidatas confirmou que todas têm PRs já **merged** e estão `ahead_by=0` em relação a `main` no estado atual:
+
+| Branch | PR | Estado do PR | Merge commit |
+|---|---:|---|---|
+| hardening/p0-iam-tenant-20260915 | #34 | merged | ac0471e9887ee003f9d4c4030dac47fedaed61ca |
+| hardening/durable-jobs-tenant-lifecycle-current-main | #44 | merged | e723181919c18305601d604f07c838c1db41feb1 |
+| fix/blk-worker-01-freight-status-flow-2026-09-21 | #63 | merged | ab5bbd7b5eb7a208d3da010988d4b77e88e425c0 |
+| stage10.11-dr-safe-drill-evidence | #27 | merged | 14cdbde2c057a2552c7fd1391add6f3f76cd0bd0 |
+| stage10.10-backup-restore-readiness-v2 | #25 | merged | 8ec2537aced9a113b51e8f7e5be82e3eab4b0e1f |
+
+### Decisão de limpeza
+
+A evidência de conteúdo não indica commits exclusivos pendentes nessas cinco branches, e os trabalhos correspondentes já estão representados pelos merge commits em `main`. Elas permanecem **candidatas seguras para exclusão de branch**, sujeitas apenas à confirmação de que não existe referência operacional externa específica (por exemplo, automação apontando nominalmente para a branch).
+
+A capacidade GitHub disponível nesta sessão não expôs uma operação de exclusão de branch/ref. Portanto, **nenhuma exclusão foi simulada ou declarada como realizada**.
+
+As branches divergentes continuam preservadas.
+
+### Próximo passo
+
+Se a operação de exclusão estiver disponível, remover somente essas cinco após uma última verificação de refs/automação; registrar cada remoção com branch, data e resultado. Não remover branches divergentes por idade.
