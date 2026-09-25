@@ -377,3 +377,21 @@ O pacote `packages/config` centraliza definições, mas o AuthGuard continua con
 O worker verifica `current_user = tms_app` no startup, mas a prova da identidade efetiva e do fluxo de negócio em runtime continua pendente.
 
 Nenhuma alteração funcional foi feita.
+
+
+## 11. Avanço da Fase 2 — 2026-09-25 — DB-04 e limpeza de branches
+
+### DB-04
+A tentativa read-only mais recente de executar SQL no branch canônico continua rejeitada pelo backend por exigir project_id, embora o contrato exposto de run_sql não aceite esse campo. O projeto correto é tms / shiny-hall-34679912; o bloqueio é de integração da ferramenta, não de identificação.
+
+**DB-04 permanece BLOQUEADO POR TOOLING / E4 PENDENTE.** Nenhuma mutation foi executada.
+
+### Branches
+A auditoria do GitHub identificou branches com ahead_by=0 em relação a main, portanto sem commits exclusivos no estado atual: hardening/p0-iam-tenant-20260915, hardening/durable-jobs-tenant-lifecycle-current-main, fix/blk-worker-01-freight-status-flow-2026-09-21, stage10.11-dr-safe-drill-evidence e stage10.10-backup-restore-readiness-v2.
+
+Essas branches são candidatas a limpeza, não exclusões automáticas: antes de remover, deve-se verificar PR aberto/fechado, tags, referências operacionais e se a branch possui valor histórico que não esteja preservado em commits/docs.
+
+Branches divergentes com commits exclusivos permanecem preservadas até reconciliação.
+
+### Próximo passo
+Resolver o bloqueio de DB-04 com uma sessão real tms_app; em paralelo, concluir a reconciliação de PRs/refs das branches ahead_by=0 antes de qualquer exclusão.
