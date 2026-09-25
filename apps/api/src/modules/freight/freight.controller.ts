@@ -132,7 +132,16 @@ export class FreightController {
     };
   }
 
-  @Delete(":id")\n  @RequirePermission("freight:delete")\n  remove(\n    @CurrentUser() context: RequestContext,\n    @Param("id", new ParseUUIDPipe()) id: string,\n  ) {\n    return this.service.remove(context, id);\n  }\n\n  @Get(":id")
+  @Delete(":id")
+  @RequirePermission("freight:delete")
+  remove(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+  ) {
+    return this.service.remove(context, id);
+  }
+
+  @Get(":id")
   @RequirePermission("freight:read")
   get(
     @CurrentUser() context: RequestContext,
