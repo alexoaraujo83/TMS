@@ -274,3 +274,28 @@ O plano read-only de `SELECT version, checksum FROM public.schema_migrations ORD
 A execução efetiva continua bloqueada porque o backend exige `project_id` no executor SQL, mas o contrato exposto não aceita esse campo. O project ID correto já foi fornecido; o problema remanescente é de compatibilidade do conector, não de identificação do projeto.
 
 **DB-01 permanece BLOQUEADO POR TOOLING.** Nenhuma alteração de produção foi executada. O próximo passo é obter uma capacidade SQL read-only que aceite/encaminhe `project_id`; somente então registrar head/checksums e avançar para DB-04 → AUTH-01 → SEC-01 → REL-01.
+
+
+## 45. DB-01 — evidência live recebida e gate fechado
+
+### Evidência
+A saída read-only autoritativa de `public.schema_migrations` para o Neon canônico `tms / shiny-hall-34679912`, branch `main / br-lingering-shadow-act0vvi9`, contém as migrations `0001`–`0033` em sequência.
+
+Os dois checksums que eram necessários para reconciliar o novo head com o baseline do repositório coincidem exatamente:
+
+| Migration | Live | Repositório |
+|---|---|---|
+| 0032_observability_audit_context.sql | `1c8e70d30f1bbd9442682035b7c08e8fdc3ed619b83615f8eb033bbb4cc45e78` | `1c8e70d30f1bbd9442682035b7c08e8fdc3ed619b83615f8eb033bbb4cc45e78` |
+| 0033_durable_job_idempotency.sql | `d18c0849023fd07407350cbd1bb38a1b4caf0074242b7ff4bf8cd59d426b2a3c` | `d18c0849023fd07407350cbd1bb38a1b4caf0074242b7ff4bf8cd59d426b2a3c` |
+
+### Decisão
+**DB-01 = FECHADO / COMPROVADO.** O bloqueio de tooling foi superado pela obtenção da evidência read-only autoritativa. Não houve migration corretiva nem qualquer mutation no banco.
+
+### Próxima ação sequencial
+Executar **DB-04**: prova comportamental de isolamento cross-tenant com a credencial/papel real de runtime, cobrindo leitura e escrita negativa entre tenants. Depois, e somente depois, avançar para **AUTH-01 → SEC-01 → REL-01** conforme o gate definido no tracker.
+
+### Não fazer
+- não reaplicar 0032/0033;
+- não executar migration apenas para “confirmar” o estado já comprovado;
+- não considerar DB-01 como evidência de RLS comportamental;
+- não antecipar correções funcionais antes da prova DB-04.
