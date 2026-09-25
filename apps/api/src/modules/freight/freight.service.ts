@@ -68,7 +68,7 @@ export class FreightService {
     return this.repository.list(context.tenantId);
   }
 
-  async get(context: RequestContext, freightId: string): Promise<FreightRow> {
+  async remove(context: RequestContext, freightId: string): Promise<{ id: string; deleted: true }> {\n    const deleted = await this.repository.deleteWithAudit(freightId, context.tenantId, {\n      actorUserId: context.userId,\n      action: "freight.deleted",\n      entityType: "freight",\n      requestId: context.requestId,\n      correlationId: context.correlationId,\n    });\n    if (!deleted) throw new NotFoundException("Freight not found");\n    return { id: freightId, deleted: true };\n  }\n\n  async get(context: RequestContext, freightId: string): Promise<FreightRow> {
     const freight = await this.repository.findById(context.tenantId, freightId);
     if (!freight) throw new NotFoundException("Freight not found");
     return freight;
