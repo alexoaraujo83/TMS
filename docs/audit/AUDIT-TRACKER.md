@@ -1177,3 +1177,32 @@ P1, sem alteração de produção nesta etapa:
 3. somente depois avaliar refatoração para tornar impossível, por construção, uma mudança de status sem emissão do evento.
 
 Nenhuma mutation de produção foi executada neste avanço.
+
+
+## 17. Avanço da Fase 2 — 2026-09-25 — WORK-02a refinado após auditoria de consumidores e transação
+
+A busca de consumidores no monorepo não encontrou chamadas internas de `PostgresFreightRepository.updateStatus()`; o caminho HTTP usa `FreightService.updateStatus()`, que chama explicitamente `updateStatusWithAudit(..., audit)`. Os testes de lifecycle também usam a variante com auditoria.
+
+A auditoria de `withTransaction()` confirmou que:
+- a transação começa antes da alteração de freight;
+- `app.tenant_id` é configurado dentro da transação;
+- qualquer exceção executa `ROLLBACK`;
+- o commit só ocorre após toda a função de trabalho terminar.
+
+Assim, a garantia de atomicidade do caminho canônico é estruturalmente forte: se a gravação de audit/outbox falhar, a alteração de status não deve ser commitada.
+
+### Reclassificação
+
+O risco original de WORK-02a foi reduzido de “possível caminho de produção conhecido” para **API interna/exportada sem consumidor interno identificado**.
+
+**Estado:** P1 de hardening/teste; não é evidência de defeito no endpoint atual.
+
+### Lacuna que permanece
+
+Não existe teste que injete/facilite uma falha especificamente na etapa de `outbox_events` depois do `UPDATE freights` e demonstre, em banco, que o status, audit e outbox são todos revertidos.
+
+### Ação recomendada
+
+Adicionar teste de integração de falha transacional, preferencialmente por uma condição de banco determinística e isolada, sem mocks que escondam o comportamento real. Também avaliar se `updateStatus()` deve ser removido/privatizado por ser uma API redundante sem consumidores internos, ou se deve passar a exigir audit obrigatório.
+
+Nenhuma alteração funcional foi aplicada nesta etapa.
