@@ -1048,3 +1048,52 @@ As branches divergentes continuam preservadas.
 ### Próximo passo
 
 Se a operação de exclusão estiver disponível, remover somente essas cinco após uma última verificação de refs/automação; registrar cada remoção com branch, data e resultado. Não remover branches divergentes por idade.
+
+
+## 51. FASE 2 — 2026-09-25 — DB-04: caminho runtime reconciliado; bloqueio passa a ser evidência de sessão
+
+### 51.1 Identidade efetiva de tms_app
+
+A evidência fornecida no Neon SQL Editor confirmou:
+
+- tms_app: rolcanlogin=true;
+- rolsuper=false;
+- rolbypassrls=false;
+- rolcreaterole=false;
+- rolcreatedb=false;
+- rolreplication=false.
+
+A consulta de membership retornou somente neondb_owner → tms_app. Não existe associação authenticator → tms_app comprovada por essa consulta.
+
+### 51.2 Arquitetura runtime reconciliada
+
+A revisão do código confirma que o TMS não utiliza Neon Data API/Neon Auth como caminho de banco da aplicação. API e worker criam pools PostgreSQL diretamente a partir de DATABASE_URL, e ambos validam current_user = tms_app no runtime.
+
+Portanto, não será criado GRANT tms_app TO authenticator apenas para fabricar uma cadeia que não pertence ao caminho efetivo da aplicação.
+
+O caminho canônico de prova é:
+
+TMS API/Worker → DATABASE_URL → PostgreSQL → current_user=tms_app → RLS/FORCE RLS.
+
+### 51.3 Tentativa de obter evidência operacional
+
+A conexão Railway disponível nesta sessão só expõe o projeto tms-backup; a tentativa de listar serviços retornou ausência de permissão (viewer) para esse recurso. A leitura histórica do repositório identifica tms-worker, mas essa evidência não substitui uma leitura atual do serviço.
+
+Assim, não foi possível extrair nesta sessão a DATABASE_URL runtime nem abrir/observar uma sessão real do serviço sem solicitar ou expor credenciais.
+
+### 51.4 Estado DB-04
+
+DB-04 = BLOQUEADO / E4 PENDENTE, agora por falta de sessão runtime observável, não por falta de definição do papel.
+
+Critério de fechamento permanece: evidência da sessão real com current_user=tms_app, rolbypassrls=false, leitura own-tenant, bloqueio cross-tenant de leitura, INSERT e UPDATE.
+
+Nenhuma alteração de schema, role, RLS, credential ou dado de produção foi executada.
+
+### 51.5 Próximo gate
+
+Obter a evidência de runtime por uma das duas vias legítimas:
+
+1. observabilidade do deployment/serviço que já usa DATABASE_URL; ou
+2. cliente PostgreSQL autorizado conectado diretamente como tms_app, sem compartilhar o segredo.
+
+Depois executar a matriz comportamental E4 e registrar resultados antes de avançar DB-04.
