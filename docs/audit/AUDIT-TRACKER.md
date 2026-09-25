@@ -1097,3 +1097,27 @@ Obter a evidência de runtime por uma das duas vias legítimas:
 2. cliente PostgreSQL autorizado conectado diretamente como tms_app, sem compartilhar o segredo.
 
 Depois executar a matriz comportamental E4 e registrar resultados antes de avançar DB-04.
+
+
+## 52. FASE 2 — 2026-09-25 — API runtime role comprovado via readiness E4
+
+### Evidência operacional nova
+
+Foi executado o endpoint público de readiness da API de produção em `https://tms-api-snowy.vercel.app/ready`. A resposta observada foi HTTP 200 com `{"status":"ready","service":"tms-api"}` em 2026-09-25 19:28 -03:00.
+
+O código canônico de `apps/api/src/health.controller.ts` estabelece que `/ready` só retorna `ready` depois de executar `select current_user` e rejeitar qualquer valor diferente de `tms_app`. Portanto, esta evidência combina execução real do runtime da API com o gate de identidade `current_user=tms_app`; não é apenas teste unitário.
+
+### Limite da evidência
+
+Esta prova fecha a adoção do papel no **API runtime**, mas não fecha DB-04. O endpoint não expõe `rolbypassrls` nem executa a matriz cross-tenant. As rotas autenticadas `/freights/runtime-db-context` e `/freights/runtime-rls-isolation` foram também sondadas sem credencial e responderam HTTP 401, confirmando que a superfície de diagnóstico não está anônima, mas sem produzir a evidência tenant-scoped necessária.
+
+### Estado atualizado
+
+- **DB-03 — API runtime role:** E4 operacional comprovado para a API.
+- **DB-04 — RLS comportamental:** permanece BLOQUEADO / E4 PENDENTE.
+- **WORK-DB-03 — worker runtime role:** permanece pendente de observação direta.
+- **AUTH-01:** permanece pendente de token Auth0 real.
+
+### Próximo passo sequencial
+
+Obter a mesma evidência para o worker ou, preferencialmente, uma sessão PostgreSQL real como `tms_app` capaz de executar a matriz DB-04 completa sem expor credenciais. Não alterar RLS, grants ou schema para viabilizar o teste.
