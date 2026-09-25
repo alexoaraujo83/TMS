@@ -467,3 +467,40 @@ O último run verde explicitamente consolidado continua sendo `36077970795` no S
 Nenhuma correção funcional, migration, alteração de RLS, alteração de Auth0, mudança de infraestrutura ou refatoração foi executada nesta primeira entrada da Fase 2. O único write funcional/documental desta etapa foi a criação do roadmap de execução.
 
 Próximo alvo P0: obter o `project_id` Neon necessário para a consulta read-only de DB-01; em seguida executar DB-04 e AUTH-01 somente com credenciais/ambientes operacionais apropriados, sem fabricar evidência.
+
+
+## 32. FASE 2 — DB-01: projeto Neon identificado, consulta live ainda bloqueada pelo contrato da ferramenta
+
+### 32.1 Identificação do projeto canônico
+
+A busca no repositório encontrou evidência versionada em `docs/operations/BACKUP-RESTORE-DRILL.md` que identifica o projeto Neon canônico como `tms` com identificador `shiny-hall-34679912`. Isso resolve a identificação nominal do projeto, mas não substitui a consulta live.
+
+### 32.2 Limitação operacional reproduzida
+
+Foram tentadas as operações Neon necessárias para resolver a branch/consulta live. O backend da ferramenta rejeitou as chamadas por ausência de `project_id`, enquanto o schema exposto pela própria ferramenta não aceita esse campo nos métodos `list_branches`/`describe_branch`/`run_sql`. Portanto existe uma incompatibilidade entre o contrato exposto da conexão e o requisito interno do backend.
+
+**Estado:** DB-01 continua **BLOQUEADO por tooling**, não por ausência de identificação do projeto.
+
+### 32.3 Checksums esperados no repositório
+
+O script `packages/database/scripts/migrate.ts` define o checksum de cada migration como SHA-256 do conteúdo UTF-8 integral do arquivo. Com os arquivos atuais:
+
+| Migration | SHA-256 esperado |
+|---|---|
+| `0032_observability_audit_context.sql` | `1c8e70d30f1bbd9442682035b7c08e8fdc3ed619b83615f8eb033bbb4cc45e78` |
+| `0033_durable_job_idempotency.sql` | `d18c0849023fd07407350cbd1bb38a1b4caf0074242b7ff4bf8cd59d426b2a3c` |
+
+Os hashes acima são **baseline de código**, não evidência do banco live. O fechamento de DB-01 exige comparar esses valores com `schema_migrations` da branch de produção.
+
+### 32.4 Segurança operacional
+
+Nenhuma migration foi aplicada, nenhuma branch foi criada/resetada/deletada e nenhum dado de produção foi alterado nesta etapa. O próximo passo continua sendo uma consulta read-only de `schema_migrations` assim que a conexão Neon puder receber o identificador do projeto de forma compatível.
+
+### 32.5 Próximo avanço P0
+
+1. Resolver a incompatibilidade do conector Neon para executar a consulta read-only no projeto `shiny-hall-34679912`.
+2. Registrar head, checksums e `current_user`/database somente como evidência mínima necessária.
+3. Se houver drift de checksum/head, interromper qualquer migration automática e abrir correção específica; não equalizar SHA cegamente.
+4. Com DB-01 fechado, avançar para DB-04 comportamental.
+
+**Estado da Fase 2:** P0 ainda aberto; nenhuma correção funcional executada.
