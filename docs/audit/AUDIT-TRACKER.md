@@ -816,3 +816,91 @@ Consequentemente, **não foi produzido ainda um E4 válido** executado sob `tms_
 
 ### Próximo passo necessário
 Executar, com uma conexão realmente autenticada como `tms_app`, um teste controlado em dois tenants que prove leitura própria, ausência de leitura cross-tenant e rejeição de escrita cross-tenant. O teste deve registrar o papel efetivo e o tenant context antes de cada operação.
+
+
+## 47. FASE 2 — 2026-09-25 — DB-04: conexões fornecidas, mas E4 não pode ser executado nesta sessão
+
+### 47.1 Nova evidência operacional
+
+Foram fornecidas as referências de conexão para o banco `neondb`, incluindo as roles `neondb_owner`, `authenticator`, `tms_app`, `anonymous` e `authenticated`, além da URL do Neon Data API.
+
+As credenciais chegaram com o segredo de autenticação redigido (`**`). Portanto, elas permitem identificar a **role/endpoint pretendidos**, mas não fornecem material autenticador utilizável para abrir uma sessão PostgreSQL como `tms_app`.
+
+### 47.2 Tentativa pelo conector Neon
+
+Foi novamente tentado o executor SQL com:
+
+- branch `br-lingering-shadow-act0vvi9`;
+- database `neondb`;
+- consulta read-only de contexto.
+
+O backend rejeitou a chamada antes da execução SQL porque exige `project_id`, embora o contrato exposto de `run_sql` aceite somente `sql`, `branch_id` e `database_name`.
+
+Também foram inspecionados os contratos disponíveis para `list_postgres_roles`, `get_postgres_role` e `get_data_api`; eles apresentam a mesma limitação de não expor `project_id`.
+
+### 47.3 Conclusão
+
+**DB-04 = BLOQUEADO / E4 PENDENTE.**
+
+A informação fornecida não deve ser tratada como prova de que `tms_app` está sendo usada efetivamente no runtime. Também não é apropriado usar a role privilegiada `neondb_owner` como substituto do teste, porque isso poderia contornar justamente a condição de `NOBYPASSRLS` que o finding precisa provar.
+
+Nenhuma migration, alteração de RLS, branch, dado ou configuração foi executada.
+
+### 47.4 Teste E4 que deve ser executado sem expor segredo
+
+A evidência necessária pode ser obtida diretamente no Neon SQL Editor ou em um cliente PostgreSQL local, usando a conexão **já configurada no ambiente do operador** para `tms_app`. Não é necessário enviar senha/token para esta conversa.
+
+Primeiro, somente leitura:
+
+```sql
+SELECT
+  current_user,
+  current_database(),
+  r.rolbypassrls,
+  r.rolsuper,
+  r.rolcreaterole,
+  r.rolcreatedb
+FROM pg_roles r
+WHERE r.rolname = current_user;
+```
+
+Depois, com dois `tenant_id` reais existentes, executar em sessão `tms_app` e registrar apenas os resultados, sem credenciais:
+
+```sql
+BEGIN;
+SET LOCAL app.tenant_id = '<TENANT_A>';
+
+SELECT count(*) AS own_rows
+FROM public.freights
+WHERE tenant_id = '<TENANT_A>';
+
+SELECT count(*) AS cross_tenant_rows
+FROM public.freights
+WHERE tenant_id = '<TENANT_B>';
+
+ROLLBACK;
+```
+
+Para a parte de escrita, como ela é mutação mesmo dentro de uma transação de teste, **não deve ser executada autonomamente nesta sessão**. Se autorizada pelo operador, deve ser feita com dados controlados e `ROLLBACK`, comprovando que INSERT/UPDATE cross-tenant são rejeitados ou não produzem alteração persistente.
+
+### 47.5 Evidência mínima para fechar DB-04
+
+Registrar:
+
+1. `current_user = tms_app`;
+2. `rolbypassrls = false`;
+3. tenant A consegue acessar registros próprios;
+4. tenant A não consegue observar registros de B;
+5. tentativa de INSERT com `tenant_id = B` é rejeitada;
+6. tentativa de UPDATE de registro de B é rejeitada;
+7. nenhum segredo, senha, token ou connection string completo entra no tracker.
+
+O fechamento continua condicionado à execução real do teste, não à configuração declarada no repositório.
+
+### 47.6 Próximo gate
+
+Enquanto DB-04 permanecer aberto, a sequência continua:
+
+**DB-04 → AUTH-01 → SEC-01 → REL-01**
+
+Não iniciar correções funcionais ou refatorações a partir deste finding antes da evidência comportamental.
