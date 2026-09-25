@@ -498,3 +498,25 @@ O consumidor de produção atualmente observado (`FreightService.updateStatus()`
 ### Gate
 
 Este achado não altera a classificação de DB-04, AUTH-01 ou E4 do worker. A próxima evidência operacional continua sendo uma sessão runtime real e, para o worker, um evento de negócio real no ambiente autorizado.
+
+
+## 17. WORK-02a — refinamento de risco e garantia transacional
+
+A auditoria de consumidores não encontrou uso interno de `PostgresFreightRepository.updateStatus()`. O caminho de produção conhecido usa `updateStatusWithAudit()` com contexto de auditoria.
+
+A implementação de `withTransaction()` faz `BEGIN`, configura o tenant, executa o trabalho, só então faz `COMMIT`, e executa `ROLLBACK` em qualquer exceção. Isso sustenta a atomicidade do caminho canônico.
+
+### Novo estado
+
+- **WORK-02a:** P1 hardening/teste, não defeito funcional comprovado.
+- **Risco atual:** API redundante/exportada pode permitir no futuro uma transição sem outbox/audit.
+- **Lacuna de evidência:** falta teste de falha após o update e durante a gravação do outbox, verificando rollback conjunto.
+
+### Próxima correção planejada
+
+1. Adicionar teste de integração real para falha de outbox e rollback conjunto.
+2. Avaliar remoção/privatização de `updateStatus()` ou tornar audit obrigatório.
+3. Executar CI.
+4. Só então considerar promoção da correção.
+
+A auditoria continua sem mutation de produção.
