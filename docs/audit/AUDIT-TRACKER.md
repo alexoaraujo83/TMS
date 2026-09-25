@@ -197,6 +197,7 @@ Código-fonte, deploy SUCCESS, documentação ou teste isolado não bastam para 
 - 2026-09-24: auditoria de governança registrou lacuna de prova sobre branch protection/rulesets porque o endpoint disponível retornou 403.
 - 2026-09-24: auditoria de testes não encontrou testes dedicados para serviços/controllers de negócio da API nem para as rotas proxy/componentes principais do Web; CI comprova execução da suíte existente, mas não possui gate quantitativo de cobertura.
 - 2026-09-24: tracker atualizado novamente para manter a distinção entre HEAD funcional, HEAD de controle/documentação e evidência operacional ainda pendente; auditoria permanece em fase de cobertura estrutural, sem fechamento de P0/P1 por inferência.
+- 2026-09-24: auditoria de SQL/RLS confirmou RLS/FORCE RLS nas tabelas tenant-scoped encontradas e acesso direto ao banco concentrado em database/worker; também identificou lacuna no baseline validator: colunas 0032/0033 e invariantes 0030/0031 ainda não são verificadas antes do registro canônico.
 
 ## 12. Continuação da auditoria — workspace e dependências
 
@@ -224,6 +225,11 @@ A auditoria segue sem correções de código. O próximo bloco deve cobrir: impo
 - **API-08 — Bootstrap HTTP valida entrada globalmente:** `ValidationPipe` usa `whitelist: true`, `forbidNonWhitelisted: true` e `transform: true`; há filtro global de exceções e CORS com allowlist. **Estado: ESTRUTURALMENTE COMPROVADO.** Ainda falta matriz de smoke/E2E para provar comportamento em produção.
 - **SEC-04 — Configuração Auth0 usa non-null assertions:** `apps/web/src/lib/auth0.ts` usa `process.env.AUTH0_*!` sem validação explícita de startup. Falta de secret pode gerar falha tardia e pouco diagnóstica. **Estado: DÍVIDA DE ROBUSTEZ / P2.**
 
+## 15. Novos achados — banco e contratos de package
+
+- **DB-06 — Validação de baseline não cobre integralmente o schema 0033:** `packages/database/scripts/migrate.ts` declara `durable_jobs` sem a coluna `idempotency_key` adicionada em 0033 e `audit_events` sem as colunas adicionadas em 0032 (`correlation_id`, `actor_subject`, `ip_address`, `user_agent`, `outcome`). A rotina também não valida explicitamente as constraints compostas introduzidas em 0030/0031. Portanto, quando `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true`, a validação existente pode aceitar um schema compatível sem provar integralmente o contrato das migrações finais antes de registrar todos os checksums. **Estado: LACUNA DE CONTROLE / P1.** Evidência necessária: baseline validator deve verificar colunas/constraints críticas de 0030–0033 antes de registrar a baseline.
+- **PKG-08 — Código IAM potencialmente órfão:** `packages/database/src/iam.ts` exporta `findTenantMembership`, mas a busca de referências no repositório encontrou somente a própria definição. O runtime atual usa o resolver SQL `check_tenant_membership` e `verifyTenantMembership`. **Estado: CANDIDATO A ORFÃO / P2.**
+
 ## 15. Estado após esta etapa
 
-A auditoria estrutural avançou por workspace, worker, Web, proxy de autenticação, CI e migrations workflow. O inventário funcional ainda não está completo: falta terminar a matriz de SQL/RLS para todas as migrações, todos os repositories e todos os caminhos de acesso direto ao banco, além da revisão integral dos módulos da API e dos workflows de deploy. **Nenhum P0/P1 foi encerrado por inferência e nenhuma correção funcional foi iniciada.**
+A auditoria estrutural avançou por workspace, worker, Web, proxy de autenticação, CI, acesso SQL e matriz inicial de RLS/migrações. Foi identificado também que o validador de baseline não cobre integralmente o contrato introduzido em 0030–0033. O inventário funcional ainda não está completo: falta terminar a revisão integral dos repositories, módulos da API e workflows de deploy. **Nenhum P0/P1 foi encerrado por inferência e nenhuma correção funcional foi iniciada.**
