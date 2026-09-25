@@ -796,3 +796,23 @@ Isso fecha a lacuna que permanecia bloqueada por tooling. A evidência anterior 
 Com DB-01 fechado, a sequência canônica avança para **DB-04 — prova comportamental de RLS/cross-tenant**. AUTH-01 permanece bloqueado/aberto até obter token Auth0 real e evidência E2E; SEC-01 continua dependente de DB-04 + AUTH-01; REL-01 continua após a reconciliação dos componentes e do head de migration.
 
 Regra preservada: o fechamento de DB-01 não implica fechamento de DB-04, AUTH-01, SEC-01 ou REL-01 por inferência.
+
+
+## 46. FASE 2 — DB-04 — tentativa de evidência comportamental
+
+Após o fechamento de DB-01, foi iniciada a prova E4 de isolamento cross-tenant.
+
+### Evidência estrutural já consolidada
+- O papel de runtime definido pelo repositório é `tms_app`.
+- A migration `0029_runtime_app_role.sql` define `LOGIN`, `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOINHERIT`, `NOREPLICATION`, `NOBYPASSRLS`, sem `CREATE` em `public`.
+- As policies tenant-scoped usam `current_setting('app.tenant_id', true)` e várias tabelas possuem `FORCE ROW LEVEL SECURITY`.
+
+### Bloqueio da prova comportamental
+As ferramentas disponíveis para inspeção/SQL do Neon continuam apresentando incompatibilidade de contrato: o backend exige `project_id` para chamadas como inspeção de roles/Data API/SQL, mas o schema exposto dessas chamadas não aceita esse campo. A tentativa de consultar o papel `tms_app` foi rejeitada pelo backend por ausência de `project_id`.
+
+Consequentemente, **não foi produzido ainda um E4 válido** executado sob `tms_app`. EXPLAIN/inspeção estrutural não substituem o teste comportamental.
+
+**DB-04: BLOQUEADO POR TOOLING / E4 PENDENTE.** Nenhuma mutação foi realizada.
+
+### Próximo passo necessário
+Executar, com uma conexão realmente autenticada como `tms_app`, um teste controlado em dois tenants que prove leitura própria, ausência de leitura cross-tenant e rejeição de escrita cross-tenant. O teste deve registrar o papel efetivo e o tenant context antes de cada operação.
