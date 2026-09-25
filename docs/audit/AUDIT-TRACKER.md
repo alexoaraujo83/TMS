@@ -775,3 +775,24 @@ A tentativa de execução efetiva via executor SQL continua rejeitada pelo backe
 **Estado DB-01: BLOQUEADO POR TOOLING.** Não houve mutation, migration, alteração de branch, alteração de dados ou uso de credencial privilegiada.
 
 **Gate preservado:** DB-04 → AUTH-01 → SEC-01 → REL-01 permanecem sequenciais e bloqueados até a obtenção dos registros live de `schema_migrations`.
+
+
+## 45. FASE 2 — 2026-09-25 — DB-01 fechado com evidência live de schema_migrations
+
+Foi fornecida a saída read-only autoritativa de `public.schema_migrations` para o projeto Neon `tms / shiny-hall-34679912`, branch `main / br-lingering-shadow-act0vvi9`, contendo as versões `0001` a `0033` em sequência.
+
+A evidência live confirma:
+- **head live = 0033_durable_job_idempotency.sql**;
+- **0032 live checksum = `1c8e70d30f1bbd9442682035b7c08e8fdc3ed619b83615f8eb033bbb4cc45e78`**, igual ao SHA-256 do arquivo versionado no repositório;
+- **0033 live checksum = `d18c0849023fd07407350cbd1bb38a1b4caf0074242b7ff4bf8cd59d426b2a3c`**, igual ao SHA-256 do arquivo versionado no repositório;
+- não há lacuna aparente entre 0001 e 0033 na saída fornecida.
+
+Isso fecha a lacuna que permanecia bloqueada por tooling. A evidência anterior de EXPLAIN demonstrava apenas a existência da relação/colunas; a saída agora fornecida demonstra os **valores efetivos** de versão/checksum.
+
+**DB-01: FECHADO / COMPROVADO.** Não foi necessária nenhuma migration, alteração de schema ou mutação no banco.
+
+### Próximo gate P0
+
+Com DB-01 fechado, a sequência canônica avança para **DB-04 — prova comportamental de RLS/cross-tenant**. AUTH-01 permanece bloqueado/aberto até obter token Auth0 real e evidência E2E; SEC-01 continua dependente de DB-04 + AUTH-01; REL-01 continua após a reconciliação dos componentes e do head de migration.
+
+Regra preservada: o fechamento de DB-01 não implica fechamento de DB-04, AUTH-01, SEC-01 ou REL-01 por inferência.
