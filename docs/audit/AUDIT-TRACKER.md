@@ -549,3 +549,27 @@ Nenhuma migration, alteração de RLS, Auth0, infraestrutura ou refatoração fo
 ### 33.4 Próximo alvo
 
 Continuar P0 pelo desbloqueio de DB-01; em paralelo, preservar a evidência CI-01 recém-fechada e não reclassificar os demais P0 por inferência.
+
+## 34. FASE 2 — DB-01: incompatibilidade confirmada também no resolvedor de branch
+
+### 34.1 Nova tentativa read-only
+
+Foi testado o método Neon `get_branch` diretamente para a branch de produção já identificada (`br-lingering-shadow-act0vvi9`). O contrato exposto declara apenas `branch_id`, porém o backend retornou erro de validação informando que `project_id` é obrigatório e estava ausente.
+
+Isso confirma que a incompatibilidade não está limitada a `run_sql`, `list_branches` ou `describe_branch`: também afeta a resolução direta de uma branch conhecida.
+
+### 34.2 Conclusão operacional
+
+- **DB-01 permanece BLOQUEADO por tooling.**
+- O projeto canônico continua identificado como `tms / shiny-hall-34679912`.
+- A branch de produção continua identificada como `br-lingering-shadow-act0vvi9` por evidência versionada prévia.
+- Não foi obtida nenhuma leitura live de `schema_migrations` nesta tentativa.
+- Nenhuma migration, branch, dado ou configuração de produção foi alterado.
+
+### 34.3 Limite importante
+
+O método `get_connection_string` também não é um substituto adequado para esta auditoria: além de poder expor credencial privilegiada, seu contrato não oferece um campo `project_id` e a própria documentação da ferramenta informa que a string é indisponível em modo somente leitura. Portanto não será usado para contornar o bloqueio nem para expor segredo.
+
+### 34.4 Próximo alvo
+
+Continuar buscando uma capacidade Neon compatível com o identificador do projeto ou uma correção de integração que preserve consulta read-only. Se isso não for possível nesta sessão, o finding deve permanecer BLOQUEADO e nenhuma evidência live deve ser inferida de contagens históricas, logs de backup ou sucesso de CI.
