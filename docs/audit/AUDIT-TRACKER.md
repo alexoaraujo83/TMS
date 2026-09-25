@@ -743,3 +743,16 @@ Os checksums SHA-256 de baseline já registrados para 0032 e 0033 permanecem os 
 | REL-01 | ABERTO | Manifesto depende de head de migration e SHAs efetivos | DB-01 + reconciliação de release |
 
 **Próximo passo único de maior dependência:** desbloquear DB-01 sem alterar produção.
+
+
+## 43. FASE 2 — 2026-09-25 — bloqueio Neon reproduzido no executor SQL
+
+Foi feita uma tentativa direta de consulta **read-only** ao branch de produção conhecido `br-lingering-shadow-act0vvi9`, usando `SELECT version, checksum FROM public.schema_migrations ORDER BY version`.
+
+O executor `run_sql` exposto aceita `sql`, `branch_id` e `database_name`, mas o backend rejeitou a chamada exigindo `project_id`, campo que não existe no contrato exposto dessa ferramenta. A mesma incompatibilidade já havia sido observada na resolução de branches/databases.
+
+**Conclusão:** a consulta autoritativa ainda não foi desbloqueada. DB-01 permanece **BLOQUEADO POR TOOLING**. DB-01 remains blocked after direct run_sql attempt. Backend requires project_id although exposed schema omits it; authoritative read-only query could not execute.
+
+Nenhuma mutation, migration, alteração de branch ou alteração de dados foi executada.
+
+**Gate preservado:** DB-04 → AUTH-01 → SEC-01 → REL-01 só avançam após evidência operacional suficiente de DB-01, sem inferência.
