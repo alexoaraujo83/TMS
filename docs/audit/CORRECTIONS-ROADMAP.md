@@ -247,3 +247,16 @@ Não marcar DB-01 como concluído por DDL, contagem histórica, backup, CI ou pr
 ### Próximo passo
 
 Resolver a incompatibilidade da integração Neon e obter consulta read-only autoritativa de `schema_migrations`. Depois: DB-04 → AUTH-01 → SEC-01 → REL-01.
+
+
+## 43. FASE 2 — 2026-09-25 — bloqueio Neon reproduzido no executor SQL
+
+Foi feita uma tentativa direta de consulta **read-only** ao branch de produção conhecido `br-lingering-shadow-act0vvi9`, usando `SELECT version, checksum FROM public.schema_migrations ORDER BY version`.
+
+O executor `run_sql` exposto aceita `sql`, `branch_id` e `database_name`, mas o backend rejeitou a chamada exigindo `project_id`, campo que não existe no contrato exposto dessa ferramenta. A mesma incompatibilidade já havia sido observada na resolução de branches/databases.
+
+**Conclusão:** a consulta autoritativa ainda não foi desbloqueada. DB-01 permanece **BLOQUEADO POR TOOLING**. DB-01 tooling incompatibility reproduced at run_sql/database-resolution layer. No production mutation performed. Sequential DB-04/AUTH-01/SEC-01/REL-01 must remain gated.
+
+Nenhuma mutation, migration, alteração de branch ou alteração de dados foi executada.
+
+**Gate preservado:** DB-04 → AUTH-01 → SEC-01 → REL-01 só avançam após evidência operacional suficiente de DB-01, sem inferência.
