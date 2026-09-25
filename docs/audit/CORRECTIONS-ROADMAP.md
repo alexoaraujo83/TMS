@@ -461,3 +461,40 @@ Acesso Railway continua limitado ao projeto `tms-backup`, impedindo a observaç�
 ### Próxima ação
 
 Executar o harness somente em ambiente explicitamente autorizado, ou obter uma sessão `tms_app` equivalente no Neon de produção, preservando fixtures isoladas e sem compartilhar credenciais.
+
+
+## 16. Auditoria adicional — contrato interno de emissão do outbox
+
+### Achado
+
+A cadeia `freight.status_changed → outbox_events → durable_jobs → handler → audit/telemetry` está implementada no caminho do serviço, mas a API do repositório permite um caminho alternativo sem outbox:
+
+`PostgresFreightRepository.updateStatus()` → `updateStatusWithAudit()` sem `audit` → bloco de outbox condicionado a `if (audit)`.
+
+O consumidor de produção atualmente observado (`FreightService.updateStatus()`) usa `updateStatusWithAudit()` com contexto de auditoria, portanto o achado é de **robustez de contrato interno**, não evidência de falha do endpoint atual.
+
+### Classificação
+
+- **WORK-02:** E2/E3 comprovado / E4 ainda aberto.
+- **Novo subfinding:** `WORK-02a — status transition can bypass outbox through repository API`.
+- **Prioridade:** P1.
+- **Tipo:** correção funcional preventiva / endurecimento de contrato.
+- **Sem mudança imediata em produção.**
+
+### Lacuna de teste
+
+`apps/worker/src/freight-status-flow.integration.test.ts` injeta diretamente um evento em `outbox_events` com conexão administrativa antes de executar o worker. Portanto, o teste não começa na operação de negócio `updateStatus` e não prova, sozinho, a atomicidade completa:
+
+`status transition → outbox → durable job → handler → audit`.
+
+### Correção planejada
+
+1. criar teste de integração iniciando pela transição de status do serviço/repositório canônico;
+2. afirmar que status e outbox são persistidos na mesma transação;
+3. afirmar rollback conjunto quando a emissão do outbox falhar;
+4. tornar a API de mudança de status incapaz de omitir os metadados necessários à emissão do evento, se isso for compatível com o desenho atual;
+5. repetir CI e atualizar a evidência antes de qualquer promoção.
+
+### Gate
+
+Este achado não altera a classificação de DB-04, AUTH-01 ou E4 do worker. A próxima evidência operacional continua sendo uma sessão runtime real e, para o worker, um evento de negócio real no ambiente autorizado.
