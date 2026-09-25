@@ -756,3 +756,22 @@ O executor `run_sql` exposto aceita `sql`, `branch_id` e `database_name`, mas o 
 Nenhuma mutation, migration, alteração de branch ou alteração de dados foi executada.
 
 **Gate preservado:** DB-04 → AUTH-01 → SEC-01 → REL-01 só avançam após evidência operacional suficiente de DB-01, sem inferência.
+
+
+## 44. FASE 2 — 2026-09-25 — projeto/branch fornecidos e EXPLAIN read-only validado
+
+O identificador operacional fornecido para a auditoria é:
+- projeto: `tms / shiny-hall-34679912`
+- branch: `main / br-lingering-shadow-act0vvi9`
+- database alvo usado na tentativa: `neondb`
+
+Foi executado, em modo de análise read-only, o plano da consulta:
+`SELECT version, checksum FROM public.schema_migrations ORDER BY version;`
+
+O resultado do EXPLAIN confirmou que o banco/branch alcançado possui a relação `public.schema_migrations` e as colunas `version` e `checksum`, com leitura sequencial e ordenação por `version`. Isso é evidência estrutural adicional de que a consulta é válida no alvo. **Não é evidência dos valores/linhas retornados** e, portanto, não fecha DB-01.
+
+A tentativa de execução efetiva via executor SQL continua rejeitada pelo backend por exigir `project_id`, embora esse campo não exista no contrato exposto do executor. Assim, o identificador correto já está conhecido, mas a integração ainda não consegue encaminhá-lo para a operação SQL efetiva.
+
+**Estado DB-01: BLOQUEADO POR TOOLING.** Não houve mutation, migration, alteração de branch, alteração de dados ou uso de credencial privilegiada.
+
+**Gate preservado:** DB-04 → AUTH-01 → SEC-01 → REL-01 permanecem sequenciais e bloqueados até a obtenção dos registros live de `schema_migrations`.
