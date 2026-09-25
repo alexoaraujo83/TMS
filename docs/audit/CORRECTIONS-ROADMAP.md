@@ -181,3 +181,21 @@ Os quatro status externos observados no mesmo commit — tms-worker, tms-backup-
 ### 7.3 Próximo passo
 
 Manter DB-01 como primeiro bloqueador: resolver a incompatibilidade do conector Neon para executar a consulta read-only de `schema_migrations`. Nenhuma migration ou alteração de produção deve ser executada para contornar essa ausência de evidência.
+
+## 8. Avanço da Fase 2 — DB-01: bloqueio de tooling reproduzido em `get_branch`
+
+### 8.1 Evidência adicional
+
+Uma nova tentativa read-only usando `get_branch` para `br-lingering-shadow-act0vvi9` retornou erro de validação do backend exigindo `project_id`, embora o schema exposto do método aceite somente `branch_id`.
+
+### 8.2 Estado
+
+DB-01 continua **BLOQUEADO por incompatibilidade do conector Neon**. O bloqueio agora está reproduzido também no resolvedor de branch, não apenas nos caminhos de listagem/descrição/SQL já registrados no tracker.
+
+### 8.3 Regra preservada
+
+Não usar `get_connection_string` como workaround: a ferramenta informa que ele retorna uma credencial privilegiada e não está disponível em modo read-only. Não expor ou copiar segredo para fabricar evidência de migration head.
+
+### 8.4 Próximo passo
+
+Continuar o desbloqueio por capacidade de consulta read-only compatível com o projeto `shiny-hall-34679912`. Enquanto o contrato permanecer incompatível, DB-01 não será fechado por inferência.
