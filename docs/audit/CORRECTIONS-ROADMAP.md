@@ -260,3 +260,17 @@ O executor `run_sql` exposto aceita `sql`, `branch_id` e `database_name`, mas o 
 Nenhuma mutation, migration, alteração de branch ou alteração de dados foi executada.
 
 **Gate preservado:** DB-04 → AUTH-01 → SEC-01 → REL-01 só avançam após evidência operacional suficiente de DB-01, sem inferência.
+
+
+## 44. FASE 2 — 2026-09-25 — projeto/branch fornecidos; consulta preparada, mas leitura de linhas ainda bloqueada
+
+Projeto/branch canônicos fornecidos para a execução:
+- `tms / shiny-hall-34679912`
+- `main / br-lingering-shadow-act0vvi9`
+- `neondb`
+
+O plano read-only de `SELECT version, checksum FROM public.schema_migrations ORDER BY version` foi validado com sucesso, confirmando a existência da relação/colunas no alvo. Isso não substitui os registros live.
+
+A execução efetiva continua bloqueada porque o backend exige `project_id` no executor SQL, mas o contrato exposto não aceita esse campo. O project ID correto já foi fornecido; o problema remanescente é de compatibilidade do conector, não de identificação do projeto.
+
+**DB-01 permanece BLOQUEADO POR TOOLING.** Nenhuma alteração de produção foi executada. O próximo passo é obter uma capacidade SQL read-only que aceite/encaminhe `project_id`; somente então registrar head/checksums e avançar para DB-04 → AUTH-01 → SEC-01 → REL-01.
