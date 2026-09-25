@@ -1,0 +1,13 @@
+"use client";
+import { useEffect,useState } from "react";
+import Link from "next/link";
+import { AppShell } from "../components/shell";
+type Session={authenticated:boolean;user?:{name?:string;email?:string}|null};
+const cards=[["Transportes","128","+8,4%","/app/transportes"],["Em trânsito","42","12 chegando hoje","/app/transportes"],["Entregas no prazo","96%","+2,1%","/app/relatorios"],["Alertas","18","4 críticos","/app/auditoria"]];
+export default function DashboardPage(){
+ const [session,setSession]=useState<Session|null>(null);
+ useEffect(()=>{fetch("/auth/profile",{cache:"no-store"}).then(async r=>setSession(r.ok?{authenticated:true,user:await r.json()}:{authenticated:false})).catch(()=>setSession({authenticated:false}));},[]);
+ if(session && !session.authenticated) return <main className="auth-wall"><div><span className="brand-mark">T</span><h1>Acesse o TMS</h1><p>Entre para visualizar a operação da sua organização.</p><Link className="button button-primary" href="/auth/login">Entrar com Auth0</Link></div></main>;
+ const greeting=session?.user?.name ? "Olá, "+session.user.name.split(" ")[0]+"." : "Olá, operador.";
+ return <AppShell><main className="dashboard"><section className="welcome-row"><div><p className="eyebrow">VISÃO GERAL</p><h2>{greeting}</h2><p>Acompanhe o estado da operação e entre rapidamente nos módulos críticos.</p></div><Link className="button button-primary" href="/app/transportes">Novo transporte</Link></section><section className="metric-grid dashboard-metrics">{cards.map(([title,value,meta,href])=><Link href={href} className="metric-card" key={title}><span>{title}</span><strong>{value}</strong><small>{meta}</small></Link>)}</section><section className="dashboard-grid"><article className="data-card"><div className="card-heading"><div><p className="eyebrow">EM ROTA</p><h3>Movimentos de hoje</h3></div><Link href="/app/transportes">Ver todos →</Link></div>{["Santos → Campinas","Guarulhos → Ribeirão Preto","Santos → São José dos Campos","Jundiaí → São Paulo"].map((route,i)=><div className="movement" key={route}><div><strong>{route}</strong><small>Veículo {12+i} · Motorista em rota</small></div><span className={i===3?"warning":"ok"}>{i===3?"Atenção":"Em trânsito"}</span></div>)}</article><article className="data-card"><div className="card-heading"><div><p className="eyebrow">ATENÇÃO</p><h3>Alertas recentes</h3></div><Link href="/app/auditoria">Auditoria →</Link></div>{["Documento pendente","Prazo de entrega próximo","Atualização de veículo"].map((item,i)=><div className="alert-row" key={item}><span className="alert-icon">!</span><div><strong>{item}</strong><small>{i+1} evento(s) aguardando ação</small></div></div>)}</article></section></main></AppShell>;
+}

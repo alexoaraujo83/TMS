@@ -1,80 +1,25 @@
-"use client";
+import Link from "next/link";
 
-import { useEffect, useState } from "react";
-import { fetchApiHealth, type ApiHealth } from "../lib/api";
-
-type Session = { authenticated: boolean; user?: { name?: string; email?: string } | null };
-type Freight = { id: string; status: string; originCity: string; originState: string; destinationCity: string; destinationState: string };
-
-const initial = { freightType:"dedicated", originCity:"Santos", originState:"SP", destinationCity:"Campinas", destinationState:"SP", cargoDescription:"Carga de teste TMS", quantity:"1", weightKg:"100" };
+const highlights = [
+  ["Operação", "Visibilidade de transportes, veículos, motoristas e rotas em um único fluxo."],
+  ["Controle", "Dados tenant-scoped, autenticação Auth0 e trilhas de auditoria como parte da arquitetura."],
+  ["Escala", "Next.js na web, API separada e PostgreSQL/Neon como persistência."],
+];
 
 export default function HomePage() {
-  const [health,setHealth]=useState<ApiHealth|null>(null);
-  const [session,setSession]=useState<Session|null>(null);
-  const [freights,setFreights]=useState<Freight[]>([]);
-  const [form,setForm]=useState(initial);
-  const [error,setError]=useState<string|null>(null);
-  const [busy,setBusy]=useState(false);
-  const [updating,setUpdating]=useState<string|null>(null);
-
-  async function loadFreights() {
-    const r=await fetch("/api/tms/freights",{cache:"no-store"});
-    if(!r.ok) throw new Error((await r.text())||`GET /freights: HTTP ${r.status}`);
-    setFreights(await r.json());
-  }
-
-  async function createFreight(e:React.FormEvent) {
-    e.preventDefault(); setBusy(true); setError(null);
-    try {
-      const r=await fetch("/api/tms/freights",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({...form,quantity:Number(form.quantity),weightKg:Number(form.weightKg)})});
-      if(!r.ok) throw new Error((await r.text())||`POST /freights: HTTP ${r.status}`);
-      await loadFreights();
-    } catch(e) { setError(e instanceof Error?e.message:"Freight creation failed"); }
-    finally { setBusy(false); }
-  }
-
-  async function openFreight(id:string) {
-    setUpdating(id); setError(null);
-    try {
-      const r=await fetch(`/api/tms/freights/${encodeURIComponent(id)}/status`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({status:"open"})});
-      if(!r.ok) throw new Error((await r.text())||`PATCH /freights/:id/status: HTTP ${r.status}`);
-      await loadFreights();
-    } catch(e) { setError(e instanceof Error?e.message:"Status update failed"); }
-    finally { setUpdating(null); }
-  }
-
-  useEffect(()=>{ void Promise.all([
-    fetchApiHealth().then(setHealth).catch(()=>setHealth(null)),
-    fetch("/auth/profile",{cache:"no-store"}).then(async r=>setSession(r.ok?{authenticated:true,user:await r.json()}:{authenticated:false})).catch(()=>setSession({authenticated:false}))
-  ]); },[]);
-
-  useEffect(()=>{ if(session?.authenticated) void loadFreights().catch(e=>setError(e instanceof Error?e.message:"Freight list failed")); },[session?.authenticated]);
-
-  return <main>
-    <h1>TMS</h1>
-    <p>Frontend foundation with Auth0 session and live freight API integration.</p>
-    {error && <p role="alert">{error}</p>}
-    <section>
-      <h2>Authentication</h2>
-      {!session && <p>Checking session…</p>}
-      {session?.authenticated ? <><p>Signed in as {session.user?.name ?? session.user?.email ?? "authenticated user"}.</p><a href="/auth/logout">Log out</a></> : session ? <><a href="/auth/login">Log in with Auth0</a><br/><a href="/auth/login?screen_hint=signup">Sign up</a></> : null}
-    </section>
-    {session?.authenticated && <section>
-      <h2>Freight</h2>
-      <form onSubmit={createFreight}>
-        <label>Type <select value={form.freightType} onChange={e=>setForm({...form,freightType:e.target.value})}><option value="dedicated">dedicated</option><option value="shared">shared</option><option value="complement">complement</option><option value="urgent">urgent</option></select></label>{" "}
-        <label>Origin <input value={form.originCity} onChange={e=>setForm({...form,originCity:e.target.value})}/></label>{" "}
-        <label>UF <input value={form.originState} maxLength={2} onChange={e=>setForm({...form,originState:e.target.value})}/></label>{" "}
-        <label>Destination <input value={form.destinationCity} onChange={e=>setForm({...form,destinationCity:e.target.value})}/></label>{" "}
-        <label>UF <input value={form.destinationState} maxLength={2} onChange={e=>setForm({...form,destinationState:e.target.value})}/></label>{" "}
-        <label>Cargo <input value={form.cargoDescription} onChange={e=>setForm({...form,cargoDescription:e.target.value})}/></label>{" "}
-        <label>Qty <input type="number" min="1" value={form.quantity} onChange={e=>setForm({...form,quantity:e.target.value})}/></label>{" "}
-        <label>kg <input type="number" min="1" value={form.weightKg} onChange={e=>setForm({...form,weightKg:e.target.value})}/></label>{" "}
-        <button disabled={busy}>{busy?"Creating…":"Create freight"}</button>
-      </form>
-      <h3>Current freights</h3>
-      <ul>{freights.map(f=><li key={f.id}>{f.originCity}/{f.originState} → {f.destinationCity}/{f.destinationState} — {f.status} {f.status==="draft" && <button type="button" disabled={updating===f.id} onClick={()=>void openFreight(f.id)}>{updating===f.id?"Updating…":"Open freight"}</button>}</li>)}</ul>
-    </section>}
-    <section><h2>API status</h2><p>{health?health.service+": "+health.status:"Checking API…"}</p></section>
-  </main>;
+  return (
+    <main className="marketing-shell">
+      <header className="marketing-nav">
+        <Link href="/" className="brand"><span className="brand-mark">T</span> TMS</Link>
+        <nav><Link href="#produto">Produto</Link><Link href="#modulos">Módulos</Link><Link href="/app">Acessar sistema</Link></nav>
+      </header>
+      <section className="hero">
+        <div className="hero-copy"><p className="eyebrow">TRANSPORTATION MANAGEMENT SYSTEM</p><h1>Uma operação de transporte clara, conectada e auditável.</h1><p className="hero-lead">Centralize embarques, frota, motoristas, rotas, documentos, financeiro e indicadores em uma experiência operacional única.</p><div className="hero-actions"><Link className="button button-primary" href="/app">Abrir TMS</Link><Link className="button button-secondary" href="#produto">Conhecer módulos</Link></div></div>
+        <div className="hero-panel"><div className="panel-top"><span>Visão operacional</span><span className="status-dot">● Online</span></div><div className="metric-grid"><div><strong>128</strong><span>Transportes ativos</span></div><div><strong>42</strong><span>Veículos em rota</span></div><div><strong>96%</strong><span>Entregas no prazo</span></div><div><strong>18</strong><span>Alertas abertos</span></div></div><div className="route-card"><span>Hoje</span><strong>Santos → Campinas</strong><small>Coleta 08:30 · Entrega 14:00 · Em trânsito</small></div></div>
+      </section>
+      <section id="produto" className="section"><div className="section-heading"><p className="eyebrow">BASE DO PRODUTO</p><h2>Feito para a operação real.</h2></div><div className="feature-grid">{highlights.map(([title,body],i)=><article className="feature-card" key={title}><span className="feature-index">0{i+1}</span><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+      <section id="modulos" className="section section-soft"><div className="section-heading"><p className="eyebrow">MÓDULOS</p><h2>O fluxo completo, por domínio.</h2></div><div className="module-grid">{["Transportes","Veículos","Motoristas","Clientes","Rotas","Documentos","Financeiro","Relatórios","Auditoria","Configurações"].map((item,i)=><Link href="/app" className="module-card" key={item}><span>0{i+1}</span><strong>{item}</strong><span>→</span></Link>)}</div></section>
+      <footer className="marketing-footer"><span>© TMS</span><span>Arquitetura orientada a operação e evidências.</span></footer>
+    </main>
+  );
 }
