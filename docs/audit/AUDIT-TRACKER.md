@@ -904,3 +904,75 @@ Enquanto DB-04 permanecer aberto, a sequência continua:
 **DB-04 → AUTH-01 → SEC-01 → REL-01**
 
 Não iniciar correções funcionais ou refatorações a partir deste finding antes da evidência comportamental.
+
+
+## 48. FASE 2 — 2026-09-25 — continuação: Auth0/Neon Data API e superfície HTTP
+
+### 48.1 Auth0/Neon não substitui o Auth0 real do TMS
+
+Foi verificado novamente o conjunto de capacidades Neon/Auth. Existem operações para Neon Auth e Neon Data API, mas os métodos de leitura de configuração disponíveis também exigem internamente `project_id` que não aparece no contrato exposto em `get_auth`/`get_data_api`. A tentativa de leitura foi rejeitada antes da execução.
+
+O projeto, entretanto, possui contrato explícito no código para **Auth0 externo**, não Neon Auth:
+- issuer configurado por `AUTH0_ISSUER_BASE_URL`;
+- audience por `AUTH0_AUDIENCE`;
+- JWKS por `AUTH0_JWKS_URL`;
+- algoritmo permitido: RS256;
+- `sub` obrigatório;
+- claim tenant namespaced `https://tms-platform.io/claims/tenant_id`;
+- membership ativa no banco antes de criar o RequestContext.
+
+**Conclusão:** a existência/configuração de Neon Auth ou Data API não deve ser usada como prova de AUTH-01. O caminho de autenticação auditado continua sendo **Auth0 → API → membership/RLS**.
+
+### 48.2 AUTH-01 permanece aberto
+
+A busca cruzada confirmou que os testes automatizados cobrem issuer, audience, expiração, tenant claim, membership e divergência de tenant header usando chaves/testes sintéticos. Isso é E2/E3 de implementação/CI.
+
+Não foi obtido nesta sessão:
+- token Auth0 real recém-emitido;
+- confirmação independente do audience de produção;
+- execução real Web/API com esse token;
+- rejeição observada em produção para tenant sem membership.
+
+**Estado: AUTH-01 = ABERTO / E4 PENDENTE.**
+
+### 48.3 API-11 confirmado por código
+
+A superfície de Freight continua protegida globalmente por `AuthGuard, PermissionGuard`, mas os endpoints:
+- `runtime-context`;
+- `runtime-db-context`;
+- `runtime-rls-isolation`;
+- `runtime-auth-claims`
+
+estão associados a `freight:read`.
+
+Esses endpoints expõem contexto operacional de tenant/usuário/roles/permissões e detalhes de banco/OIDC; o diagnóstico de RLS ainda executa uma sonda específica.
+
+**Classificação mantida: API-11 / API-06 = P1 — CONTROLE DE EXPOSIÇÃO.**
+
+Não foi alterado código. A correção somente deve ocorrer depois da decisão operacional sobre diagnóstico em produção.
+
+### 48.4 API-02/SEC-03 confirmado
+
+O endpoint de replay continua dentro do controller protegido por AuthGuard + PermissionGuard, mas usa a permissão funcional ampla `freight:update`. Não foi encontrada permissão dedicada de replay nesta nova verificação.
+
+**Estado: API-02/SEC-03 = P1 / HARDENING PENDENTE.**
+
+### 48.5 CONFIG-01 reafirmado
+
+Existe `packages/config` que conhece as variáveis Auth0, mas o `AuthGuard` ainda lê diretamente `process.env.AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` e `AUTH0_JWKS_URL`.
+
+Isso mantém CONFIG-01 como dívida técnica: o contrato centralizado existe, mas o consumidor crítico de autenticação não está efetivamente ligado a ele.
+
+Não corrigir nesta fase; registrar para P2 após fechamento dos gates operacionais.
+
+### 48.6 DB-03 / Worker
+
+O worker possui verificação de startup que consulta `current_user` e falha se o papel não for `tms_app`. Isso comprova a intenção e o mecanismo de proteção no código.
+
+A evidência operacional do worker continua separada: a auditoria precisa reconciliar a identidade efetiva da conexão de produção e a execução real do fluxo de negócio.
+
+**DB-03 = PARCIAL; WORK-02/03 permanecem E4 ABERTOS.**
+
+### 48.7 Regra preservada
+
+Nenhuma migration, alteração de RLS, configuração Auth0, configuração Neon Auth/Data API ou alteração de produção foi executada nesta etapa.
