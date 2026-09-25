@@ -29,7 +29,7 @@ A regra de evidência é:
 | Vercel Web | tms-web, deployment dpl_9zSdC58f8hhwg1ejaURTyGRLznbK, READY, production, SHA 20ff155544c99e587100fa17aedeeeb6eda5a284; código funcional auditado permanece fb0025... | CONTROLE/DOCUMENTAÇÃO ATUAL / CÓDIGO DE APP INALTERADO | Registrar SHA efetivo e diferenciar deploy de controle de mudança funcional. |
 | Railway worker | Deployment do SHA atual `74c88ebf-7046-4d01-836b-c72847e08255` foi SKIPPED; último worker principal conhecido como SUCCESS é `9d938334-b80c-4064-bd40-683620f950a2`, SHA `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | SHA EFETIVO ANTERIOR | Verificar regras de watch/build e registrar o SHA efetivo. Não forçar deploy apenas para igualar SHAs. |
 | Railway backup worker | Deployment `21278249-58dc-4121-85de-d866a71a1003` está SUCCESS no SHA atual | ATUAL / EXECUÇÃO DE BACKUP NÃO PROVADA | Obter evidência de artefato real, checksum e retenção. |
-| CI | Run `36074378568` no HEAD de controle `9c0d786386bb129c57cd2bd7b92458fc4ce35365` concluiu `success`; job `107882428713` executou architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build | COMPROVADO NO HEAD DE CONTROLE | Repetir no próximo HEAD relevante e manter CI separado da prova operacional de produção |
+| CI | Run `36081162875` / #1139 no SHA `2eb43e87bb8005cbfb6d65c7808e34dde725cca4` concluiu `success`; job `107903222930` passou architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build | COMPROVADO NO HEAD ATUAL DE CONTROLE | Manter CI separado da prova operacional de produção e repetir após mudanças funcionais relevantes |
 
 ## 3. Tabela mestre de execução
 
@@ -63,7 +63,7 @@ A regra de evidência é:
 | WEB-02 | Modelo de deploy Web/API | Vercel pulou o Web no commit API-only; isso é comportamento esperado de monorepo, não defeito automático | ACEITO / PRECISA DOCUMENTAÇÃO | Formalizar promoção por componente | Manifesto explica SHA efetivo por componente | P1 |
 | DOC-01 | Fonte de verdade da auditoria | Existem documentos datados com estados históricos diferentes | PARCIAL | Manter históricos imutáveis e usar este tracker como estado corrente | Todo finding atual aparece aqui; históricos ficam explicitamente datados | P1 |
 | DOC-02 | Diagramas | Conjunto versionado de Mermaid criado em `docs/architecture/`: contexto, deployment e domínio; índice e check estrutural entram no CI; CI atual passou no SHA de controle | IMPLEMENTADO NO REPOSITÓRIO / CI COMPROVADO / RUNTIME PENDENTE | Revisar os três diagramas contra runtime efetivo e, se necessário, ampliar para ERD/event-flow | Diagramas coincidem com runtime e relações de banco; CI verde no HEAD auditado | P2 |
-| CI-01 | CI do HEAD atual | Run `36074378568` / job `107882428713` no SHA `9c0d786386bb129c57cd2bd7b92458fc4ce35365` terminou com sucesso e todos os passos do job passaram | COMPROVADO | Preservar evidência e repetir no próximo HEAD de aplicação/control plane relevante | format/lint/typecheck/test/build + architecture check verdes no SHA auditado | P0 |
+| CI-01 | CI do HEAD atual | Run `36081162875` / #1139 no SHA `2eb43e87bb8005cbfb6d65c7808e34dde725cca4` terminou `success`; job `107903222930` passou todos os passos, incluindo architecture, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build | FECHADO / COMPROVADO | Preservar esta evidência e repetir após mudanças funcionais relevantes | Gates configurados passam no SHA auditado | P0 |
 | CI-02 | Gates de promoção | Web/API/Worker podem ser promovidos separadamente | ABERTO | Definir gates explícitos por componente e release | Componente desatualizado/falho não é confundido com release completa | P1 |
 | SEC-03 | Replay sensível | Replay é mutação de produção que cria durable job e auditoria | PRECISA HARDENING | Permissão dedicada, motivo estruturado, rate/approval quando aplicável e auditoria | Replay controlado + testes negativos + trilha de auditoria | P1 |
 | FINAL-01 | DoD final | P0/P1 ainda têm evidência operacional aberta | BLOQUEADO | Fechar P0, depois P1, executar regressão e reconciliar documentação | Gates finais verdes ou aceitos formalmente com evidência | P0 |
@@ -456,11 +456,11 @@ A capacidade específica do plugin Auth0 solicitada para esta etapa não está e
 
 ### 31.4 P0 — CI-01: atualização da evidência
 
-O run `36080140034` / #1135, SHA `c4fcb3ba598a0218142c11911b52d7a032eb24a4`, terminou posteriormente com **conclusion=cancelled**. Portanto ele não pode ser tratado como CI verde.
+O run `36080140034` / #1135 no SHA `c4fcb3ba598a0218142c11911b52d7a032eb24a4` terminou `cancelled` e foi corretamente descartado como evidência verde. Em seguida, o run `36081162875` / #1139 foi executado no SHA `2eb43e87bb8005cbfb6d65c7808e34dde725cca4` e terminou `success`.
 
-O último run verde explicitamente consolidado continua sendo `36077970795` no SHA `c6606af28861e05f14c80bc50c89192907d02378`.
+O job `107903222930` passou integralmente por: instalação frozen do lockfile, validação dos diagramas, migration, roles/RLS/IAM, integração outbox/durable jobs/replay, format, lint, typecheck, test e build.
 
-**Estado:** CI-01 permanece aberto para um HEAD relevante com conclusão final verde.
+**Estado:** CI-01 FECHADO/COMPROVADO para o HEAD de controle/documentação `2eb43e87...`. Isso não fecha DB-01/DB-04/AUTH-01 e não substitui evidência operacional de produção.
 
 ### 31.5 Regra operacional desta fase
 
@@ -503,4 +503,49 @@ Nenhuma migration foi aplicada, nenhuma branch foi criada/resetada/deletada e ne
 3. Se houver drift de checksum/head, interromper qualquer migration automática e abrir correção específica; não equalizar SHA cegamente.
 4. Com DB-01 fechado, avançar para DB-04 comportamental.
 
-**Estado da Fase 2:** P0 ainda aberto; nenhuma correção funcional executada.
+**Estado da Fase 2 antes deste avanço:** P0 ainda aberto; nenhuma correção funcional executada.
+
+
+## 33. FASE 2 — CI-01 fechado no HEAD de controle atual
+
+### 33.1 Evidência CI atual
+
+O GitHub Actions run `36081162875` / #1139, workflow `CI`, foi executado por push no SHA `2eb43e87bb8005cbfb6d65c7808e34dde725cca4` e terminou com **status=completed / conclusion=success**.
+
+Job: `107903222930` (`quality`). Todos os passos concluíram com sucesso, incluindo:
+- instalação `pnpm install --frozen-lockfile`;
+- validação da documentação arquitetural versionada;
+- migration;
+- validação de atributos do runtime role;
+- RLS com role non-bypass;
+- IAM runtime resolver;
+- integração PostgreSQL de Durable Jobs;
+- fluxo `freight.status_changed` de outbox para durable job;
+- replay e evidência cross-tenant em runtime de CI;
+- format, lint, typecheck, test e build.
+
+### 33.2 Limite da evidência
+
+Esta evidência fecha **CI-01** para o SHA de controle/documentação atual. Ela comprova os gates automatizados configurados no CI, mas não comprova:
+- head/checksum do `schema_migrations` no Neon de produção;
+- RLS comportamental com a credencial real de produção;
+- E2E Auth0 real em produção;
+- execução E4 do worker em produção;
+- release funcional completa por componente.
+
+Os quatro status externos associados ao commit `2eb43e87...` também retornaram `success` para tms-worker, tms-backup-worker, tms-web e tms-core-api. Esses status são registrados como evidência de integração/deploy, não como substitutos dos gates P0 operacionais.
+
+### 33.3 Estado após este avanço
+
+- **CI-01: FECHADO/COMPROVADO.**
+- **DB-01: BLOQUEADO por incompatibilidade do conector Neon.**
+- **DB-04: BLOQUEADO aguardando credencial/runtime de produção.**
+- **AUTH-01: ABERTO/BLOQUEADO aguardando capacidade operacional Auth0.**
+- **SEC-01: permanece dependente de DB-04 + AUTH-01.**
+- **REL-01: ainda não iniciado, pois o manifesto deve reconciliar migration head e versões efetivas dos componentes.**
+
+Nenhuma migration, alteração de RLS, Auth0, infraestrutura ou refatoração foi executada neste avanço.
+
+### 33.4 Próximo alvo
+
+Continuar P0 pelo desbloqueio de DB-01; em paralelo, preservar a evidência CI-01 recém-fechada e não reclassificar os demais P0 por inferência.
