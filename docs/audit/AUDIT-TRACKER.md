@@ -1920,3 +1920,43 @@ A busca adicional no repositório não encontrou workflow GitHub versionado que 
 ### Próxima ação
 
 Obter/reconciliar a configuração live do Auth0 Production por caminho autorizado (Action publicada, binding do Post-Login Flow, usuário de teste com `app_metadata.tenant_id`, audience/client) e, somente após essa prova, promover o commit Web corrigido para Production e executar o E2E completo.
+
+
+## 31. FASE 2 — 2026-09-26 — revisão dos PRs abertos e estado de promoção
+
+### 31.1 PR #93 — contrato Auth0 Production
+
+- PR permanece **OPEN**, não draft, base `main`, head `fix/auth0-production-tenant-contract-2026-09-26`.
+- A branch está **10 commits à frente e 0 atrás de main**, portanto não há drift de base neste momento.
+- O HEAD do PR é `9be23ec6d13a0bef1578836bc033766299beb6d4`.
+- Status combinado observado no HEAD: Vercel Web **success** e Vercel Core API **success**.
+- A alteração funcional permanece restrita ao contrato do Auth0 Next.js SDK: `appBaseUrl` explícito, mantendo audience e sessão no SDK v4.
+- O PR **não deve ser mesclado ainda**: AUTH-01 continua P0/BLOQUEADO porque a configuração live do Auth0 Production, Action publicada, binding do Post-Login e token real ainda não foram reconciliados.
+- Não há justificativa para alterar AuthGuard, remover a exigência de tenant ou introduzir workaround no Web.
+
+### 31.2 PR #92 — contrato de release
+
+- PR permanece **OPEN** e é documentação/release-contract.
+- O estado anteriormente observado de branch desatualizada/mergeability deve ser reavaliado antes de qualquer merge.
+- A documentação deve distinguir claramente estado histórico de runtime atual e não pode transformar SHAs/deployment IDs históricos em evidência atual.
+- Ação: manter fora da promoção até branch/base e evidências do manifesto estarem reconciliadas.
+
+### 31.3 PR #85 — application shell
+
+- PR permanece **OPEN/DRAFT**.
+- Escopo é UI/application shell; não deve ultrapassar os gates P0 de Auth0 e DB-04.
+- Ação: manter Draft; repetir validações de deployment quando a infraestrutura estiver disponível e somente então reavaliar promoção.
+
+### 31.4 Regra de promoção consolidada
+
+| Gate | Estado | Evidência |
+|---|---|---|
+| CI/status do HEAD do PR #93 | PASS | Vercel Web + Core API success |
+| Base do PR #93 | PASS | 10 commits ahead / 0 behind |
+| Auth0 Production live | BLOQUEADO | sem Management/CLI live nesta conexão |
+| Token real com tenant claim | BLOQUEADO | AUTH-01 E4 pendente |
+| DB-04 RLS com sessão `tms_app` | BLOQUEADO | E4 pendente |
+| PR #92 release contract | ABERTO | requer reconciliação da branch/evidências |
+| PR #85 UI | DRAFT | aguardar gates P0 |
+
+**Decisão operacional desta etapa:** nenhuma mesclagem, promoção Vercel Production, alteração Auth0 Production ou alteração de RLS foi executada. O próximo passo P0 continua sendo obter evidência live autorizada do Auth0 Production e executar o E4 de DB-04 com sessão real `tms_app`.
