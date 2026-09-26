@@ -638,3 +638,22 @@ Após estabilização do build-rate-limit do Vercel, executar/obter nova valida�
 ### Regra
 
 Não usar `rerun` em run cancelado antigo apenas para transformar histórico em verde. Reexecutar somente uma execução relevante ao HEAD final ou um job explicitamente falho por causa transitória, quando houver evidência de que o retry é apropriado.
+
+
+## 2026-09-25 — Continuação: reconciliação documental e semântica de replay
+
+### P1 — API-16 / SEC-03: separar idempotência do handler de deduplicação do replay
+
+A auditoria confirmou duas propriedades diferentes: (1) o handler é idempotente para o mesmo `event_id`; (2) o endpoint manual de replay gera `replay:<event_id>:<random_uuid>` como `idempotency_key`, portanto cada POST explícito pode criar um novo durable job.
+
+Isso pode ser uma decisão operacional válida para reprocessamento deliberado. O gap é de contrato/controle: a permissão atual é `freight:update` e não existe uma decisão explícita registrada sobre deduplicação de solicitações de replay.
+
+**Próxima ação:** decidir e documentar a semântica pretendida; se a intenção for replay idempotente, usar chave determinística e teste de integração; se a intenção for permitir múltiplos replays, manter a chave aleatória, mas restringir a operação e registrar motivo obrigatório/controle operacional.
+
+### DOC-01 — SSOT reconciliado
+
+O SSOT foi corrigido para não repetir a afirmação histórica de 31 migrations. O head live conhecido é 0033, com checksums de 0032/0033 reconciliados anteriormente.
+
+### Gate
+
+O bloqueio **DB-04/E4** continua aberto: evidência de código/CI e evidência read-only do schema não substituem a execução controlada com o papel runtime real.
