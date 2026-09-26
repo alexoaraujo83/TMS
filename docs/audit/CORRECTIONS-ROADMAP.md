@@ -743,3 +743,13 @@ Correção:
 ### Reconciliação de documentação
 
 `docs/DATABASE.md` foi atualizado para refletir a cadeia 0001–0035, incluindo observabilidade/audit context, durable-job idempotency, replay permission e diagnostics permission.
+
+
+## 2026-09-25 — P0/P1 gate: autorização reconciliada e DB-04 permanece bloqueado
+
+- HEAD auditado: `d304b2cdfacc6d78282648b1d5bd1243811a7b78`.
+- Replay manual: `freight:replay` dedicado e grant administrativo explícito em 0035.
+- Diagnósticos: `ops:diagnostics` dedicado; operador excluído por bootstrap e admin concedido explicitamente.
+- AuthGuard: contrato estrutural confirmado; E2/E3 comprovado, E4 Auth0 ainda pendente.
+- CI atual: worker e backup-worker SUCCESS; Vercel API/Web apresentam `build-rate-limit`, portanto não há evidência de build completo do HEAD em Vercel.
+- **Gate P0 DB-04:** permanece BLOCKER. A próxima evidência é uma sessão real `tms_app` com os testes de isolamento definidos no tracker. Não modificar RLS/grants apenas para viabilizar o teste.
