@@ -1562,3 +1562,26 @@ A execução cancelada do commit anterior (#1258 / 36240846312) não é tratada 
 Manter a prova de CI como evidência automatizada complementar e continuar a busca do caminho autenticado de produção tms_app, sem reutilizar neondb_owner e sem alterar RLS/grants/roles/configuração para fabricar evidência.
 
 **Estado: DB-04 = BLOQUEADO / E4 PENDENTE.**
+
+
+## 52. FASE 2 — 2026-09-26 — Webhook endpoint contract reconciliado
+
+### Evidência
+
+A revisão cruzada de `docs/PROJECT-DOCUMENTATION.md`, `docs/architecture/STAGE-10.5-WEBHOOKS.md` e do código do worker confirmou que o repositório **não define atualmente um receiver HTTP externo de webhook** como parte de uma integração de negócio implementada.
+
+O worker apenas lê `OUTBOX_WEBHOOK_URLS`, valida os destinos e publica o evento para os endpoints configurados. O contrato de código exige HTTPS e, quando existe pelo menos um endpoint configurado, também exige `OUTBOX_WEBHOOK_SECRET` não vazio. O repositório não contém uma rota TMS/API que funcione como receiver desses POSTs.
+
+### Decisão
+
+- `OUTBOX_WEBHOOK_URLS`: **OPCIONAL / NÃO CONFIGURADO por padrão** quando não houver consumidor externo contratado.
+- Não usar `/health` ou `/ready` como receiver; são endpoints de saúde/readiness e não fazem parte do contrato de webhook.
+- Não inventar uma URL de produção para preencher a variável.
+- `OUTBOX_WEBHOOK_SECRET`: **CONDICIONALMENTE OBRIGATÓRIO**; se `OUTBOX_WEBHOOK_URLS` possuir qualquer endpoint, o código exige um segredo não vazio e assina o payload com HMAC-SHA256.
+- Se uma integração externa for ativada no futuro, registrar explicitamente o receiver, ownership, contrato de payload, idempotência, timeout/retry e segredo antes de configurar Railway.
+
+### Correção documental
+
+A documentação de Stage 10.5 foi corrigida para refletir o comportamento efetivo do código: o secret não é simplesmente “optional”; ele é obrigatório sempre que houver endpoint configurado.
+
+**Estado:** ENV-03 / WORK-04 — **RECONCILIADO DOCUMENTALMENTE; sem alteração de produção**.
