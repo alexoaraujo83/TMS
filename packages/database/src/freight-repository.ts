@@ -131,6 +131,68 @@ export class PostgresFreightRepository {
     );
   }
 
+
+  async updateWithAudit(
+    tenantId: string,
+    freightId: string,
+    input: Partial<Omit<CreateFreightInput, "tenantId">>,
+    audit?: AuditInput,
+  ): Promise<FreightRow | null> {
+    assertUuid(tenantId, "tenantId");
+    assertUuid(freightId, "freightId");
+    return withTransaction(this.pool, { tenantId }, async (client) => {
+      const currentResult = await client.query<FreightRow>(
+        `select ${FREIGHT_COLUMNS} from freights where id = $1 and tenant_id = $2 limit 1`,
+        [freightId, tenantId],
+      );
+      const current = currentResult.rows[0];
+      if (!current) return null;
+
+      const result = await client.query<FreightRow>(
+        `update freights set
+          freight_type = coalesce($3, freight_type),
+          origin_city = coalesce($4, origin_city),
+          origin_state = coalesce($5, origin_state),
+          destination_city = coalesce($6, destination_city),
+          destination_state = coalesce($7, destination_state),
+          cargo_description = coalesce($8, cargo_description),
+          quantity = coalesce($9, quantity),
+          weight_kg = coalesce($10, weight_kg),
+          volume_m3 = case when $11::numeric is null then volume_m3 else $11 end,
+          linear_meters = case when $12::numeric is null then linear_meters else $12 end,
+          customer_price_cents = case when $13::integer is null then customer_price_cents else $13 end,
+          driver_price_cents = case when $14::integer is null then driver_price_cents else $14 end,
+          vehicle_types = coalesce($15, vehicle_types),
+          body_types = coalesce($16, body_types),
+          minimum_free_meters = case when $17::numeric is null then minimum_free_meters else $17 end,
+          minimum_capacity_kg = case when $18::numeric is null then minimum_capacity_kg else $18 end,
+          updated_at = now()
+        where id = $1 and tenant_id = $2
+        returning ${FREIGHT_COLUMNS}`,
+        [
+          freightId, tenantId, input.freightType ?? null, input.originCity ?? null,
+          input.originState ?? null, input.destinationCity ?? null,
+          input.destinationState ?? null, input.cargoDescription ?? null,
+          input.quantity ?? null, input.weightKg ?? null, input.volumeM3 ?? null,
+          input.linearMeters ?? null, input.customerPriceCents ?? null,
+          input.driverPriceCents ?? null, input.vehicleTypes ?? null, input.bodyTypes ?? null,
+          input.minimumFreeMeters ?? null, input.minimumCapacityKg ?? null,
+        ],
+      );
+      const row = result.rows[0] ?? null;
+      if (row && audit) {
+        await appendAuditEvent(client, {
+          ...audit,
+          tenantId,
+          entityId: row.id,
+          beforeState: audit.beforeState ?? current,
+          afterState: audit.afterState ?? row,
+        });
+      }
+      return row;
+    });
+  }
+
   async deleteWithAudit(
     freightId: string,
     tenantId: string,

@@ -16,6 +16,7 @@ import { DATABASE_POOL } from "../../common/database.provider.js";
 import type { RequestContext } from "../../common/request-context.js";
 import type {
   CreateFreightDto,
+  UpdateFreightDto,
   UpdateFreightStatusDto,
 } from "./freight.dto.js";
 
@@ -66,6 +67,49 @@ export class FreightService {
 
   list(context: RequestContext): Promise<readonly FreightRow[]> {
     return this.repository.list(context.tenantId);
+  }
+
+
+  async update(
+    context: RequestContext,
+    freightId: string,
+    dto: UpdateFreightDto,
+  ): Promise<FreightRow> {
+    const current = await this.repository.findById(context.tenantId, freightId);
+    if (!current) throw new NotFoundException("Freight not found");
+
+    const updated = await this.repository.updateWithAudit(
+      context.tenantId,
+      freightId,
+      {
+        freightType: dto.freightType,
+        originCity: dto.originCity,
+        originState: dto.originState?.toUpperCase(),
+        destinationCity: dto.destinationCity,
+        destinationState: dto.destinationState?.toUpperCase(),
+        cargoDescription: dto.cargoDescription,
+        quantity: dto.quantity,
+        weightKg: dto.weightKg,
+        volumeM3: dto.volumeM3 ?? undefined,
+        linearMeters: dto.linearMeters ?? undefined,
+        customerPriceCents: dto.customerPriceCents ?? undefined,
+        driverPriceCents: dto.driverPriceCents ?? undefined,
+        vehicleTypes: dto.vehicleTypes,
+        bodyTypes: dto.bodyTypes,
+        minimumFreeMeters: dto.minimumFreeMeters ?? undefined,
+        minimumCapacityKg: dto.minimumCapacityKg ?? undefined,
+      },
+      {
+        actorUserId: context.userId,
+        action: "freight.updated",
+        entityType: "freight",
+        requestId: context.requestId,
+        correlationId: context.correlationId,
+        beforeState: current,
+      },
+    );
+    if (!updated) throw new NotFoundException("Freight not found");
+    return updated;
   }
 
   async remove(context: RequestContext, freightId: string): Promise<{ id: string; deleted: true }> {

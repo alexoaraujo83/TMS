@@ -99,6 +99,26 @@ export class CreateFreightDto {
   minimumCapacityKg?: number;
 }
 
+
+export class UpdateFreightDto {
+  @IsOptional() @IsIn(freightTypes) freightType?: FreightType;
+  @IsOptional() @IsString() @Length(2, 120) originCity?: string;
+  @IsOptional() @IsString() @Length(2, 2) originState?: string;
+  @IsOptional() @IsString() @Length(2, 120) destinationCity?: string;
+  @IsOptional() @IsString() @Length(2, 2) destinationState?: string;
+  @IsOptional() @IsString() @Length(1, 500) cargoDescription?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @IsPositive() quantity?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @IsPositive() weightKg?: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @IsPositive() volumeM3?: number | null;
+  @IsOptional() @Type(() => Number) @IsNumber() @IsPositive() linearMeters?: number | null;
+  @IsOptional() @Type(() => Number) @IsInt() @IsPositive() customerPriceCents?: number | null;
+  @IsOptional() @Type(() => Number) @IsInt() @IsPositive() driverPriceCents?: number | null;
+  @IsOptional() @IsArray() @IsIn(vehicleTypes, { each: true }) vehicleTypes?: VehicleType[];
+  @IsOptional() @IsArray() @IsIn(bodyTypes, { each: true }) bodyTypes?: BodyType[];
+  @IsOptional() @Type(() => Number) @IsNumber() @IsPositive() minimumFreeMeters?: number | null;
+  @IsOptional() @Type(() => Number) @IsNumber() @IsPositive() minimumCapacityKg?: number | null;
+}
+
 export class UpdateFreightStatusDto {
   @IsIn(freightStatuses)
   status!: FreightStatus;
