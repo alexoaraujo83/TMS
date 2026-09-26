@@ -1261,3 +1261,26 @@ A revisão dos repositórios mutáveis encontrou a lacuna já registrada em REPO
 - 83bf0147569247c37fc08ba483d6381b596e4970 — limpeza dos guards redundantes de audit em Carrier/Driver/Vehicle.
 
 Nenhuma mutation de produção foi executada nesta etapa.
+
+
+## 2026-09-25 — Varredura de repositories mutáveis: fechamento do inventário
+
+A revisão dos repositories de Assignment, Trip, Trip Execution e Compliance não encontrou novos caminhos de mutação sem auditoria obrigatória. As operações de criação/transição desses domínios já recebem AuditInput e chamam appendAuditEvent dentro da mesma transação.
+
+Também foi revisado o estado atual de Freight e Operations após os hardenings anteriores: create/update/status/delete de Freight e create/update de Carrier/Driver/Vehicle exigem auditoria.
+
+### Novo teste de atomicidade financeira
+
+Foi acrescentado teste de integração que usa actor_user_id inválido para forçar falha na persistência de audit_events e confirma que a criação de financial_entries é revertida.
+
+**Commit:** 1f7c2e53ffcd0e73cc4a00759e06f276e9c70a29.
+
+### Estado do inventário
+
+**REPO-01/02/03:** sem novo gap estrutural identificado nesta passada.
+
+**REPO-04:** correção aplicada; agora possui também prova automatizada de rollback quando a auditoria falha.
+
+**REPO-07:** inventário de SQL de negócio em packages/database está substancialmente fechado para os repositories auditados. Permanecem como fronteiras legítimas a revisar separadamente: outbox/durable-jobs, stores/contexto do worker, diagnósticos RLS, replay e scripts de migration.
+
+Nenhuma mutation de produção foi executada.
