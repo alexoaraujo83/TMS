@@ -531,3 +531,12 @@ A auditoria continua sem mutation de produção.
 - Adicionado teste de integração para falha de auditoria por FK inválida, verificando que a alteração de status sofre rollback e que nenhum `freight.status_changed` é persistido.
 - A correção reduz o risco de regressão arquitetural identificado em WORK-02a, sem alterar RLS ou produzir mutação em produção.
 - Próximo passo: executar CI e, separadamente, manter DB-04 bloqueado até haver sessão runtime real de `tms_app` autorizada para os testes E4.
+
+
+## 2026-09-25 — Hardening de mutações operacionais
+
+**Status:** P2 — aplicado.
+
+- Carrier/Driver/Vehicle create/update deixaram de aceitar audit opcional.
+- A camada de serviço já fornecia audit em todos os consumidores identificados; a mudança transforma essa expectativa em contrato de compilação/runtime da API de persistência.
+- Próxima validação: CI/typecheck e testes de integração; depois prosseguir para outros repositórios mutáveis procurando o mesmo padrão.
