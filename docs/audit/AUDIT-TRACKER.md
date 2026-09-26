@@ -1781,3 +1781,44 @@ Portanto, para o erro `missing_tenant_id`, a próxima prova necessária é **liv
 
 Não criar um novo Action nem modificar o AuthGuard. Primeiro reconciliar o estado live do tenant Production. Se a Action live divergir do repositório, a correção deve ser feita por dry-run + revisão + aplicação controlada do contrato versionado, preservando rollback e sem incluir credenciais no repositório.
 
+
+## 58. FASE 2 — 2026-09-26 — AUTH-01: runbook de reconciliação live criado
+
+### Evidência adicional
+
+A auditoria do repositório encontrou **zero ocorrências** de `api.access.deny` e `missing_tenant_id` no código versionado. O Action Post-Login versionado não contém lógica de negação por ausência do tenant.
+
+A documentação oficial do Auth0 confirma que:
+- `api.access.deny()` produz `access_denied` e a mensagem fornecida aparece como `error_description`;
+- erros não tratados dentro de Rules/Actions também podem resultar em `access_denied`;
+- uma Action pode estar deployada sem estar efetivamente vinculada ao trigger, sendo necessário reconciliar o binding.
+
+Portanto, o incidente Production ainda exige inspeção do **código efetivamente publicado/executado**, e não apenas da configuração desejada em `tenant.yaml`.
+
+### Artefato criado
+
+Foi criado:
+
+`docs/audit/AUTH0-PRODUCTION-RECONCILIATION-RUNBOOK.md`
+
+O runbook define a sequência segura:
+1. inspeção read-only do Post-Login Flow;
+2. identificação de todas as Actions efetivamente vinculadas;
+3. busca por `api.access.deny`, `missing_tenant_id` e erros de runtime;
+4. comparação com a Action versionada;
+5. verificação do `app_metadata.tenant_id` do usuário de teste;
+6. reconciliação de client/audience/issuer;
+7. dry-run do Deploy CLI antes de qualquer alteração;
+8. novo login;
+9. validação Web → API → membership → PostgreSQL;
+10. testes negativos de tenant.
+
+### Limite atual
+
+Nesta sessão **não há uma ferramenta Auth0 Management/CLI conectada ao tenant Production**. A instalação local não possui o binário Auth0 CLI disponível e não foi usada nenhuma credencial presente no contexto para contornar essa limitação.
+
+Assim, não é possível afirmar qual Action/binding está efetivamente ativo em Production. A evidência atual permite concluir **drift/configuração live como finding**, mas não identifica ainda o objeto live responsável.
+
+**AUTH-01 = P0 / BLOQUEADO / E4 PENDENTE.**
+
+Nenhuma alteração foi aplicada ao Auth0 Production.
