@@ -119,6 +119,8 @@ if (!enabled) {
       assert.ok(result.rows[0].permissions.includes("trip:create"));
       assert.ok(result.rows[0].permissions.includes("trip:update"));
       assert.equal(result.rows[0].permissions.includes("iam:manage"), false);
+      assert.equal(result.rows[0].permissions.includes("freight:replay"), false);
+      assert.equal(result.rows[0].permissions.includes("ops:diagnostics"), false);
     } finally {
       client.release();
     }
