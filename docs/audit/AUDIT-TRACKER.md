@@ -1734,3 +1734,50 @@ Não alterar o AuthGuard para aceitar ausência de tenant, não confiar em tenan
 **AUTH-01 = P0 / BLOQUEADO ATÉ RECONCILIAÇÃO DO AUTH0 PRODUCTION.**
 
 Nenhuma alteração foi aplicada ao Auth0 Production nesta etapa.
+
+
+## 57. FASE 2 — 2026-09-26 — AUTH-01: auditoria estrutural do contrato de deploy Auth0 concluída
+
+### 57.1 Estado versionado encontrado
+
+A infraestrutura Auth0 do repositório está concentrada em `infra/auth0/`:
+
+- `actions/post-login.js` contém somente o comportamento de emissão do claim namespaced a partir de `event.user.app_metadata.tenant_id`;
+- `tenant.yaml` declara a Action `TMS — Tenant Claim` como `deployed: true`, `status: built`, trigger `post-login/v3` e binding no `triggers.post-login`;
+- `README.md` documenta o uso do Auth0 Deploy CLI com dry-run antes de aplicar.
+
+**Importante:** os campos `deployed: true` e `status: built` em `tenant.yaml` são o estado desejado versionado; não constituem prova de que o tenant Production atualmente possui aquela versão publicada ou aquele binding.
+
+### 57.2 Auditoria de CI/CD
+
+A busca estrutural no repositório não encontrou workflow GitHub Actions que execute automaticamente o `auth0-deploy-cli import` nem pipeline versionado que reconcilie o tenant Auth0 Production.
+
+Consequentemente, o caminho atual é **manual/documentado**, não um deployment Auth0 automatizado e comprovável pelo CI.
+
+Isso explica por que o repositório consegue manter um contrato correto sem garantir, sozinho, que Production esteja no mesmo estado.
+
+### 57.3 Relevância para o incidente
+
+A documentação oficial do Auth0 confirma que uma Action pode estar marcada como deployed e ainda não estar anexada ao trigger; o binding do trigger precisa ser aplicado separadamente. A documentação também confirma que o Deploy CLI é apropriado para import/deployment de configuração e que o fluxo deve incluir os bindings.
+
+Portanto, para o erro `missing_tenant_id`, a próxima prova necessária é **live**:
+
+1. listar Actions Post-Login efetivamente vinculadas ao Production Login Flow;
+2. identificar a versão efetivamente publicada de `TMS — Tenant Claim`;
+3. identificar qualquer outra Action que execute `api.access.deny` com `missing_tenant_id`;
+4. confirmar o client Production e a audience;
+5. confirmar `app_metadata.tenant_id` do usuário de teste;
+6. emitir uma sessão nova e observar o resultado sem registrar token/cookie.
+
+### 57.4 Classificação atual
+
+- **AUTH-01:** P0 / BLOQUEADO / E4 pendente.
+- **AUTH-02:** P1 / aberto para reconciliação independente de ambiente.
+- **AUTH-03:** E2-E3 documental; E4 bloqueado pela ausência de capacidade Auth0 live nesta conexão.
+- **SEC-01:** permanece dependente de AUTH-01 + DB-04.
+- **Nenhuma alteração de Production foi executada.**
+
+### 57.5 Próxima sequência
+
+Não criar um novo Action nem modificar o AuthGuard. Primeiro reconciliar o estado live do tenant Production. Se a Action live divergir do repositório, a correção deve ser feita por dry-run + revisão + aplicação controlada do contrato versionado, preservando rollback e sem incluir credenciais no repositório.
+
