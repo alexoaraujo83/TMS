@@ -25,14 +25,18 @@ function formFrom(f:Freight):FormState{return{
 };}
 
 export default function TransportesPage(){
- const [freights,setFreights]=useState<Freight[]>([]);\n const [selected,setSelected]=useState<Set<string>>(new Set());
+ const [freights,setFreights]=useState<Freight[]>([]);
+ const [selected,setSelected]=useState<Set<string>>(new Set());
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState<string|null>(null),[deleting,setDeleting]=useState<string|null>(null),[bulkDeleting,setBulkDeleting]=useState(false);
  const [editing,setEditing]=useState<string|null>(null),[form,setForm]=useState<FormState|null>(null),[error,setError]=useState("");
  async function load(){setLoading(true);setError("");try{const r=await fetch("/api/tms/freights",{cache:"no-store"});const body=await r.json().catch(()=>[]);if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível carregar os transportes.");setFreights(Array.isArray(body)?body:[]);setSelected(new Set());}catch(e){setError(e instanceof Error?e.message:"Não foi possível carregar os transportes.");}finally{setLoading(false);}}
  useEffect(()=>{void load();},[]);
  function startEdit(f:Freight){setEditing(f.id);setForm(formFrom(f));setError("");}
  function cancelEdit(){setEditing(null);setForm(null);}
- function change(key:keyof FormState,value:string){setForm(v=>v?{...v,[key]:value}:v);}\n function toggleSelected(id:string){setSelected(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next;});}\n function toggleAll(){setSelected(prev=>prev.size===freights.length?new Set():new Set(freights.map(f=>f.id)));}\n async function removeSelected(){const ids=Array.from(selected);if(!ids.length)return;if(!window.confirm(`Excluir ${ids.length} frete${ids.length===1?"":"s"} selecionado${ids.length===1?"":"s"}? Esta ação é permanente e será registrada na auditoria.`))return;setBulkDeleting(true);setError("");const results=await Promise.allSettled(ids.map(async id=>{const r=await fetch(`/api/tms/freights?id=${encodeURIComponent(id)}`,{method:"DELETE"});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível excluir o frete.");return id;}));const ok=results.flatMap(r=>r.status==="fulfilled"?[r.value]:[]);setFreights(v=>v.filter(f=>!ok.includes(f.id)));setSelected(new Set());setBulkDeleting(false);const failed=results.length-ok.length;if(failed)setError(`Não foi possível excluir ${failed} frete${failed===1?"":"s"} selecionado${failed===1?"":"s"}.`);}
+ function change(key:keyof FormState,value:string){setForm(v=>v?{...v,[key]:value}:v);}
+ function toggleSelected(id:string){setSelected(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next;});}
+ function toggleAll(){setSelected(prev=>prev.size===freights.length?new Set():new Set(freights.map(f=>f.id)));}
+ async function removeSelected(){const ids=Array.from(selected);if(!ids.length)return;if(!window.confirm(`Excluir ${ids.length} frete${ids.length===1?"":"s"} selecionado${ids.length===1?"":"s"}? Esta ação é permanente e será registrada na auditoria.`))return;setBulkDeleting(true);setError("");const results=await Promise.allSettled(ids.map(async id=>{const r=await fetch(`/api/tms/freights?id=${encodeURIComponent(id)}`,{method:"DELETE"});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível excluir o frete.");return id;}));const ok=results.flatMap(r=>r.status==="fulfilled"?[r.value]:[]);setFreights(v=>v.filter(f=>!ok.includes(f.id)));setSelected(new Set());setBulkDeleting(false);const failed=results.length-ok.length;if(failed)setError(`Não foi possível excluir ${failed} frete${failed===1?"":"s"} selecionado${failed===1?"":"s"}.`);}
  async function save(id:string){
   if(!form)return;
   setSaving(id);setError("");
