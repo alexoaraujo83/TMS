@@ -22,6 +22,16 @@ if (!enabled) {
   const otherTenantId = randomUUID();
   const freightId = randomUUID();
   const otherFreightId = randomUUID();
+  const audit = {
+    actorUserId: randomUUID(),
+    action: "finance.test_mutation",
+    entityType: "financial_entry",
+    requestId: randomUUID(),
+  };
+  const createFinancialEntry = (input: Parameters<typeof finance.create>[0]) =>
+    finance.create(input, audit);
+  const settleFinancialEntry = (tenantId: string, id: string) =>
+    finance.settle(tenantId, id, audit);
 
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
@@ -95,7 +105,7 @@ if (!enabled) {
   });
 
   it("creates, lists and settles a tenant financial entry", async () => {
-    const entry = await finance.create({
+    const entry = await createFinancialEntry({
       tenantId,
       freightId,
       direction: "receivable",
@@ -118,14 +128,14 @@ if (!enabled) {
     assert.equal(listed.length, 1);
     assert.equal(listed[0]?.id, entry.id);
 
-    const settled = await finance.settle(tenantId, entry.id);
+    const settled = await settleFinancialEntry(tenantId, entry.id);
     assert.equal(settled.id, entry.id);
     assert.equal(settled.status, "settled");
     assert.ok(settled.settledAt instanceof Date);
   });
 
   it("does not expose another tenant's entries", async () => {
-    await finance.create({
+    await createFinancialEntry({
       tenantId,
       freightId,
       direction: "payable",
@@ -142,7 +152,7 @@ if (!enabled) {
     assert.deepEqual(visibleToOtherTenant, []);
 
     await assert.rejects(
-      finance.create({
+      createFinancialEntry({
         tenantId: otherTenantId,
         freightId,
         direction: "receivable",
@@ -154,7 +164,7 @@ if (!enabled) {
   });
 
   it("rejects a second settlement of the same entry", async () => {
-    const entry = await finance.create({
+    const entry = await createFinancialEntry({
       tenantId,
       freightId,
       direction: "payable",
@@ -164,15 +174,15 @@ if (!enabled) {
       externalReference: `driver-${tenantId}`,
     });
 
-    await finance.settle(tenantId, entry.id);
+    await settleFinancialEntry(tenantId, entry.id);
     await assert.rejects(
-      finance.settle(tenantId, entry.id),
+      settleFinancialEntry(tenantId, entry.id),
       /FINANCIAL_ENTRY_NOT_SETTLEABLE/,
     );
   });
 
   it("prevents mutation of a settled entry", async () => {
-    const entry = await finance.create({
+    const entry = await createFinancialEntry({
       tenantId,
       freightId,
       direction: "receivable",
@@ -182,7 +192,7 @@ if (!enabled) {
       externalReference: `immutable-${tenantId}`,
     });
 
-    await finance.settle(tenantId, entry.id);
+    await settleFinancialEntry(tenantId, entry.id);
 
     const client = await pool.connect();
     try {
