@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   Body,
   Controller,
+  Delete,
   Inject,
   Get,
   Param,
@@ -130,6 +131,15 @@ export class FreightController {
       expiresAt: context.oidc?.expiresAt ?? null,
       tenantId: context.tenantId,
     };
+  }
+
+  @Delete(":id")
+  @RequirePermission("freight:delete")
+  remove(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+  ) {
+    return this.service.remove(context, id);
   }
 
   @Get(":id")

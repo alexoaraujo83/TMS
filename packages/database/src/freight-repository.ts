@@ -131,6 +131,29 @@ export class PostgresFreightRepository {
     );
   }
 
+  async deleteWithAudit(
+    freightId: string,
+    tenantId: string,
+    audit: Omit<AuditEventInput, "tenantId" | "entityId">,
+  ): Promise<boolean> {
+    assertUuid(tenantId, "tenantId");
+    assertUuid(freightId, "freightId");
+    return withTransaction(this.pool, { tenantId }, async (client) => {
+      const result = await client.query<{ id: string }>(
+        "delete from freights where id = $1 and tenant_id = $2 returning id",
+        [freightId, tenantId],
+      );
+      const row = result.rows[0];
+      if (!row) return false;
+      await appendAuditEvent(client, {
+        ...audit,
+        tenantId,
+        entityId: row.id,
+      });
+      return true;
+    });
+  }
+
   async findById(
     tenantId: string,
     freightId: string,

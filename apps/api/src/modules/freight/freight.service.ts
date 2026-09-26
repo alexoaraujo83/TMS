@@ -68,6 +68,26 @@ export class FreightService {
     return this.repository.list(context.tenantId);
   }
 
+  async remove(context: RequestContext, freightId: string): Promise<{ id: string; deleted: true }> {
+    try {
+      const deleted = await this.repository.deleteWithAudit(freightId, context.tenantId, {
+        actorUserId: context.userId,
+        action: "freight.deleted",
+        entityType: "freight",
+        requestId: context.requestId,
+        correlationId: context.correlationId,
+      });
+      if (!deleted) throw new NotFoundException("Freight not found");
+      return { id: freightId, deleted: true };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      if (error instanceof Error && "code" in error && (error as { code?: string }).code === "23503") {
+        throw new ConflictException("Freight cannot be deleted because it has dependent operational records");
+      }
+      throw error;
+    }
+  }
+
   async get(context: RequestContext, freightId: string): Promise<FreightRow> {
     const freight = await this.repository.findById(context.tenantId, freightId);
     if (!freight) throw new NotFoundException("Freight not found");
