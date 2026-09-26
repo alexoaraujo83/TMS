@@ -1851,3 +1851,37 @@ Portanto, permanece obrigatório reconciliar o Action/flow efetivo de Production
 - **DB-04:** permanece P0 / E4 PENDENTE, independente deste ajuste.
 
 Nenhuma alteração foi aplicada diretamente ao Auth0 Production.
+
+## 60. FASE 2 — 2026-09-26 — Vercel: correção Auth0 validada em Preview; Production ainda não contém o commit corrigido
+
+### Evidência Vercel
+
+A integração Vercel foi usada para verificar o estado efetivo dos deployments do projeto Web.
+
+Foi observado um deployment `READY` do branch `fix/auth0-production-tenant-contract-2026-09-26`, contendo o commit `70e5e49a97e0ac959dbe46ef028a97f5d4377286`. Esse branch contém a correção do Auth0 SDK v4 aplicada em `29ba3b8b34f17fbd82ebb3208c2afe1f8d5f1aab`.
+
+O deployment identificado como Production permanece associado ao branch `main`, commit `08b69301b6d020b6049d0bb395628e8616946da8`, portanto não há evidência de que a correção do SDK já esteja em Production.
+
+### Callback Production
+
+Os logs do deployment Production observado registraram múltiplos:
+
+`GET /auth/callback 500`
+
+entre 15:30 e 16:01 (-03), além de um `GET /auth/callback 307`. Esses registros comprovam falha no callback em Production, mas não carregam o `error_description` do Auth0 e, isoladamente, não provam que cada 500 corresponda a `missing_tenant_id`.
+
+### Correção/decisão
+
+Não foi promovido o branch automaticamente para Production. A promoção agora deve ocorrer somente depois da reconciliação do Auth0 Production, porque o Web SDK e o Auth0 Post-Login Action são controles independentes.
+
+Também foi avaliada a referência do Vercel Connect SDK. O SDK de Connect não é componente do fluxo de autenticação Auth0 do TMS e não deve ser introduzido como workaround para `missing_tenant_id`.
+
+### Estado
+
+- **Web SDK v4:** CORRIGIDO no branch de reconciliação.
+- **Vercel Preview:** READY com a correção.
+- **Vercel Production:** ainda no `main`; correção não promovida.
+- **Auth0 Production:** ainda precisa de reconciliação live.
+- **AUTH-01:** P0 / BLOQUEADO / E4 PENDENTE.
+
+Nenhuma alteração de Production foi realizada nesta etapa.
