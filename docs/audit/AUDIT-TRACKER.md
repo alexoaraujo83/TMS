@@ -1235,3 +1235,29 @@ Nenhuma alteração funcional foi aplicada nesta etapa.
 - `updateStatusWithAudit()` já exigia audit desde a correção anterior; com isso, as mutações de Freight expostas pelo repositório seguem contrato único de auditoria obrigatória.
 - Commit: `5eeee95b142722fd49113aafdadc436143d68c97`.
 - Observação: ainda é necessário CI para confirmar typecheck/testes após o endurecimento de contratos.
+
+
+## 2026-09-25 — REPO-04: hardening das mutações financeiras
+
+A revisão dos repositórios mutáveis encontrou a lacuna já registrada em REPO-04: FinanceRepository.create() e settle() alteravam financial_entries sem gerar audit_events.
+
+### Correção aplicada
+
+- FinanceRepository.create() agora exige AuditInput e grava finance.entry_created na mesma transação da inserção.
+- FinanceRepository.settle() agora exige AuditInput, bloqueia a linha com FOR UPDATE, captura o estado anterior e grava finance.entry_settled na mesma transação da liquidação.
+- FinanceService passou a propagar actorUserId, requestId e metadados de ação/entidade para ambas as mutações.
+- O teste de integração financeiro foi adaptado para exercer o novo contrato.
+- A limpeza dos repositórios operacionais removeu os if (audit) redundantes depois de tornar o argumento obrigatório.
+
+### Estado
+
+**REPO-04: correção estrutural aplicada — P1 hardening.** A trilha de auditoria das mutações financeiras fica atomicamente acoplada à mutação de negócio. A evidência E4/produção continua separada: ainda não houve execução autorizada contra a sessão produtiva tms_app.
+
+### Commits
+
+- 434e9e712877f4834ca92ec46390e3841087b938 — contrato e persistência de audit no FinanceRepository.
+- fce228fc721c8feb3a5ed8425b720512ca4a6583 — propagação do contexto de auditoria no FinanceService.
+- 51c2f699d401a43747f81c9ea434bb7a64d93289 / e2f5d4852c190c837d50cf582f7905f048c9567e — atualização do teste de integração financeiro.
+- 83bf0147569247c37fc08ba483d6381b596e4970 — limpeza dos guards redundantes de audit em Carrier/Driver/Vehicle.
+
+Nenhuma mutation de produção foi executada nesta etapa.
