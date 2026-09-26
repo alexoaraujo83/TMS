@@ -520,3 +520,14 @@ A implementação de `withTransaction()` faz `BEGIN`, configura o tenant, execut
 4. Só então considerar promoção da correção.
 
 A auditoria continua sem mutation de produção.
+
+
+## 2026-09-25 — WORK-02a: correction applied
+
+**Status:** P1 — hardening applied; production evidence still pending.
+
+- Removida a API redundante `PostgresFreightRepository.updateStatus()`.
+- `updateStatusWithAudit()` agora exige explicitamente um objeto de auditoria; o caminho de status não pode mais ser chamado internamente sem produzir audit + outbox na mesma transação.
+- Adicionado teste de integração para falha de auditoria por FK inválida, verificando que a alteração de status sofre rollback e que nenhum `freight.status_changed` é persistido.
+- A correção reduz o risco de regressão arquitetural identificado em WORK-02a, sem alterar RLS ou produzir mutação em produção.
+- Próximo passo: executar CI e, separadamente, manter DB-04 bloqueado até haver sessão runtime real de `tms_app` autorizada para os testes E4.
