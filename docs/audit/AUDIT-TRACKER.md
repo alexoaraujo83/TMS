@@ -1466,3 +1466,46 @@ A ferramenta Neon disponível continua sem conseguir executar SQL devido ao mism
 - O manifesto versionado de release foi reintroduzido/atualizado em docs/releases/2026-09-26.json para registrar o estado observado acima, inclusive divergência de SHA e migration head 0035 como head do repositório, não como prova independente do Neon live.
 
 P0: REL-01 passa a ter manifesto versionado; DB-01 e DB-04 continuam bloqueados até evidência read-only/runtime do Neon. P1: WORK-01 fica reconciliado quanto ao SHA efetivo, sem deploy artificial. E4 continua separado de CI/deploy.
+
+
+## 49. FASE 2 — 2026-09-26 — reconciliação final das evidências desta sequência
+
+### 49.1 Correção de estado documental
+
+As seções históricas deste tracker devem ser lidas pela data da evidência. Em particular, a seção 48 registrava um estado anterior em que replay ainda usava `freight:update` e os diagnósticos usavam `freight:read`. Esse estado foi posteriormente corrigido e não representa o estado corrente.
+
+Estado corrente comprovado pelo código e pelos testes mais recentes:
+
+- **API-02 / SEC-03:** replay usa a permissão dedicada `freight:replay`, criada na migration 0034 e concedida explicitamente ao administrador na 0035; CI estrutural está verde.
+- **API-06 / API-11:** endpoints de diagnóstico usam `ops:diagnostics`; operador não recebe essa permissão por padrão e admin recebe explicitamente; CI estrutural está verde.
+- **API-04:** suíte dedicada de replay foi adicionada e passou no CI #1247 / run `36216015744`.
+- **API-06/API-02:** suíte de autorização do FreightController foi adicionada e passou no CI #1250 / run `36216153527`.
+- **REL-01:** manifesto de release foi registrado em `docs/releases/2026-09-26.json`; promoção seletiva por componente está documentada.
+- **CI-01:** CI #1251 / run `36216294963` passou no SHA de controle `d00355d81ccd56edf628baf9e114cbe51790f608`.
+
+### 49.2 P0 atual
+
+| ID | Estado | Próxima evidência |
+|---|---|---|
+| DB-01 | **FECHADO / COMPROVADO** | Nenhuma ação adicional; preservar head 0033 + checksums live |
+| DB-04 | **BLOQUEADO / E4 PENDENTE** | Sessão real `tms_app`, `rolbypassrls=false`, teste próprio/cross-tenant de leitura e escrita controlada |
+| AUTH-01 | **ABERTO / E4 PENDENTE** | Token Auth0 real → Web → API → DB, com tenant/membership reais |
+| SEC-01 | **BLOQUEADO** | DB-04 + AUTH-01 |
+| REL-01 | **ESTRUTURALMENTE REGISTRADO / RECONCILIAÇÃO OPERACIONAL PENDENTE** | Head de migration já fechado; preservar SHAs efetivos por componente e confirmar que o manifesto corresponde ao runtime atual |
+
+### 49.3 P1 atual
+
+- **WORK-01:** worker principal continua em SHA anterior por promoção seletiva; o último deployment do HEAD atual foi SKIPPED. Não forçar deploy apenas para alinhar SHAs.
+- **WORK-02/03:** contrato de outbox → durable jobs → handler está comprovado em CI; E4 do runtime produtivo continua pendente.
+- **BAK-01 / DR-01:** deploy SUCCESS não prova artefato, checksum, retenção ou restore independente.
+- **CI-10:** branch protection/required checks continua sem confirmação administrativa suficiente.
+- **API-03:** semântica de replay repetível permanece documentada; não alterar novamente sem decisão operacional explícita.
+- **DOC-03 / CONFIG-01:** drift documental e centralização efetiva de configuração permanecem P1/P2 conforme classificação existente.
+
+### 49.4 Gate preservado
+
+A sequência operacional continua:
+
+**DB-04 → AUTH-01 → SEC-01 → REL-01 → WORK/BAK/DR P1 → P2 de refatoração.**
+
+Nenhuma alteração de RLS, grants, credencial, Auth0, migration de produção ou dado foi executada nesta sequência.
