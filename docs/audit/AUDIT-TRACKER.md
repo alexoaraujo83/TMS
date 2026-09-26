@@ -1688,3 +1688,235 @@ Executar o runbook em um terminal/cliente PostgreSQL que consiga abrir a sessão
 Não registrar senha, connection string completa, JWT, cookie ou token.
 
 Somente após os oito critérios mínimos do runbook serem observados o DB-04 deve ser fechado e a sequência avançada para **AUTH-01**.
+
+
+## 56. FASE 2 — 2026-09-26 — AUTH-01: incidente Production `missing_tenant_id` e contrato Auth0 reconciliado
+
+### Evidência de código
+
+O incidente observado no Web Production foi:
+
+`/auth/callback?error=access_denied&error_description=missing_tenant_id`
+
+A auditoria do HEAD confirmou que `infra/auth0/actions/post-login.js` atualmente **não chama** `api.access.deny()`. Quando `event.user.app_metadata.tenant_id` está ausente, o Action simplesmente não emite o claim. O claim emitido quando presente é `https://tms-platform.io/claims/tenant_id`.
+
+A auditoria também confirmou que `apps/api/src/common/auth.guard.ts` exige o claim, valida `sub + tenant_id` contra membership ativo e não usa o header de tenant como autoridade independente.
+
+### Conclusão
+
+O `access_denied / missing_tenant_id` observado **não é explicado pelo Action atualmente versionado**. O finding correto é **drift/configuração efetiva do Auth0 Production**, com necessidade de identificar a Action/versão/flow que está efetivamente executando.
+
+### Correção preparada
+
+Foi criada a branch:
+
+`fix/auth0-production-tenant-contract-2026-09-26`
+
+e o artefato:
+
+`docs/audit/AUTH0-PRODUCTION-CONTRACT-2026-09-26.md`
+
+O contrato exige reconciliação de:
+
+1. Actions efetivamente anexadas ao Post-Login;
+2. versão publicada de `TMS — Tenant Claim`;
+3. qualquer `api.access.deny`/ `missing_tenant_id` no flow efetivo;
+4. application/client Production;
+5. audience `urn:tms:api:production`;
+6. `app_metadata.tenant_id` do usuário de teste;
+7. membership ativa `sub + tenant_id` no TMS;
+8. novo login e validação Web → Auth0 → API → DB.
+
+### Regra de segurança preservada
+
+Não alterar o AuthGuard para aceitar ausência de tenant, não confiar em tenant fornecido pelo browser e não desabilitar RLS. O tenant continua derivado do claim autenticado e reconfirmado pelo membership PostgreSQL.
+
+**AUTH-01 = P0 / BLOQUEADO ATÉ RECONCILIAÇÃO DO AUTH0 PRODUCTION.**
+
+Nenhuma alteração foi aplicada ao Auth0 Production nesta etapa.
+
+
+## 57. FASE 2 — 2026-09-26 — AUTH-01: auditoria estrutural do contrato de deploy Auth0 concluída
+
+### 57.1 Estado versionado encontrado
+
+A infraestrutura Auth0 do repositório está concentrada em `infra/auth0/`:
+
+- `actions/post-login.js` contém somente o comportamento de emissão do claim namespaced a partir de `event.user.app_metadata.tenant_id`;
+- `tenant.yaml` declara a Action `TMS — Tenant Claim` como `deployed: true`, `status: built`, trigger `post-login/v3` e binding no `triggers.post-login`;
+- `README.md` documenta o uso do Auth0 Deploy CLI com dry-run antes de aplicar.
+
+**Importante:** os campos `deployed: true` e `status: built` em `tenant.yaml` são o estado desejado versionado; não constituem prova de que o tenant Production atualmente possui aquela versão publicada ou aquele binding.
+
+### 57.2 Auditoria de CI/CD
+
+A busca estrutural no repositório não encontrou workflow GitHub Actions que execute automaticamente o `auth0-deploy-cli import` nem pipeline versionado que reconcilie o tenant Auth0 Production.
+
+Consequentemente, o caminho atual é **manual/documentado**, não um deployment Auth0 automatizado e comprovável pelo CI.
+
+Isso explica por que o repositório consegue manter um contrato correto sem garantir, sozinho, que Production esteja no mesmo estado.
+
+### 57.3 Relevância para o incidente
+
+A documentação oficial do Auth0 confirma que uma Action pode estar marcada como deployed e ainda não estar anexada ao trigger; o binding do trigger precisa ser aplicado separadamente. A documentação também confirma que o Deploy CLI é apropriado para import/deployment de configuração e que o fluxo deve incluir os bindings.
+
+Portanto, para o erro `missing_tenant_id`, a próxima prova necessária é **live**:
+
+1. listar Actions Post-Login efetivamente vinculadas ao Production Login Flow;
+2. identificar a versão efetivamente publicada de `TMS — Tenant Claim`;
+3. identificar qualquer outra Action que execute `api.access.deny` com `missing_tenant_id`;
+4. confirmar o client Production e a audience;
+5. confirmar `app_metadata.tenant_id` do usuário de teste;
+6. emitir uma sessão nova e observar o resultado sem registrar token/cookie.
+
+### 57.4 Classificação atual
+
+- **AUTH-01:** P0 / BLOQUEADO / E4 pendente.
+- **AUTH-02:** P1 / aberto para reconciliação independente de ambiente.
+- **AUTH-03:** E2-E3 documental; E4 bloqueado pela ausência de capacidade Auth0 live nesta conexão.
+- **SEC-01:** permanece dependente de AUTH-01 + DB-04.
+- **Nenhuma alteração de Production foi executada.**
+
+### 57.5 Próxima sequência
+
+Não criar um novo Action nem modificar o AuthGuard. Primeiro reconciliar o estado live do tenant Production. Se a Action live divergir do repositório, a correção deve ser feita por dry-run + revisão + aplicação controlada do contrato versionado, preservando rollback e sem incluir credenciais no repositório.
+
+
+## 58. FASE 2 — 2026-09-26 — AUTH-01: runbook de reconciliação live criado
+
+### Evidência adicional
+
+A auditoria do repositório encontrou **zero ocorrências** de `api.access.deny` e `missing_tenant_id` no código versionado. O Action Post-Login versionado não contém lógica de negação por ausência do tenant.
+
+A documentação oficial do Auth0 confirma que:
+- `api.access.deny()` produz `access_denied` e a mensagem fornecida aparece como `error_description`;
+- erros não tratados dentro de Rules/Actions também podem resultar em `access_denied`;
+- uma Action pode estar deployada sem estar efetivamente vinculada ao trigger, sendo necessário reconciliar o binding.
+
+Portanto, o incidente Production ainda exige inspeção do **código efetivamente publicado/executado**, e não apenas da configuração desejada em `tenant.yaml`.
+
+### Artefato criado
+
+Foi criado:
+
+`docs/audit/AUTH0-PRODUCTION-RECONCILIATION-RUNBOOK.md`
+
+O runbook define a sequência segura:
+1. inspeção read-only do Post-Login Flow;
+2. identificação de todas as Actions efetivamente vinculadas;
+3. busca por `api.access.deny`, `missing_tenant_id` e erros de runtime;
+4. comparação com a Action versionada;
+5. verificação do `app_metadata.tenant_id` do usuário de teste;
+6. reconciliação de client/audience/issuer;
+7. dry-run do Deploy CLI antes de qualquer alteração;
+8. novo login;
+9. validação Web → API → membership → PostgreSQL;
+10. testes negativos de tenant.
+
+### Limite atual
+
+Nesta sessão **não há uma ferramenta Auth0 Management/CLI conectada ao tenant Production**. A instalação local não possui o binário Auth0 CLI disponível e não foi usada nenhuma credencial presente no contexto para contornar essa limitação.
+
+Assim, não é possível afirmar qual Action/binding está efetivamente ativo em Production. A evidência atual permite concluir **drift/configuração live como finding**, mas não identifica ainda o objeto live responsável.
+
+**AUTH-01 = P0 / BLOQUEADO / E4 PENDENTE.**
+
+Nenhuma alteração foi aplicada ao Auth0 Production.
+
+## 59. FASE 2 — 2026-09-26 — AUTH-01: Web alinhado ao Auth0 Next.js SDK v4
+
+### Correção aplicada no branch de reconciliação
+
+O Web já utiliza `@auth0/nextjs-auth0@4.30.0`, Next.js 16 e `proxy.ts` com `auth0.middleware()`, portanto a integração está no modelo atual do SDK v4.
+
+Foi corrigido `apps/web/src/lib/auth0.ts` para declarar explicitamente `appBaseUrl: process.env.APP_BASE_URL` e manter o `audience` de API explicitamente em `authorizationParameters`. A mudança foi aplicada no commit `29ba3b8b34f17fbd82ebb3208c2afe1f8d5f1aab`.
+
+A documentação atual do Auth0 para Next.js 16 confirma o uso de `Auth0Client`, `proxy.ts`/middleware e `APP_BASE_URL`; também confirma que parâmetros como audience devem ser fornecidos explicitamente ao SDK v4.
+
+### Limite funcional importante
+
+Essa correção melhora a integração Web → Auth0 SDK e torna o contrato de runtime explícito, mas **não pode por si só corrigir `access_denied / missing_tenant_id`**.
+
+O erro observado ocorre durante o fluxo de autorização do Auth0, antes de o Web receber uma sessão. O claim `tenant_id` é emitido por uma Post-Login Action no tenant Auth0; o SDK Next.js não cria esse claim e não substitui a Action/binding do tenant.
+
+Portanto, permanece obrigatório reconciliar o Action/flow efetivo de Production. Não será introduzido workaround no SDK para aceitar sessão sem tenant, porque isso enfraqueceria o contrato do AuthGuard.
+
+### Estado
+
+- **SDK Web:** corrigido/alinhado no branch.
+- **API AuthGuard:** preservado.
+- **Action versionado:** preservado.
+- **Auth0 Production live:** ainda não reconciliado.
+- **AUTH-01:** P0 / BLOQUEADO / E4 PENDENTE.
+- **DB-04:** permanece P0 / E4 PENDENTE, independente deste ajuste.
+
+Nenhuma alteração foi aplicada diretamente ao Auth0 Production.
+
+## 60. FASE 2 — 2026-09-26 — Vercel: correção Auth0 validada em Preview; Production ainda não contém o commit corrigido
+
+### Evidência Vercel
+
+A integração Vercel foi usada para verificar o estado efetivo dos deployments do projeto Web.
+
+Foi observado um deployment `READY` do branch `fix/auth0-production-tenant-contract-2026-09-26`, contendo o commit `70e5e49a97e0ac959dbe46ef028a97f5d4377286`. Esse branch contém a correção do Auth0 SDK v4 aplicada em `29ba3b8b34f17fbd82ebb3208c2afe1f8d5f1aab`.
+
+O deployment identificado como Production permanece associado ao branch `main`, commit `08b69301b6d020b6049d0bb395628e8616946da8`, portanto não há evidência de que a correção do SDK já esteja em Production.
+
+### Callback Production
+
+Os logs do deployment Production observado registraram múltiplos:
+
+`GET /auth/callback 500`
+
+entre 15:30 e 16:01 (-03), além de um `GET /auth/callback 307`. Esses registros comprovam falha no callback em Production, mas não carregam o `error_description` do Auth0 e, isoladamente, não provam que cada 500 corresponda a `missing_tenant_id`.
+
+### Correção/decisão
+
+Não foi promovido o branch automaticamente para Production. A promoção agora deve ocorrer somente depois da reconciliação do Auth0 Production, porque o Web SDK e o Auth0 Post-Login Action são controles independentes.
+
+Também foi avaliada a referência do Vercel Connect SDK. O SDK de Connect não é componente do fluxo de autenticação Auth0 do TMS e não deve ser introduzido como workaround para `missing_tenant_id`.
+
+### Estado
+
+- **Web SDK v4:** CORRIGIDO no branch de reconciliação.
+- **Vercel Preview:** READY com a correção.
+- **Vercel Production:** ainda no `main`; correção não promovida.
+- **Auth0 Production:** ainda precisa de reconciliação live.
+- **AUTH-01:** P0 / BLOQUEADO / E4 PENDENTE.
+
+Nenhuma alteração de Production foi realizada nesta etapa.
+
+## 61. FASE 2 — 2026-09-26 — Vercel/Auth0: nova verificação do estado efetivo
+
+### Evidência nova
+
+A verificação do projeto Vercel `tms-web` confirmou novamente que existem deployments READY do branch `fix/auth0-production-tenant-contract-2026-09-26`, incluindo o deployment mais recente associado ao commit de controle/documentação `1e6bb120cce9f52d03e109ddd88bb343b6faaea9`. Também permanecem deployments READY anteriores do mesmo branch que contêm diretamente a correção funcional do Auth0 SDK em `29ba3b8b34f17fbd82ebb3208c2afe1f8d5f1aab`.
+
+O deployment atualmente identificado como **Production** continua no branch `main`, commit `08b69301b6d020b6049d0bb395628e8616946da8`. Portanto, a correção do SDK continua sem prova de promoção para Production.
+
+### Runtime Production
+
+Nova consulta aos logs do Web Production encontrou múltiplos `GET /auth/callback 500` no deployment de Production `dpl_A9mP3zZW6a51oAoSyARxywgsbBFc`, inclusive ocorrências às 15:51, 16:00, 16:01 e 16:26 (-03).
+
+A agregação de Runtime Errors das últimas 24h não retornou clusters. Isso não invalida os logs brutos: são superfícies de observabilidade diferentes. Os logs também não expõem `error_description`, portanto não se deve atribuir cada 500 especificamente a `missing_tenant_id` sem evidência adicional.
+
+### Limitação de build-log
+
+A ação de build-log exposta pelo conector Vercel nesta sessão retornou que o recurso não está disponível no servidor conectado. Assim, não será registrado um falso “build log verificado”. O estado `READY` do deployment continua sendo a evidência disponível de conclusão do deployment.
+
+### Auth0
+
+A busca adicional no repositório não encontrou workflow GitHub versionado que faça `auth0-deploy-cli import` automaticamente. A configuração Auth0 permanece manual/documentada. Não há ferramenta Auth0 Management/CLI live disponível nesta conexão para identificar ou corrigir a Action/binding efetivamente ativo no tenant Production.
+
+### Estado
+
+- **AUTH-01:** P0 / BLOQUEADO / E4 PENDENTE.
+- **DB-04:** P0 / BLOQUEADO / E4 PENDENTE.
+- **Web SDK:** correção versionada e validada em Preview.
+- **Vercel Production:** ainda no `main`; não promover automaticamente enquanto o Auth0 Production não estiver reconciliado.
+- **Auth0 Production:** drift/configuração live ainda não reconciliado.
+- **Nenhuma alteração de Production foi executada nesta etapa.**
+
+### Próxima ação
+
+Obter/reconciliar a configuração live do Auth0 Production por caminho autorizado (Action publicada, binding do Post-Login Flow, usuário de teste com `app_metadata.tenant_id`, audience/client) e, somente após essa prova, promover o commit Web corrigido para Production e executar o E2E completo.
