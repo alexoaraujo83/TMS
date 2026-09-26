@@ -540,3 +540,13 @@ A auditoria continua sem mutation de produção.
 - Carrier/Driver/Vehicle create/update deixaram de aceitar audit opcional.
 - A camada de serviço já fornecia audit em todos os consumidores identificados; a mudança transforma essa expectativa em contrato de compilação/runtime da API de persistência.
 - Próxima validação: CI/typecheck e testes de integração; depois prosseguir para outros repositórios mutáveis procurando o mesmo padrão.
+
+
+## 2026-09-25 — Freight mutation contract hardened
+
+**Status:** P2 — aplicado.
+
+- Removido o wrapper `PostgresFreightRepository.create()`, que permitia criação sem audit.
+- `createWithAudit` e `updateWithAudit` agora exigem audit.
+- O contrato de mutação de Freight fica alinhado ao de status: mutações persistentes exigem identidade/auditoria dentro da transação.
+- Próximo passo: validar os contratos endurecidos no CI e continuar a varredura por APIs mutáveis equivalentes.
