@@ -1,0 +1,42 @@
+{
+  "releaseDate": "2026-09-26",
+  "status": "observed-state",
+  "repositorySha": "db4e20748b04fc5fcd31378090f760dc628dec4a",
+  "web": {
+    "sha": "9bd61e5fcb9815e721246c959bf5454c90967066",
+    "deployment": "dpl_B1bz3gv63wMNw7h5coJPUshtwnCd",
+    "state": "READY",
+    "target": "production"
+  },
+  "api": {
+    "sha": "695ba3fbb42f1917c84336711ccb6800a29a0a85",
+    "deployment": "dpl_43rvFqPsZjWdhmb3gnEUsxqa9gHG",
+    "state": "READY",
+    "target": "production"
+  },
+  "worker": {
+    "sha": "c4808ec58eba65b564d97fdb015cd3c599720860",
+    "deployment": "ab2142c4-67b9-4143-9531-3f55f1a19739",
+    "state": "SUCCESS",
+    "platform": "railway",
+    "project": "tms-backup",
+    "service": "tms-worker"
+  },
+  "backupWorker": {
+    "sha": "db4e20748b04fc5fcd31378090f760dc628dec4a",
+    "deployment": "60bf798a-8b73-4f0e-a34d-37e12cdcc4b4",
+    "state": "SUCCESS",
+    "platform": "railway",
+    "project": "tms-backup",
+    "service": "tms-backup-worker",
+    "cron": "0 2 * * *"
+  },
+  "database": {
+    "migrationHead": "0035"
+  },
+  "deploymentPolicy": {
+    "worker": "deploy when relevant worker/runtime paths change; otherwise SKIPPED is an intentional state",
+    "backupWorker": "deploy when relevant backup/DR paths change; otherwise SKIPPED is an intentional state",
+    "shaDivergence": "component SHAs may differ; divergence must be represented explicitly in this manifest and must not be treated as an implicit deployment failure"
+  }
+}
