@@ -1225,3 +1225,13 @@ Nenhuma alteração funcional foi aplicada nesta etapa.
 - Não foram identificados consumidores internos sem audit nas buscas realizadas.
 - Commit: `6a0d5044007424c4cff8f9439f09a8799c2af41c`.
 - Classificação: P2 de hardening de contrato, sem evidência de exploração atual.
+
+
+## 2026-09-25 — Freight CRUD: fechamento do mesmo contrato de auditoria
+
+- A revisão do `PostgresFreightRepository` encontrou mais duas superfícies opcionais: `createWithAudit(..., audit?)` e `updateWithAudit(..., audit?)`, além do wrapper `create()` que delegava sem audit.
+- A busca de consumidores encontrou o fluxo de criação/atualização HTTP usando explicitamente `createWithAudit`/`updateWithAudit`; não foi encontrado consumidor interno legítimo do wrapper sem audit.
+- O wrapper `create()` foi removido e create/update agora exigem `AuditInput`.
+- `updateStatusWithAudit()` já exigia audit desde a correção anterior; com isso, as mutações de Freight expostas pelo repositório seguem contrato único de auditoria obrigatória.
+- Commit: `5eeee95b142722fd49113aafdadc436143d68c97`.
+- Observação: ainda é necessário CI para confirmar typecheck/testes após o endurecimento de contratos.
