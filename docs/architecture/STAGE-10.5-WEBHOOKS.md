@@ -7,7 +7,7 @@ Provide a production-safe HTTP delivery adapter for the existing tenant-scoped o
 ## Configuration
 
 - `OUTBOX_WEBHOOK_URLS`: comma-separated HTTP(S) endpoints.
-- `OUTBOX_WEBHOOK_SECRET`: optional HMAC-SHA256 signing secret.
+- `OUTBOX_WEBHOOK_SECRET`: required when `OUTBOX_WEBHOOK_URLS` contains at least one endpoint; the worker rejects configured endpoints when the secret is empty.
 - `OUTBOX_WEBHOOK_TIMEOUT_MS`: positive request timeout; default `10000`.
 
 Endpoint URLs and secrets are configuration only and must not be written to logs.
