@@ -1,13 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { TMS_TENANT_ID_CLAIM } from "@tms/auth";
+import {
+  TMS_DISPLAY_NAME_CLAIM,
+  TMS_EMAIL_CLAIM,
+  TMS_TENANT_ID_CLAIM,
+} from "@tms/auth";
 import { AuthGuard } from "../src/common/auth.guard.ts";
 
 const ISSUER = "https://tenant.example.auth0.com";
 const AUDIENCE = "urn:tms:api:development";
 const JWKS_URL = "https://jwks.example.test/.well-known/jwks.json";
 const AUTH0_SUBJECT = "auth0|user-1";
+const USER_EMAIL = "user-1@example.test";
+const USER_NAME = "User One";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const TENANT_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TENANT_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -46,6 +52,8 @@ async function token(
 ) {
   return new SignJWT({
     [TMS_TENANT_ID_CLAIM]: TENANT_A,
+    [TMS_EMAIL_CLAIM]: USER_EMAIL,
+    [TMS_DISPLAY_NAME_CLAIM]: USER_NAME,
     ...overrides,
   })
     .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
@@ -205,7 +213,10 @@ test("rejects an expired token", async () => {
 });
 
 test("requires tenant selection without a tenant claim", async () => {
-  const noTenant = await new SignJWT({})
+  const noTenant = await new SignJWT({
+    [TMS_EMAIL_CLAIM]: USER_EMAIL,
+    [TMS_DISPLAY_NAME_CLAIM]: USER_NAME,
+  })
     .setProtectedHeader({ alg: "RS256", kid: "test-key", typ: "JWT" })
     .setSubject(AUTH0_SUBJECT)
     .setIssuer(ISSUER)
@@ -220,4 +231,40 @@ test("requires tenant selection without a tenant claim", async () => {
     (error: unknown) =>
       error instanceof Error && error.message === "Tenant claim is required",
   );
+});
+
+test("bootstraps a first-time Auth0 identity before membership lookup", async () => {
+  let calls = 0;
+  const pool = {
+    query: async (sql: string) => {
+      calls += 1;
+      if (sql.includes("bootstrap_auth0_identity")) {
+        return {
+          rows: [{ userId: USER_ID, tenantId: TENANT_A, linked: true }],
+        };
+      }
+      return {
+        rows: [
+          {
+            userId: USER_ID,
+            tenantId: TENANT_A,
+            role: "operator",
+            permissions: ["freight:read"],
+            active: true,
+          },
+        ],
+      };
+    },
+  };
+
+  const request = {
+    headers: {
+      authorization: `Bearer ${await token()}`,
+      "x-tenant-id": TENANT_A,
+    },
+  };
+
+  const result = await new AuthGuard(pool as never).canActivate(contextFor(request));
+  assert.equal(result, true);
+  assert.equal(calls, 2);
 });
