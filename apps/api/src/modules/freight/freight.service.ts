@@ -16,6 +16,7 @@ import { DATABASE_POOL } from "../../common/database.provider.js";
 import type { RequestContext } from "../../common/request-context.js";
 import type {
   CreateFreightDto,
+  UpdateFreightDto,
   UpdateFreightStatusDto,
 } from "./freight.dto.js";
 
@@ -66,6 +67,36 @@ export class FreightService {
 
   list(context: RequestContext): Promise<readonly FreightRow[]> {
     return this.repository.list(context.tenantId);
+  }
+
+
+  async update(
+    context: RequestContext,
+    freightId: string,
+    dto: UpdateFreightDto,
+  ): Promise<FreightRow> {
+    const current = await this.repository.findById(context.tenantId, freightId);
+    if (!current) throw new NotFoundException("Freight not found");
+
+    const updated = await this.repository.updateWithAudit(
+      context.tenantId,
+      freightId,
+      {
+        ...dto,
+        originState: dto.originState?.toUpperCase(),
+        destinationState: dto.destinationState?.toUpperCase(),
+      },
+      {
+        actorUserId: context.userId,
+        action: "freight.updated",
+        entityType: "freight",
+        requestId: context.requestId,
+        correlationId: context.correlationId,
+        beforeState: current,
+      },
+    );
+    if (!updated) throw new NotFoundException("Freight not found");
+    return updated;
   }
 
   async remove(context: RequestContext, freightId: string): Promise<{ id: string; deleted: true }> {
