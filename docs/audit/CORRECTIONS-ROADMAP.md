@@ -771,3 +771,14 @@ Correção:
 - O teste de repetição documenta a semântica atual: `replay:<eventId>:<randomUUID>`, portanto cada solicitação manual cria uma intenção distinta.
 - CI run #1247 (`36216015744`) no SHA `478e2a3e9247a331dc9a31ee172a06f7366daa6d` concluiu com sucesso, incluindo test/typecheck/build e os controles de migration/RLS/IAM/worker.
 - Próxima etapa: teste HTTP autenticado negativo/positivo e tenant isolation; não alterar a semântica de replay novamente sem decisão operacional explícita.
+
+
+## 2026-09-26 — API-06/API-02: proteção contra regressão de permissões
+
+**Status:** P1 — testes estruturais aplicados; CI verde; E4 HTTP ainda pendente.
+
+- Criado `apps/api/test/freight.controller.authorization.test.ts`.
+- Todas as rotas protegidas do FreightController passam a ter sua permissão esperada explicitamente verificada.
+- Diagnósticos ficam protegidos por `ops:diagnostics`; replay por `freight:replay`.
+- CI run #1250 (`36216153527`) no SHA `5f5289d4cc263c6a08ab5ae41b65eb0412ac33f7` concluiu com sucesso.
+- Próxima etapa: executar a matriz HTTP real com usuário sem a permissão → 403, usuário autorizado → 200 e confirmar tenant/OIDC/DB context.

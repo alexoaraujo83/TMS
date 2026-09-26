@@ -1447,3 +1447,14 @@ A ferramenta Neon disponível continua sem conseguir executar SQL devido ao mism
 - **API-04:** avançou de ABERTO para **TESTES DIRECIONADOS IMPLEMENTADOS / CI COMPROVADO**. A prova HTTP E4 de 403/200 e isolamento tenant permanece pendente.
 - **API-03:** a suíte formaliza a semântica atualmente implementada: replay manual repetido é deliberadamente distinto por solicitação; permanece necessária a decisão operacional/documental sobre controles adicionais (motivo, rate/approval quando aplicável).
 - **CI-01:** a evidência anterior foi atualizada: o run #1247 é a execução verde relevante para este avanço funcional.
+
+
+## 2026-09-26 — API-06: matriz estrutural de permissões protegida por teste
+
+- Adicionado `apps/api/test/freight.controller.authorization.test.ts`.
+- O teste verifica que todas as rotas protegidas do `FreightController` possuem metadata explícita de permissão.
+- Os quatro endpoints de diagnóstico exigem `ops:diagnostics` e não `freight:read`.
+- O endpoint de replay exige `freight:replay`.
+- CI do SHA `5f5289d4cc263c6a08ab5ae41b65eb0412ac33f7`, run #1250 / `36216153527`, concluiu `success`, incluindo migration, RLS, IAM, integrações do worker, format, lint, typecheck, test e build.
+- **API-06:** cobertura estrutural agora está protegida contra regressão; E4 HTTP 403/200 e tenant-context continuam pendentes.
+- **API-02:** permissão dedicada de replay permanece protegida contra regressão estrutural; E4 continua pendente.
