@@ -131,12 +131,24 @@ test("rejects a forged tenant without membership", async () => {
     },
   };
 
+  let calls = 0;
+  const pool = {
+    query: async (sql: string) => {
+      calls += 1;
+      if (sql.includes("bootstrap_auth0_identity")) {
+        return { rows: [{ userId: USER_ID, tenantId: null, linked: false }] };
+      }
+      return { rows: [] };
+    },
+  };
+
   await assert.rejects(
-    () => guard([]).canActivate(contextFor(request)),
+    () => new AuthGuard(pool as never).canActivate(contextFor(request)),
     (error: unknown) =>
       error instanceof Error &&
       error.message === "Active tenant membership required",
   );
+  assert.equal(calls, 3);
 });
 
 test("rejects an inactive tenant membership", async () => {
@@ -180,8 +192,7 @@ test("rejects a token with an invalid issuer", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
   );
 });
 
@@ -191,8 +202,7 @@ test("rejects a token with an invalid audience", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
   );
 });
 
@@ -207,8 +217,7 @@ test("rejects an expired token", async () => {
 
   await assert.rejects(
     () => guard([]).canActivate(contextFor(request)),
-    (error: unknown) =>
-      error instanceof Error && error.message === "Invalid access token",
+    (error: unknown) => error instanceof Error && error.message === "Invalid access token",
   );
 });
 
@@ -243,6 +252,9 @@ test("bootstraps a first-time Auth0 identity before membership lookup", async ()
           rows: [{ userId: USER_ID, tenantId: TENANT_A, linked: true }],
         };
       }
+      if (calls === 1) {
+        return { rows: [] };
+      }
       return {
         rows: [
           {
@@ -266,5 +278,5 @@ test("bootstraps a first-time Auth0 identity before membership lookup", async ()
 
   const result = await new AuthGuard(pool as never).canActivate(contextFor(request));
   assert.equal(result, true);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3);
 });
