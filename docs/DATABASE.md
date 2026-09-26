@@ -8,7 +8,7 @@ The canonical database is independent from the reference Nexora project. No Nexo
 
 ## 2. Current schema state
 
-The repository currently contains **31 ordered migrations**, from `0001_foundation.sql` through `0031_finance_relationship_invariants.sql`. CI proves that the complete migration chain applies to a fresh PostgreSQL 17 database before the quality chain proceeds.
+The repository currently contains **35 ordered migrations**, from `0001_foundation.sql` through `0035_diagnostics_permission_and_admin_replay.sql`. CI proves that the complete migration chain applies to a fresh PostgreSQL 17 database before the quality chain proceeds.
 
 The migration sequence is:
 
@@ -45,6 +45,10 @@ The migration sequence is:
 | 0029 | Non-superuser/non-`BYPASSRLS` runtime role `tms_app` |
 | 0030 | Compliance/GR assignment-to-freight composite invariant |
 | 0031 | Finance assignment/trip-to-freight composite invariants |
+| 0032 | Observability audit context metadata |
+| 0033 | Durable Job idempotency |
+| 0034 | Dedicated freight replay permission |
+| 0035 | Operational diagnostics permission and admin replay grant |
 
 ## 3. Core entity catalogue
 
