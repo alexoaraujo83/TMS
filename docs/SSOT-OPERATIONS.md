@@ -203,7 +203,7 @@ Implemented source path:
 4. `freight-status-changed.handler.ts` validates tenant/freight/status and writes an idempotent audit completion record.
 5. Worker telemetry records the handler event and durable-job lifecycle/status/errorCode.
 
-Classification: **E2/E3 CI-PROVEN / E4 RUNTIME OPEN**. The CI integration test passed against PostgreSQL with migration `0033_durable_job_idempotency.sql`. Production/main Neon remains at the previously observed 31 migrations, and Railway runtime execution of this business event is still unproven.
+Classification: **E2/E3 CI-PROVEN / E4 RUNTIME OPEN**. The CI integration test passed against PostgreSQL with migration `0033_durable_job_idempotency.sql`. Production/main Neon was subsequently reconciled to migrations 0001–0033, with the live checksums for 0032_observability_audit_context.sql and 0033_durable_job_idempotency.sql matching the repository. Railway runtime execution of this business event remains unproven.
 
 ## Required next execution order
 
@@ -285,3 +285,12 @@ Current classification:
 6. Update Evidence Ledger and SSOT again.
 
 This section supersedes earlier statements in this document that treated PR #63 as merely pending source integration; PR #63 is now merged, while E4 runtime proof remains open.
+
+
+## 2026-09-25 — Audit continuation: replay and documentation reconciliation
+
+The production replay endpoint is tenant-scoped and writes the replay enqueue plus its audit record in the same transaction. The current implementation deliberately generates a fresh idempotency key for each explicit replay request (`replay:<event_id>:<random_uuid>`); therefore the handler's idempotent processing of the same business event is not equivalent to deduplicating repeated manual replay requests at enqueue time.
+
+The existing CI runtime-evidence test proves handler-level idempotency: two jobs carrying the same `event_id` result in one `freight.status_changed.processed` audit record. It does not prove that two POST replay requests collapse into one durable job. This distinction remains a P1 control question under API-02/SEC-03.
+
+No production mutation was executed during this audit continuation.
