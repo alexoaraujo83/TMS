@@ -2134,3 +2134,37 @@ AUTH-01 continua **P0 / E4 PENDENTE**. Não mergear nem aplicar migration 0036 e
 
 ### Próxima ação
 Executar o pipeline CI sobre o novo HEAD (ou aguardar o disparo automático correspondente), revisar todos os jobs e, se verde, avançar para a revisão final do PR e dos gates de promoção.
+
+## 67. FASE 2 — 2026-09-26 — AUTH-01: CI 1281 verde no HEAD corrigido
+
+### Evidência
+- HEAD validado: `17cae7d3841b7f106770276e875d070bc7f8f8f1`.
+- GitHub Actions CI #1281: **SUCCESS**.
+- Job `quality`: **SUCCESS**.
+- Migration CI: SUCCESS.
+- Provisionamento e validação do runtime role: SUCCESS.
+- Validação RLS com role sem bypass: SUCCESS.
+- IAM runtime resolver: SUCCESS.
+- Durable Jobs/outbox e integração `freight.status_changed → durable job`: SUCCESS.
+- Replay/cross-tenant runtime evidence: SUCCESS.
+- Format, lint, typecheck, testes e build: SUCCESS.
+
+### Deploys
+- Railway PR environment: `tms-worker` **SUCCESS**.
+- `tms-backup-worker`: SKIPPED, coerente com serviço não afetado pela PR.
+- Vercel `tms-core-api`: deployment Preview **READY**.
+- Vercel `tms-web`: continua bloqueado por `api-deployments-free-per-day`; não há evidência de falha funcional do código Web neste check.
+
+### Estado do gate
+O gate de qualidade da PR #94 está **VERDE** no HEAD atual. Isso encerra a falha de CI 1278 como corrigida.
+
+AUTH-01, entretanto, permanece **P0 / E4 PENDENTE**, porque CI não prova:
+1. migration 0036 aplicada em Neon Production;
+2. Action Auth0 publicada e binding correto no Post-Login Flow Production;
+3. token Auth0 real contendo os claims esperados;
+4. primeiro login criando `users` + `tenant_memberships` em Production;
+5. operação tenant-scoped completa;
+6. DB-04 E4 com sessão real `tms_app`.
+
+### Decisão
+Não executar merge, migration Production ou mutação Auth0 automaticamente nesta etapa. O próximo avanço é a revisão final do PR e a preparação dos gates de promoção autorizada.
