@@ -621,3 +621,20 @@ A próxima evidência operacional prioritária continua sendo a execução real 
 ## Atualização — DB-06 implementado
 
 A correção do validator foi aplicada em `packages/database/scripts/migrate.ts`. O próximo passo é somente validação automatizada/operacional: executar o baseline validator e confirmar que um schema incompleto é rejeitado e o schema canônico é aceito. O gate DB-04/E4 permanece independente e aberto.
+
+
+## 2026-09-25 — Actions canceladas e necessidade de reexecução
+
+### Conclusão operacional
+
+Não há necessidade de reexecutar os runs cancelados históricos (`36076682893` e `36080140034`) em seus SHAs antigos. O primeiro é histórico; o segundo foi substituído por execução posterior `36081162875` com `success`.
+
+O CI atual possui `cancel-in-progress: true`, portanto cancelamento pode ser comportamento deliberado de concorrência. O ponto importante é obter uma execução verde do **HEAD final**, não ressuscitar um SHA intermediário.
+
+### Ação pendente
+
+Após estabilização do build-rate-limit do Vercel, executar/obter nova validação completa do HEAD final, incluindo a correção DB-06. Os failures atuais de Vercel devem ser tratados como bloqueio de infraestrutura de build enquanto o status continuar explicitamente `build-rate-limit`, e não como defeito funcional.
+
+### Regra
+
+Não usar `rerun` em run cancelado antigo apenas para transformar histórico em verde. Reexecutar somente uma execução relevante ao HEAD final ou um job explicitamente falho por causa transitória, quando houver evidência de que o retry é apropriado.
