@@ -576,3 +576,24 @@ A auditoria continua sem mutation de produção.
 ### Gate preservado
 
 A correção não fecha DB-04/E4. A prova produtiva continua exigindo sessão real tms_app, rolbypassrls=false e testes cross-tenant autorizados sem alterar o ambiente para fabricar evidência.
+
+
+## 2026-09-25 — Fechamento da varredura de repositories mutáveis
+
+**Status:** inventário estrutural dos principais repositories de negócio fechado nesta passada.
+
+- Assignment: mutação exige audit e permanece transacional.
+- Trip: criação e transições exigem audit e permanecem transacionais.
+- Trip Execution: criação de occurrence/POD exige audit e permanece transacional.
+- Compliance/GR: criação e transições exigem audit e permanecem transacionais.
+- Freight: create/update/delete/status já exigem audit.
+- Carrier/Driver/Vehicle: create/update já exigem audit.
+- Finance: create/settle agora exigem audit.
+
+Foi adicionado teste de rollback da criação financeira quando a gravação de audit falha (`1f7c2e53...`).
+
+### Próxima frente
+
+A auditoria deve sair do inventário de repositories de negócio e concentrar-se nas fronteiras SQL restantes: outbox/durable jobs, worker stores/contexto, replay/diagnóstico e scripts de migration. Depois disso, executar a validação CI completa quando a limitação de build-rate-limit deixar de bloquear Vercel.
+
+DB-04/E4 permanece BLOCKER e não é alterado por este avanço.
