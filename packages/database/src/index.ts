@@ -78,5 +78,9 @@ export {
   type EnqueueDurableJobInput,
 } from "./durable-jobs-repository.js";
 export { verifyTenantMembership } from "./membership-bootstrap.js";
+export {
+  bootstrapAuth0Identity,
+  type Auth0IdentityBootstrapRecord,
+} from "./auth0-identity-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
