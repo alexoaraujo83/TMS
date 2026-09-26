@@ -242,26 +242,12 @@ export class PostgresFreightRepository {
     });
   }
 
-  async updateStatus(
-    tenantId: string,
-    freightId: string,
-    expectedStatus: string,
-    nextStatus: string,
-  ): Promise<FreightRow | null> {
-    return this.updateStatusWithAudit(
-      tenantId,
-      freightId,
-      expectedStatus,
-      nextStatus,
-    );
-  }
-
   async updateStatusWithAudit(
     tenantId: string,
     freightId: string,
     expectedStatus: string,
     nextStatus: string,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<FreightRow | null> {
     assertUuid(tenantId, "tenantId");
     assertUuid(freightId, "freightId");
