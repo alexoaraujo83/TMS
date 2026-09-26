@@ -75,13 +75,9 @@ type AuditInput = Omit<AuditEventInput, "tenantId" | "entityId">;
 export class PostgresFreightRepository {
   constructor(private readonly pool: Pool) {}
 
-  async create(input: CreateFreightInput): Promise<FreightRow> {
-    return this.createWithAudit(input);
-  }
-
   async createWithAudit(
     input: CreateFreightInput,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<FreightRow> {
     assertUuid(input.tenantId, "tenantId");
     return withTransaction(
@@ -119,13 +115,11 @@ export class PostgresFreightRepository {
         );
         const row = result.rows[0];
         if (!row) throw new Error("Freight creation failed");
-        if (audit) {
-          await appendAuditEvent(client, {
-            ...audit,
-            tenantId: input.tenantId,
-            entityId: row.id,
-          });
-        }
+        await appendAuditEvent(client, {
+          ...audit,
+          tenantId: input.tenantId,
+          entityId: row.id,
+        });
         return row;
       },
     );
@@ -136,7 +130,7 @@ export class PostgresFreightRepository {
     tenantId: string,
     freightId: string,
     input: Partial<Omit<CreateFreightInput, "tenantId">>,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<FreightRow | null> {
     assertUuid(tenantId, "tenantId");
     assertUuid(freightId, "freightId");
@@ -180,7 +174,7 @@ export class PostgresFreightRepository {
         ],
       );
       const row = result.rows[0] ?? null;
-      if (row && audit) {
+      if (row) {
         await appendAuditEvent(client, {
           ...audit,
           tenantId,
@@ -299,7 +293,7 @@ export class PostgresFreightRepository {
             [tenantId, activeAssignment.id, assignmentNextStatus],
           );
 
-          if (audit) {
+          {
             await appendAuditEvent(client, {
               ...audit,
               tenantId,
@@ -317,7 +311,7 @@ export class PostgresFreightRepository {
       }
 
       // Status transitions are persisted with their audit event and outbox event in one transaction.
-      if (audit) {
+      {
         await appendAuditEvent(client, {
           ...audit,
           tenantId,
