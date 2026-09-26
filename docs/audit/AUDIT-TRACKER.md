@@ -1688,3 +1688,49 @@ Executar o runbook em um terminal/cliente PostgreSQL que consiga abrir a sessão
 Não registrar senha, connection string completa, JWT, cookie ou token.
 
 Somente após os oito critérios mínimos do runbook serem observados o DB-04 deve ser fechado e a sequência avançada para **AUTH-01**.
+
+
+## 56. FASE 2 — 2026-09-26 — AUTH-01: incidente Production `missing_tenant_id` e contrato Auth0 reconciliado
+
+### Evidência de código
+
+O incidente observado no Web Production foi:
+
+`/auth/callback?error=access_denied&error_description=missing_tenant_id`
+
+A auditoria do HEAD confirmou que `infra/auth0/actions/post-login.js` atualmente **não chama** `api.access.deny()`. Quando `event.user.app_metadata.tenant_id` está ausente, o Action simplesmente não emite o claim. O claim emitido quando presente é `https://tms-platform.io/claims/tenant_id`.
+
+A auditoria também confirmou que `apps/api/src/common/auth.guard.ts` exige o claim, valida `sub + tenant_id` contra membership ativo e não usa o header de tenant como autoridade independente.
+
+### Conclusão
+
+O `access_denied / missing_tenant_id` observado **não é explicado pelo Action atualmente versionado**. O finding correto é **drift/configuração efetiva do Auth0 Production**, com necessidade de identificar a Action/versão/flow que está efetivamente executando.
+
+### Correção preparada
+
+Foi criada a branch:
+
+`fix/auth0-production-tenant-contract-2026-09-26`
+
+e o artefato:
+
+`docs/audit/AUTH0-PRODUCTION-CONTRACT-2026-09-26.md`
+
+O contrato exige reconciliação de:
+
+1. Actions efetivamente anexadas ao Post-Login;
+2. versão publicada de `TMS — Tenant Claim`;
+3. qualquer `api.access.deny`/ `missing_tenant_id` no flow efetivo;
+4. application/client Production;
+5. audience `urn:tms:api:production`;
+6. `app_metadata.tenant_id` do usuário de teste;
+7. membership ativa `sub + tenant_id` no TMS;
+8. novo login e validação Web → Auth0 → API → DB.
+
+### Regra de segurança preservada
+
+Não alterar o AuthGuard para aceitar ausência de tenant, não confiar em tenant fornecido pelo browser e não desabilitar RLS. O tenant continua derivado do claim autenticado e reconfirmado pelo membership PostgreSQL.
+
+**AUTH-01 = P0 / BLOQUEADO ATÉ RECONCILIAÇÃO DO AUTH0 PRODUCTION.**
+
+Nenhuma alteração foi aplicada ao Auth0 Production nesta etapa.
