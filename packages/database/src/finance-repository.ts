@@ -1,4 +1,7 @@
+import { appendAuditEvent, type AuditEventInput } from "./audit-repository.js";
 import { withTenantContext } from "./tenant-transaction.js";
+
+type AuditInput = Omit<AuditEventInput, "tenantId" | "entityId">;
 
 export type FinancialDirection = "receivable" | "payable";
 export type FinancialEntryStatus = "pending" | "settled" | "cancelled";
@@ -50,6 +53,7 @@ export class FinanceRepository {
 
   async create(
     input: CreateFinancialEntryInput,
+    audit: AuditInput,
   ): Promise<FinancialEntryRecord> {
     return withTenantContext(this.pool, input.tenantId, async (client: any) => {
       if (input.assignmentId) {
@@ -100,12 +104,39 @@ export class FinanceRepository {
           JSON.stringify(input.metadata ?? {}),
         ],
       );
-      return this.map(result.rows[0]);
+      const entry = this.map(result.rows[0]);
+      await appendAuditEvent(client, {
+        ...audit,
+        tenantId: input.tenantId,
+        entityId: entry.id,
+        action: "finance.entry_created",
+        entityType: "financial_entry",
+        afterState: entry,
+      });
+      return entry;
     });
   }
 
-  async settle(tenantId: string, id: string): Promise<FinancialEntryRecord> {
+  async settle(
+    tenantId: string,
+    id: string,
+    audit: AuditInput,
+  ): Promise<FinancialEntryRecord> {
     return withTenantContext(this.pool, tenantId, async (client: any) => {
+      const current = await client.query(
+        `select id, tenant_id, freight_id, assignment_id, trip_id, direction,
+          entry_type, description, amount_cents, currency, status, due_at,
+          settled_at, external_reference, metadata, created_at, updated_at
+         from financial_entries
+         where tenant_id = $1 and id = $2
+         for update`,
+        [tenantId, id],
+      );
+      const before = current.rows[0];
+      if (!before || before.status !== "pending") {
+        throw new Error("FINANCIAL_ENTRY_NOT_SETTLEABLE");
+      }
+
       const result = await client.query(
         `update financial_entries
          set status = 'settled', settled_at = now()
@@ -116,7 +147,17 @@ export class FinanceRepository {
         [tenantId, id],
       );
       if (!result.rows[0]) throw new Error("FINANCIAL_ENTRY_NOT_SETTLEABLE");
-      return this.map(result.rows[0]);
+      const entry = this.map(result.rows[0]);
+      await appendAuditEvent(client, {
+        ...audit,
+        tenantId,
+        entityId: id,
+        action: "finance.entry_settled",
+        entityType: "financial_entry",
+        beforeState: before,
+        afterState: entry,
+      });
+      return entry;
     });
   }
 
