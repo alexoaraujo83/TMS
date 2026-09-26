@@ -1,10 +1,10 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-09-25 19:11 -03:00
+> **Última atualização:** 2026-09-25 23:35 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
-> **HEAD da aplicação auditada:** `17ffdd26f36ae8baf3862294f83ceff179de171d`  
+> **HEAD da aplicação auditada:** `d304b2cdfacc6d78282648b1d5bd1243811a7b78`  
 > **HEAD de controle/documentação anterior:** `c4fcb3ba598a0218142c11911b52d7a032eb24a4`  
 > **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
 
@@ -1391,3 +1391,37 @@ Correção aplicada:
 A exposição de diagnóstico fica separada da autorização de negócio. Continua necessária validação HTTP real: operador sem `ops:diagnostics` → 403; administrador autorizado → 200; tenant e contexto OIDC continuam limitados ao próprio contexto.
 
 A revisão também reconciliou `docs/DATABASE.md` para as migrations 0001–0035, eliminando a referência obsoleta a 31 migrations.
+
+
+## 2026-09-25 — Continuação: matriz de autorização e reconciliação do HEAD
+
+**Estado:** P1 — hardening estrutural confirmado no HEAD `d304b2cdfacc6d78282648b1d5bd1243811a7b78`; evidência E4 ainda pendente.
+
+### Verificações realizadas
+
+- O `FreightController` atual exige `freight:replay` para replay e `ops:diagnostics` para os quatro endpoints de diagnóstico.
+- `AuthGuard` continua validando Bearer token, issuer, audience, JWKS, claim de tenant, compatibilidade de `x-tenant-id` e membership ativa antes de construir o contexto.
+- O CI continua configurado para executar RLS/IAM runtime em banco efêmero com `tms_app` sem bypass de RLS.
+- O CI não substitui a prova de produção: permanecem separados DB-04/E4, token Auth0 real e runtime efetivo do worker.
+
+### Nova evidência de infraestrutura
+
+No HEAD atual, os status observados são:
+- `tms-backup - tms-worker`: SUCCESS;
+- `tms-backup - tms-backup-worker`: SUCCESS;
+- `Vercel – tms-core-api`: FAILURE por `build-rate-limit`;
+- `Vercel – tms-web`: FAILURE por `build-rate-limit`.
+
+Os failures de Vercel são tratados como bloqueio de infraestrutura de build enquanto o contexto permanecer explicitamente `build-rate-limit`; não foram interpretados como defeito funcional.
+
+### Próxima ação P0
+
+Executar, sem alterar RLS/grants para fabricar evidência, a sessão controlada com o papel runtime real `tms_app`:
+1. `current_user='tms_app'`;
+2. `rolbypassrls=false`;
+3. SELECT do próprio tenant;
+4. SELECT cross-tenant sem vazamento;
+5. INSERT cross-tenant rejeitado;
+6. UPDATE cross-tenant rejeitado.
+
+A ferramenta Neon disponível continua sem conseguir executar SQL devido ao mismatch do parâmetro `project_id`; portanto DB-04 permanece BLOCKER.
