@@ -687,3 +687,31 @@ A consulta de branch protection não pôde ser concluída por `403 Resource not 
 4. Retomar DB-04/E4 com sessão real do papel runtime aprovado.
 5. Somente após isso considerar nova limpeza estrutural de CI/workflows, se evidência concreta surgir.
 
+
+
+## 2026-09-25 — Correção P1: autorização dedicada para replay
+
+### API-02 / SEC-03
+
+A superfície `POST /freights/:id/status-events/:eventId/replay` foi endurecida.
+
+Alterações:
+1. adicionada `packages/database/migrations/0034_freight_replay_permission.sql`;
+2. criada a permissão `freight:replay`;
+3. removida a dependência de `freight:update` para autorizar replay;
+4. operador não recebe `freight:replay` por padrão;
+5. administrador continua recebendo a permissão via bootstrap canônico de permissões administrativas.
+
+**Estado:** código corrigido; prova E4 ainda pendente.
+
+### Evidência exigida
+
+- usuário/role com `freight:update` mas sem `freight:replay` → HTTP 403;
+- role com `freight:replay` → replay aceito;
+- replay continua tenant-scoped;
+- auditoria `durable_job.replay_requested` continua sendo persistida na mesma transação;
+- CI deve validar migration, typecheck, testes e build no novo HEAD.
+
+### API-03
+
+Não alterar ainda a chave `replay:<eventId>:<randomUUID>`. Primeiro decidir se replay manual repetido é intencionalmente repetível ou deve ser deduplicado. A mudança de permissão não resolve essa decisão semântica.
