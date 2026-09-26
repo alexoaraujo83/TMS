@@ -1316,3 +1316,10 @@ A auditoria avançou da superfície de repositories de negócio para as fronteir
 ### Decisão
 
 **Nenhuma Action cancelada identificada precisa ser reexecutada no SHA antigo.** O que precisa ser feito é uma nova validação do HEAD final, porque DB-06 foi alterado depois das execuções verdes históricas. Essa validação deve ocorrer quando a fila/rate-limit do Vercel permitir e deve ser registrada como nova evidência, não como reaproveitamento de run cancelado.
+
+
+## 2026-09-25 — Continuação: reconciliação documental e semântica de replay
+
+- **DOC-01 — SSOT desatualizado sobre o head de migração:** `docs/SSOT-OPERATIONS.md` ainda afirmava que production/main permanecia em 31 migrations, enquanto a evidência read-only posterior já reconciliou `0001`–`0033` e os checksums de 0032/0033. **Estado: CORRIGIDO DOCUMENTALMENTE.**
+- **API-16 / SEC-03 — idempotência de replay precisa ser distinguida em dois níveis:** o teste REAL existente comprova idempotência do handler para o mesmo `event_id`, mas o endpoint de replay gera deliberadamente uma nova `idempotency_key` por solicitação. Assim, duas solicitações explícitas de replay do mesmo evento podem enfileirar jobs distintos. **Estado: P1 / CONTROLE A DECIDIR.** Antes de alterar comportamento, definir se replay manual deve ser deduplicado por `event_id`/tenant/job_type ou se cada solicitação explícita deve permanecer como nova execução controlada; então cobrir a decisão com teste de integração e controles operacionais adequados.
+- **E4 permanece bloqueado:** nenhuma dessas correções documentais substitui a prova comportamental real sob `tms_app` no Neon alvo.
