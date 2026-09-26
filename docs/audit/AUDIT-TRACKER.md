@@ -1545,3 +1545,20 @@ Isso **não fecha DB-04** porque ainda falta a sessão comportamental real. Uma 
 Priorizar a obtenção de uma sessão autenticada diretamente como `tms_app` pelo caminho de runtime existente, sem reutilizar `neondb_owner` como substituto. Se o ambiente conectado não expuser esse caminho autenticado, registrar o bloqueio e avançar apenas para o próximo finding que possa ser comprovado sem inferência.
 
 **Estado: DB-04 = BLOQUEADO / E4 PENDENTE, com execução explicitamente autorizada pelo operador.**
+
+
+## 51. FASE 2 — 2026-09-26 — DB-04: observação sobre a evidência automatizada atual
+
+### Observação
+
+A execução do CI no HEAD atual 47825210d6415ee5d3f00c8e1e7c40e48450cf05 (run #1259 / 36240857560) terminou **success**. O workflow atual executa a suíte rls-runtime.integration.test.ts com um tms_app criado/provisionado para CI e um RUNTIME_DATABASE_URL restrito, cobrindo comportamento de SELECT cross-tenant, INSERT cross-tenant, UPDATE cross-tenant, DELETE cross-tenant e vazamento de contexto entre conexões do pool.
+
+Isso fortalece a evidência de que o contrato comportamental de RLS está implementado e protegido por CI com papel não-bypass. **Não equivale, por si só, ao E4 do Neon de produção**, porque o teste executado é contra o PostgreSQL efêmero do runner. Portanto, DB-04 permanece **BLOQUEADO / E4 PENDENTE** até existir uma sessão real de produção como tms_app para a matriz definida na seção 50.
+
+A execução cancelada do commit anterior (#1258 / 36240846312) não é tratada como falha funcional: houve um novo push e o CI do HEAD seguinte (#1259) concluiu com sucesso.
+
+### Próximo passo operacional
+
+Manter a prova de CI como evidência automatizada complementar e continuar a busca do caminho autenticado de produção tms_app, sem reutilizar neondb_owner e sem alterar RLS/grants/roles/configuração para fabricar evidência.
+
+**Estado: DB-04 = BLOQUEADO / E4 PENDENTE.**
