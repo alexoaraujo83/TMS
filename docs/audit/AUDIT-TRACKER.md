@@ -1822,3 +1822,32 @@ Assim, não é possível afirmar qual Action/binding está efetivamente ativo em
 **AUTH-01 = P0 / BLOQUEADO / E4 PENDENTE.**
 
 Nenhuma alteração foi aplicada ao Auth0 Production.
+
+## 59. FASE 2 — 2026-09-26 — AUTH-01: Web alinhado ao Auth0 Next.js SDK v4
+
+### Correção aplicada no branch de reconciliação
+
+O Web já utiliza `@auth0/nextjs-auth0@4.30.0`, Next.js 16 e `proxy.ts` com `auth0.middleware()`, portanto a integração está no modelo atual do SDK v4.
+
+Foi corrigido `apps/web/src/lib/auth0.ts` para declarar explicitamente `appBaseUrl: process.env.APP_BASE_URL` e manter o `audience` de API explicitamente em `authorizationParameters`. A mudança foi aplicada no commit `29ba3b8b34f17fbd82ebb3208c2afe1f8d5f1aab`.
+
+A documentação atual do Auth0 para Next.js 16 confirma o uso de `Auth0Client`, `proxy.ts`/middleware e `APP_BASE_URL`; também confirma que parâmetros como audience devem ser fornecidos explicitamente ao SDK v4.
+
+### Limite funcional importante
+
+Essa correção melhora a integração Web → Auth0 SDK e torna o contrato de runtime explícito, mas **não pode por si só corrigir `access_denied / missing_tenant_id`**.
+
+O erro observado ocorre durante o fluxo de autorização do Auth0, antes de o Web receber uma sessão. O claim `tenant_id` é emitido por uma Post-Login Action no tenant Auth0; o SDK Next.js não cria esse claim e não substitui a Action/binding do tenant.
+
+Portanto, permanece obrigatório reconciliar o Action/flow efetivo de Production. Não será introduzido workaround no SDK para aceitar sessão sem tenant, porque isso enfraqueceria o contrato do AuthGuard.
+
+### Estado
+
+- **SDK Web:** corrigido/alinhado no branch.
+- **API AuthGuard:** preservado.
+- **Action versionado:** preservado.
+- **Auth0 Production live:** ainda não reconciliado.
+- **AUTH-01:** P0 / BLOQUEADO / E4 PENDENTE.
+- **DB-04:** permanece P0 / E4 PENDENTE, independente deste ajuste.
+
+Nenhuma alteração foi aplicada diretamente ao Auth0 Production.
