@@ -2056,3 +2056,32 @@ A função continua com `SECURITY DEFINER` e `search_path` fixo. PostgreSQL docu
 ### Gate
 
 AUTH-01 permanece P0/E4 PENDENTE. Não aprovar/mergear enquanto o novo CI não comprovar a correção e enquanto migration + Action/binding não estiverem prontos para promoção controlada.
+
+## 64. FASE 2 — 2026-09-26 — AUTH-01: CI 1276 verde e gate Vercel separado
+
+### Evidência atualizada
+
+- HEAD da PR #94: `4c72cf582f75400ad71bd93e90c0bfd22d4917ac`.
+- GitHub Actions CI #1276: **SUCCESS**.
+- Job `quality`: **SUCCESS**; passou por migration CI, provisionamento/validação do runtime role, RLS runtime, IAM resolver, Durable Jobs/outbox, testes, typecheck e build.
+- O CI verde confirma que as duas regressões identificadas no CI 1274 foram corrigidas.
+- Railway `tms-worker` no ambiente de PR: **SUCCESS**.
+- Vercel `tms-web` e `tms-core-api`: continuam **FAILURE por limite de deployments da conta** (`api-deployments-free-per-day`), sem evidência no check atual de falha de código.
+- PR #94 permanece **OPEN / mergeable**.
+
+### Decisão de gate
+
+O gate de CI do código está **VERDE**. O bloqueio restante é operacional: validação/deploy Vercel ainda não pode ser obtida pelo check automático enquanto a conta estiver no limite de deployments.
+
+Ainda não promover para Production. Antes da promoção controlada permanecem obrigatórios:
+
+1. confirmar a disponibilidade de um deploy/preview Vercel válido para Web/API;
+2. revisar a migration 0036 para as restrições e comportamento concorrente de `users.auth0_subject`, `users.email` e `tenant_memberships`;
+3. aplicar migration 0036 somente pelo pipeline autorizado;
+4. publicar/reconciliar a Action Auth0 e o binding de Post-Login no tenant Production;
+5. executar E2E com usuário Auth0 novo, provando `users`, `tenant_memberships`, idempotência e tenant scoping;
+6. manter DB-04 E4 separado: CI verde não substitui uma sessão real de Production como `tms_app`.
+
+### Próxima ação
+
+Revisar constraints/concorrência da migration 0036 e, em seguida, revalidar o PR contra os gates de deploy. Não mergear nem mutar Auth0/Neon Production nesta etapa.
