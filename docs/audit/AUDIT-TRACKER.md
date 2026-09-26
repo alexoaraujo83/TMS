@@ -1284,3 +1284,15 @@ Foi acrescentado teste de integração que usa actor_user_id inválido para for�
 **REPO-07:** inventário de SQL de negócio em packages/database está substancialmente fechado para os repositories auditados. Permanecem como fronteiras legítimas a revisar separadamente: outbox/durable-jobs, stores/contexto do worker, diagnósticos RLS, replay e scripts de migration.
 
 Nenhuma mutation de produção foi executada.
+
+
+## 16. Continuação — fronteiras Outbox/Durable Jobs e baseline
+
+- **REPO-09 — Worker Outbox store é uma implementação SQL paralela ao OutboxRepository:** `apps/worker/src/outbox-store.ts` implementa `claimPending`, `renewLease`, `markPublished` e `markFailed` diretamente sobre `outbox_events`, enquanto `packages/database/src/outbox-repository.ts` expõe contrato equivalente. A implementação do worker usa transações e `app.tenant_id`, `FOR UPDATE SKIP LOCKED` e lease token; não foi identificado, nesta leitura, um bypass de tenant. **Estado: DUPLICAÇÃO CONTROLADA / P2**, com risco de divergência futura de semântica e validações. Próxima ação: decidir explicitamente se o worker deve consumir o repository compartilhado ou se `PgOutboxStore` deve permanecer como adapter especializado, com contrato/testes comuns.
+- **REPO-10 — Durable Jobs permanece coerente entre package e worker:** `PgDurableJobStore` usa `withTenantTransaction`, valida tenant ativo, `FOR UPDATE SKIP LOCKED`, lease token e estado/attempts; o repository compartilhado mantém a mesma fronteira transacional. **Estado: COMPROVADO NO CÓDIGO / sem nova lacuna P1.**
+- **DB-06 — Baseline validator permanece P1:** a inspeção confirmou que `migrate.ts` ainda não declara as colunas de auditoria de 0032 nem `durable_jobs.idempotency_key` de 0033 e ainda não verifica diretamente as constraints compostas de 0030/0031 nem o índice `durable_jobs_idempotency_idx`. **Estado: ABERTO / P1.** Nenhuma alteração de schema foi executada; a correção deve ser feita no validator e validada em CI antes de fechar o achado.
+- **DB-07 — SQL de infraestrutura fora de `packages/database` é restrito às fronteiras identificadas:** worker stores/contexto, replay do Freight e migration validator continuam sendo os principais pontos. Os stores do worker são infraestrutura deliberada; o replay continua sendo regra de negócio que merece revisão posterior de centralização, mas sua transação tenant-scoped e auditoria já estão comprovadas. **Estado: INVENTÁRIO SUBSTANCIALMENTE FECHADO / P1 residual em REPO-07.**
+
+### Estado após esta etapa
+
+A auditoria avançou da superfície de repositories de negócio para as fronteiras de persistência operacional. Não foi identificado novo P0 nesta etapa. O principal achado acionável é DB-06 (P1), seguido pela decisão arquitetural P2 sobre duplicação do Outbox store. O gate **DB-04/E4 continua BLOCKER**, pois a inspeção de código não substitui a execução real do teste sob `tms_app` contra o banco alvo.
