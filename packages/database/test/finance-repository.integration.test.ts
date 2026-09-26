@@ -23,7 +23,6 @@ if (!enabled) {
   const freightId = randomUUID();
   const otherFreightId = randomUUID();
   const audit = {
-    actorUserId: randomUUID(),
     action: "finance.test_mutation",
     entityType: "financial_entry",
     requestId: randomUUID(),
