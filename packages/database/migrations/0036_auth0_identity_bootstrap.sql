@@ -111,7 +111,7 @@ begin
 
       insert into tenant_memberships (tenant_id, user_id, role, role_id)
       values (p_tenant_id, v_user_id, 'operator', v_role_id)
-      on conflict (tenant_id, user_id) do nothing;
+      on conflict do nothing;
     end if;
   end if;
 
