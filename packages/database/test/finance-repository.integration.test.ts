@@ -180,6 +180,35 @@ if (!enabled) {
     );
   });
 
+  it("rolls back creation when audit persistence fails", async () => {
+    const invalidAudit = {
+      actorUserId: randomUUID(),
+      action: "finance.test_invalid_audit",
+      entityType: "financial_entry",
+      requestId: randomUUID(),
+    };
+    await assert.rejects(
+      finance.create(
+        {
+          tenantId,
+          freightId,
+          direction: "receivable",
+          entryType: "freight",
+          description: "Audit rollback",
+          amountCents: 1000,
+          externalReference: `audit-rollback-${tenantId}`,
+        },
+        invalidAudit,
+      ),
+    );
+
+    const entries = await finance.listByFreight(tenantId, freightId);
+    assert.equal(
+      entries.some((entry) => entry.externalReference === `audit-rollback-${tenantId}`),
+      false,
+    );
+  });
+
   it("prevents mutation of a settled entry", async () => {
     const entry = await createFinancialEntry({
       tenantId,
