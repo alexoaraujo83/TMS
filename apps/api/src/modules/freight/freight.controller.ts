@@ -51,7 +51,7 @@ export class FreightController {
   }
 
   @Get("runtime-context")
-  @RequirePermission("freight:read")
+  @RequirePermission("ops:diagnostics")
   runtimeContext(@CurrentUser() context: RequestContext) {
     return {
       authenticated: true,
@@ -63,7 +63,7 @@ export class FreightController {
   }
 
   @Get("runtime-db-context")
-  @RequirePermission("freight:read")
+  @RequirePermission("ops:diagnostics")
   async runtimeDbContext(@CurrentUser() context: RequestContext) {
     return withTenantContext(this.pool, context.tenantId, async (client) => {
       const result = await client.query<{ databaseTenantId: string | null; freightCount: string }>(
@@ -79,7 +79,7 @@ export class FreightController {
   }
 
   @Get("runtime-rls-isolation")
-  @RequirePermission("freight:read")
+  @RequirePermission("ops:diagnostics")
   async runtimeRlsIsolation(@CurrentUser() context: RequestContext) {
     return withTenantContext(this.pool, context.tenantId, async (client) => {
       const tenantA = context.tenantId;
@@ -121,7 +121,7 @@ export class FreightController {
   }
 
   @Get("runtime-auth-claims")
-  @RequirePermission("freight:read")
+  @RequirePermission("ops:diagnostics")
   runtimeAuthClaims(@CurrentUser() context: RequestContext) {
     return {
       authenticated: true,
