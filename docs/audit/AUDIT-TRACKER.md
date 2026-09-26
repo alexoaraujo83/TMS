@@ -1960,3 +1960,22 @@ Obter/reconciliar a configuração live do Auth0 Production por caminho autoriza
 | PR #85 UI | DRAFT | aguardar gates P0 |
 
 **Decisão operacional desta etapa:** nenhuma mesclagem, promoção Vercel Production, alteração Auth0 Production ou alteração de RLS foi executada. O próximo passo P0 continua sendo obter evidência live autorizada do Auth0 Production e executar o E4 de DB-04 com sessão real `tms_app`.
+## 32. FASE 2 — 2026-09-26 — DB-04: tentativa de descoberta do projeto Neon e bloqueio de sessão `tms_app`
+
+### Evidência nova
+
+A auditoria tentou avançar o E4 de DB-04 usando o conector Neon. A chamada de descoberta de branches não pôde ser executada porque o conector exige o **Project ID real** e a conexão desta sessão não está vinculada automaticamente a um projeto. A tentativa anterior com um identificador derivado do hostname não foi tratada como evidência e não será reutilizada.
+
+Também foi confirmado que o `run_sql` disponível no conector não oferece parâmetro para escolher a role PostgreSQL da sessão. Portanto, mesmo após resolver o Project ID, esse caminho não substitui a execução com a sessão real `tms_app` exigida pelo E4.
+
+### Classificação
+
+- **DB-04:** continua **P0 / BLOQUEADO / E4 PENDENTE**.
+- Nenhuma alteração de schema, RLS, grants, role ou dados foi executada.
+- Nenhuma credencial ou connection string foi usada para contornar a limitação.
+
+### Próxima ação P0
+
+Executar `docs/audit/DB-04-E4-RUNBOOK.md` em um terminal/cliente PostgreSQL capaz de abrir a sessão real do runtime `tms_app`, registrando somente resultados não sensíveis. Em paralelo, obter o Project ID por caminho autorizado se for necessário para auditorias read-only adicionais no Neon.
+
+A sequência de promoção permanece: **DB-04 E4 + AUTH-01 live → token real → Web/API E2E → tenant/RBAC → RLS → manifesto/gates**.
