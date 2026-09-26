@@ -499,7 +499,6 @@ O consumidor de produção atualmente observado (`FreightService.updateStatus()`
 
 Este achado não altera a classificação de DB-04, AUTH-01 ou E4 do worker. A próxima evidência operacional continua sendo uma sessão runtime real e, para o worker, um evento de negócio real no ambiente autorizado.
 
-
 ## 17. WORK-02a — refinamento de risco e garantia transacional
 
 A auditoria de consumidores não encontrou uso interno de `PostgresFreightRepository.updateStatus()`. O caminho de produção conhecido usa `updateStatusWithAudit()` com contexto de auditoria.
@@ -782,3 +781,26 @@ Correção:
 - Diagnósticos ficam protegidos por `ops:diagnostics`; replay por `freight:replay`.
 - CI run #1250 (`36216153527`) no SHA `5f5289d4cc263c6a08ab5ae41b65eb0412ac33f7` concluiu com sucesso.
 - Próxima etapa: executar a matriz HTTP real com usuário sem a permissão → 403, usuário autorizado → 200 e confirmar tenant/OIDC/DB context.
+
+## 2026-09-26 — Atualização de execução: CI verde e manifesto reconciliado
+
+### P0 — REL-01
+
+- O HEAD de controle atual é d00355d81ccd56edf628baf9e114cbe51790f608.
+- O CI #1251 / run 36216294963 terminou success nesse SHA.
+- Foi registrado em docs/releases/2026-09-26.json o estado observado de Web/API/Worker/backup-worker, incluindo os SHAs efetivos e os deployments correspondentes.
+- A divergência de SHA entre componentes é documentada como promoção seletiva; não é tratada como falha sem evidência de impacto funcional.
+
+### P0 ainda bloqueado
+
+- DB-01: migration head/checksums do Neon live ainda precisam de verificação read-only autoritativa.
+- DB-04: sessão real com tms_app, rolbypassrls=false e testes cross-tenant continua pendente.
+- AUTH-01: token Auth0 real → Web → API → DB continua pendente.
+
+### P1 — WORK-01
+
+O worker principal recebeu SKIPPED para o HEAD atual e permanece efetivo no SHA c4808ec58eba65b564d97fdb015cd3c599720860, enquanto o backup-worker está SUCCESS no HEAD atual. A política de watch seletivo é mantida; não será feito deploy apenas para igualar SHAs.
+
+### Regra de evidência preservada
+
+CI verde e deploy SUCCESS/SKIPPED comprovam controle de entrega, não comportamento E4. Backup SUCCESS também não comprova artefato, checksum ou retenção.

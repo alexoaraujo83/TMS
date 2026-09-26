@@ -498,7 +498,6 @@ Os hashes acima são **baseline de código**, não evidência do banco live. O f
 Nenhuma migration foi aplicada, nenhuma branch foi criada/resetada/deletada e nenhum dado de produção foi alterado nesta etapa. O próximo passo continua sendo uma consulta read-only de `schema_migrations` assim que a conexão Neon puder receber o identificador do projeto de forma compatível.
 
 ### 32.5 Próximo avanço P0
-
 1. Resolver a incompatibilidade do conector Neon para executar a consulta read-only no projeto `shiny-hall-34679912`.
 2. Registrar head, checksums e `current_user`/database somente como evidência mínima necessária.
 3. Se houver drift de checksum/head, interromper qualquer migration automática e abrir correção específica; não equalizar SHA cegamente.
@@ -997,8 +996,7 @@ O fechamento continua condicionado a evidência executada como tms_app demonstra
 
 1. current_user = tms_app;
 2. rolbypassrls = false;
-3. leitura do tenant próprio funciona;
-4. leitura cross-tenant não retorna dados;
+3. leitura do tenant próprio funciona;4. leitura cross-tenant não retorna dados;
 5. INSERT cross-tenant é rejeitado;
 6. UPDATE cross-tenant é rejeitado.
 
@@ -1458,3 +1456,13 @@ A ferramenta Neon disponível continua sem conseguir executar SQL devido ao mism
 - CI do SHA `5f5289d4cc263c6a08ab5ae41b65eb0412ac33f7`, run #1250 / `36216153527`, concluiu `success`, incluindo migration, RLS, IAM, integrações do worker, format, lint, typecheck, test e build.
 - **API-06:** cobertura estrutural agora está protegida contra regressão; E4 HTTP 403/200 e tenant-context continuam pendentes.
 - **API-02:** permissão dedicada de replay permanece protegida contra regressão estrutural; E4 continua pendente.
+
+## 2026-09-26 — Reconciliação de CI e release observada
+
+- CI run #1251 (36216294963) no HEAD d00355d81ccd56edf628baf9e114cbe51790f608 terminou success em 2026-09-26 03:57Z. Isso valida o pipeline técnico no HEAD de controle/documentação atual; não substitui E4 de produção.
+- Vercel produção observado: tms-core-api permanece READY no deployment dpl_43rvFqPsZjWdhmb3gnEUsxqa9gHG, SHA 695ba3fbb42f1917c84336711ccb6800a29a0a85; tms-web permanece READY no deployment dpl_6WGRWWauR87GozJSwJ1UhkaJgzmS, SHA e2137446b3da21e6cb557b9a5203e2c75bac7c81. Os SHAs diferem do HEAD de controle por promoção seletiva; não há evidência de defeito apenas pela divergência.
+- Railway tms-worker: deployment do HEAD d00355d... foi SKIPPED; o último SUCCESS observado permanece ab2142c4-67b9-4143-9531-3f55f1a19739, SHA c4808ec58eba65b564d97fdb015cd3c599720860. Isso é compatível com a política de watch seletivo e não justifica forçar deploy.
+- Railway tms-backup-worker: deployment 073113c2-8ac0-4846-9dba-7bf184756fad está SUCCESS no HEAD d00355d.... Isso comprova deploy, não a existência/retensão do artefato de backup.
+- O manifesto versionado de release foi reintroduzido/atualizado em docs/releases/2026-09-26.json para registrar o estado observado acima, inclusive divergência de SHA e migration head 0035 como head do repositório, não como prova independente do Neon live.
+
+P0: REL-01 passa a ter manifesto versionado; DB-01 e DB-04 continuam bloqueados até evidência read-only/runtime do Neon. P1: WORK-01 fica reconciliado quanto ao SHA efetivo, sem deploy artificial. E4 continua separado de CI/deploy.

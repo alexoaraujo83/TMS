@@ -1,0 +1,50 @@
+{
+  "releaseDate": "2026-09-26",
+  "observedAt": "2026-09-26T03:57:46Z",
+  "status": "observed-state",
+  "repositorySha": "d00355d81ccd56edf628baf9e114cbe51790f608",
+  "ci": {
+    "runNumber": 1251,
+    "runId": "36216294963",
+    "conclusion": "success"
+  },
+  "web": {
+    "sha": "e2137446b3da21e6cb557b9a5203e2c75bac7c81",
+    "deployment": "dpl_6WGRWWauR87GozJSwJ1UhkaJgzmS",
+    "state": "READY",
+    "target": "production"
+  },
+  "api": {
+    "sha": "695ba3fbb42f1917c84336711ccb6800a29a0a85",
+    "deployment": "dpl_43rvFqPsZjWdhmb3gnEUsxqa9gHG",
+    "state": "READY",
+    "target": "production"
+  },
+  "worker": {
+    "sha": "c4808ec58eba65b564d97fdb015cd3c599720860",
+    "deployment": "ab2142c4-67b9-4143-9531-3f55f1a19739",
+    "state": "SUCCESS",
+    "platform": "railway",
+    "project": "tms-backup",
+    "service": "tms-worker",
+    "currentHeadDeployment": "SKIPPED"
+  },
+  "backupWorker": {
+    "sha": "d00355d81ccd56edf628baf9e114cbe51790f608",
+    "deployment": "073113c2-8ac0-4846-9dba-7bf184756fad",
+    "state": "SUCCESS",
+    "platform": "railway",
+    "project": "tms-backup",
+    "service": "tms-backup-worker",
+    "cron": "0 2 * * *"
+  },
+  "database": {
+    "repositoryMigrationHead": "0035",
+    "liveVerification": "pending"
+  },
+  "deploymentPolicy": {
+    "worker": "deploy when relevant worker/runtime paths change; otherwise SKIPPED is intentional",
+    "backupWorker": "deploy when relevant backup/DR paths change; otherwise SKIPPED is intentional",
+    "shaDivergence": "component SHAs may differ; divergence is explicit and is not itself a deployment failure"
+  }
+}
