@@ -1303,3 +1303,16 @@ A auditoria avançou da superfície de repositories de negócio para as fronteir
 - `packages/database/scripts/migrate.ts` passou a exigir `durable_jobs.idempotency_key` e os metadados de auditoria de 0032.
 - O baseline existente agora verifica as quatro FKs tenant-scoped de 0030/0031 e o índice `durable_jobs_idempotency_idx`, além do índice Auth0 já validado.
 - **DB-06: CORRIGIDO NO CÓDIGO / validação operacional ainda pendente.** O fechamento definitivo depende de executar o validator em CI/ambiente controlado e registrar o resultado.
+
+
+## 18. Auditoria das Actions canceladas — 2026-09-25
+
+- **CI-09 / run 36076682893:** cancelado no SHA `50314de...`. O próprio tracker já registra que foi uma execução histórica e que não constitui evidência de falha funcional. **Não refazer esse run isoladamente**, porque o SHA já não representa o estado corrigido atual.
+- **CI-01 / run 36080140034 (#1135):** cancelado no SHA `c4fcb3ba...`. O cancelamento não deve ser interpretado como falha de código. Houve execução posterior no SHA `2eb43e87...`, run `36081162875` (#1139), com `success`, cobrindo o pipeline de controle. **Não é necessário reexecutar o run cancelado antigo.**
+- A configuração atual do CI usa `concurrency` com `cancel-in-progress: true`. Portanto, cancelamentos podem ser deliberadamente causados pela chegada de uma execução mais nova no mesmo grupo, e não significam regressão.
+- Os commits de correção mais recentes (`464dd2dd...`, `9b88ab19...`, `72c8ae72...`) não possuem workflow run retornado pelo wrapper de runs, que filtra execuções disparadas por pull request. Por isso, isso **não prova ausência de execução em GitHub**; a evidência disponível mais forte para esses SHAs é o combined status.
+- Combined status dos commits de correção mostra Railway worker/backup-worker como `success`, enquanto Vercel API/Web aparece `failure` por **build-rate-limit**. Esses failures são limitação de infraestrutura de build, não evidência de teste funcional falhando. **Não refazer indiscriminadamente:** o retry útil é uma nova execução/promoção quando o rate limit estiver liberado, preferencialmente sobre o HEAD final após as correções.
+
+### Decisão
+
+**Nenhuma Action cancelada identificada precisa ser reexecutada no SHA antigo.** O que precisa ser feito é uma nova validação do HEAD final, porque DB-06 foi alterado depois das execuções verdes históricas. Essa validação deve ocorrer quando a fila/rate-limit do Vercel permitir e deve ser registrada como nova evidência, não como reaproveitamento de run cancelado.
