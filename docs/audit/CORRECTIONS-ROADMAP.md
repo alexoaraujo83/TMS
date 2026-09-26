@@ -715,3 +715,31 @@ Alterações:
 ### API-03
 
 Não alterar ainda a chave `replay:<eventId>:<randomUUID>`. Primeiro decidir se replay manual repetido é intencionalmente repetível ou deve ser deduplicado. A mudança de permissão não resolve essa decisão semântica.
+
+
+## 2026-09-25 — Correção P1: isolamento dos endpoints de diagnóstico
+
+### API-11 / API-06
+
+Os endpoints de diagnóstico não devem compartilhar a permissão funcional `freight:read`, porque expõem contexto de tenant/usuário, claims OIDC e informações de execução do banco, além de uma sonda RLS sintética.
+
+Correção:
+1. nova permissão `ops:diagnostics` na migration `0035_diagnostics_permission_and_admin_replay.sql`;
+2. quatro endpoints de diagnóstico exigem `ops:diagnostics`;
+3. operador permanece sem a permissão por padrão;
+4. admin recebe explicitamente `ops:diagnostics` e `freight:replay` por migration, sem depender de herança retroativa do bootstrap anterior;
+5. teste IAM verifica a ausência das duas permissões no operador.
+
+**Estado:** código corrigido; E4 ainda pendente.
+
+### Evidência exigida
+
+- operador com `freight:read` mas sem `ops:diagnostics` → HTTP 403;
+- admin com `ops:diagnostics` → endpoints retornam 200;
+- nenhum endpoint altera o tenant efetivo do contexto autenticado;
+- `runtime-rls-isolation` continua sendo tratado como sonda operacional, não como prova substituta do DB-04/E4;
+- novo CI deve validar migrations, IAM, typecheck, testes e build no HEAD final.
+
+### Reconciliação de documentação
+
+`docs/DATABASE.md` foi atualizado para refletir a cadeia 0001–0035, incluindo observabilidade/audit context, durable-job idempotency, replay permission e diagnostics permission.
