@@ -124,8 +124,7 @@ export class CarrierRepository {
         );
         const row = result.rows[0];
         if (!row) throw new Error("Carrier creation failed");
-        if (audit)
-          await appendAuditEvent(client, {
+        await appendAuditEvent(client, {
             ...audit,
             tenantId: input.tenantId,
             entityId: row.id,
@@ -162,8 +161,7 @@ export class CarrierRepository {
         );
         const after = result.rows[0];
         if (!after) throw new Error("Carrier update failed");
-        if (audit)
-          await appendAuditEvent(client, {
+        await appendAuditEvent(client, {
             ...audit,
             tenantId: input.tenantId,
             entityId: after.id,
@@ -240,8 +238,7 @@ export class DriverRepository {
         );
         const row = result.rows[0];
         if (!row) throw new Error("Driver creation failed");
-        if (audit)
-          await appendAuditEvent(client, {
+        await appendAuditEvent(client, {
             ...audit,
             tenantId: input.tenantId,
             entityId: row.id,
@@ -291,8 +288,7 @@ export class DriverRepository {
         );
         const after = result.rows[0];
         if (!after) throw new Error("Driver update failed");
-        if (audit)
-          await appendAuditEvent(client, {
+        await appendAuditEvent(client, {
             ...audit,
             tenantId: input.tenantId,
             entityId: after.id,
@@ -369,8 +365,7 @@ export class VehicleRepository {
         );
         const row = result.rows[0];
         if (!row) throw new Error("Vehicle creation failed");
-        if (audit)
-          await appendAuditEvent(client, {
+        await appendAuditEvent(client, {
             ...audit,
             tenantId: input.tenantId,
             entityId: row.id,
@@ -420,8 +415,7 @@ export class VehicleRepository {
         );
         const after = result.rows[0];
         if (!after) throw new Error("Vehicle update failed");
-        if (audit)
-          await appendAuditEvent(client, {
+        await appendAuditEvent(client, {
             ...audit,
             tenantId: input.tenantId,
             entityId: after.id,
