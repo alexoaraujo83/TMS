@@ -22,7 +22,12 @@ export class FinanceService {
       tenantId: context.tenantId,
       dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
     };
-    return this.repository.create(input);
+    return this.repository.create(input, {
+      actorUserId: context.userId,
+      action: "finance.entry_created",
+      entityType: "financial_entry",
+      requestId: context.requestId,
+    });
   }
 
   listByFreight(context: RequestContext, freightId: string) {
@@ -30,6 +35,11 @@ export class FinanceService {
   }
 
   settle(context: RequestContext, id: string) {
-    return this.repository.settle(context.tenantId, id);
+    return this.repository.settle(context.tenantId, id, {
+      actorUserId: context.userId,
+      action: "finance.entry_settled",
+      entityType: "financial_entry",
+      requestId: context.requestId,
+    });
   }
 }
