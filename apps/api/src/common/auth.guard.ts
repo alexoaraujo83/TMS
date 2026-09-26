@@ -7,7 +7,10 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { verifyAccessToken } from "@tms/auth";
-import { verifyTenantMembership } from "@tms/database";
+import {
+  bootstrapAuth0Identity,
+  verifyTenantMembership,
+} from "@tms/database";
 import type { Pool } from "pg";
 import type { RequestContext } from "./request-context.js";
 import { DATABASE_POOL } from "./database.provider.js";
@@ -47,7 +50,27 @@ export class AuthGuard implements CanActivate {
         throw new ForbiddenException("Tenant header does not match the authenticated tenant claim");
       }
 
-      const membership = await verifyTenantMembership(this.pool, claims.sub, claims.tenantId);
+      let membership = await verifyTenantMembership(this.pool, claims.sub, claims.tenantId);
+
+      // Just-in-time identity bootstrap closes the Auth0 -> TMS identity gap.
+      // It is idempotent and only creates the first membership when the local
+      // identity has no existing memberships. Existing memberships remain
+      // authoritative and are never expanded implicitly.
+      if (!membership?.active) {
+        if (!claims.email) {
+          throw new UnauthorizedException("Authenticated email claim is required for first-time identity bootstrap");
+        }
+
+        await bootstrapAuth0Identity(this.pool, {
+          auth0Subject: claims.sub,
+          email: claims.email,
+          displayName: claims.name ?? claims.email,
+          tenantId: claims.tenantId,
+        });
+
+        membership = await verifyTenantMembership(this.pool, claims.sub, claims.tenantId);
+      }
+
       if (!membership?.active) throw new ForbiddenException("Active tenant membership required");
 
       request.context = {
