@@ -868,3 +868,18 @@ Obter sessão efetiva autenticada como `tms_app` pelo caminho de runtime real e 
 Se a integração disponível não permitir autenticação direta como `tms_app`, manter DB-04 como **BLOCKED/E4 PENDENTE**, sem usar `neondb_owner` como substituto.
 
 **Gate:** DB-04 continua anterior a AUTH-01, SEC-01 e REL-01.
+
+
+## 2026-09-26 — DB-04: observação adicional sobre CI #1259
+
+### Observação
+
+O CI #1259 (36240857560) no HEAD 47825210d6415ee5d3f00c8e1e7c40e48450cf05 concluiu **success** e executou rls-runtime.integration.test.ts com conexão restrita tms_app no PostgreSQL efêmero do runner. A suíte comprova comportamentos de isolamento de leitura e escrita cross-tenant e proteção contra vazamento do contexto de tenant no pool.
+
+Essa evidência é **complementar**, não substitutiva do E4 de produção: o ambiente é CI e não o Neon live. O gate DB-04 permanece **BLOCKED/E4 PENDING** até a execução da mesma matriz por uma sessão real tms_app de produção.
+
+A run #1258 (36240846312) foi cancelada por substituição do commit e não representa regressão; a run subsequente #1259 passou.
+
+### Regra preservada
+
+Nenhuma alteração de RLS, grants, roles, credenciais ou configuração de produção deve ser feita para fabricar evidência. A autorização do operador cobre somente o teste controlado e a documentação de seus resultados.
