@@ -2085,3 +2085,29 @@ Ainda não promover para Production. Antes da promoção controlada permanecem o
 ### Próxima ação
 
 Revisar constraints/concorrência da migration 0036 e, em seguida, revalidar o PR contra os gates de deploy. Não mergear nem mutar Auth0/Neon Production nesta etapa.
+
+
+## 65. FASE 2 — 2026-09-26 — AUTH-01: CI 1278 encontrou ambiguidade PL/pgSQL e correção aplicada
+
+### Falha reproduzida
+
+- CI GitHub #1278 executou migration, provisionamento do runtime role e RLS runtime com sucesso.
+- O job quality falhou exclusivamente em `packages/database/test/iam-runtime.integration.test.ts`.
+- A função `public.bootstrap_auth0_identity(...)` falhou no `ON CONFLICT (tenant_id, user_id)` com PostgreSQL `42702`: `tenant_id` ficou ambíguo entre a coluna de `tenant_memberships` e a variável de saída `tenant_id` implícita pelo `RETURNS TABLE`.
+- O restante do teste confirmou que o runtime role continua `NOBYPASSRLS` e com `EXECUTE` controlado.
+
+### Correção
+
+`0036_auth0_identity_bootstrap.sql` foi corrigida para `ON CONFLICT DO NOTHING`, removendo a referência ambígua sem alterar a unicidade/PK usada pelo banco. A unicidade de `(tenant_id, user_id)` continua sendo garantida pelo constraint existente; conflitos concorrentes são tratados pelo próprio PostgreSQL.
+
+### Gate atual
+
+- PR #94 continua OPEN / mergeable.
+- CI #1278: FAILURE, corrigido na branch após análise do log.
+- O commit da correção ainda não possui CI posterior verde; portanto AUTH-01 permanece pendente.
+- Vercel permanece bloqueado pelo limite de deployments da conta.
+- Auth0 Production e Neon Production permanecem sem mutações nesta etapa.
+
+### Próxima ação
+
+Executar/aguardar o próximo CI do HEAD corrigido e revisar todos os jobs. Se verde, atualizar o gate de AUTH-01; depois manter a sequência de promoção controlada (Vercel, migration Production autorizada, Action/binding Auth0, E2E). DB-04 E4 continua independente.
