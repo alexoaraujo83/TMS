@@ -106,7 +106,7 @@ export class CarrierRepository {
   constructor(private readonly pool: Pool) {}
   async create(
     input: CreateCarrierInput,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<CarrierRecord> {
     assertUuid(input.tenantId, "tenantId");
     return withTransaction(
@@ -136,7 +136,7 @@ export class CarrierRepository {
   }
   async update(
     input: UpdateCarrierInput,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<CarrierRecord | null> {
     assertUuid(input.tenantId, "tenantId");
     assertUuid(input.id, "id");
@@ -209,7 +209,7 @@ export class DriverRepository {
   constructor(private readonly pool: Pool) {}
   async create(
     input: CreateDriverInput,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<DriverRecord> {
     assertUuid(input.tenantId, "tenantId");
     if (input.carrierId) assertUuid(input.carrierId, "carrierId");
@@ -252,7 +252,7 @@ export class DriverRepository {
   }
   async update(
     input: UpdateDriverInput,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<DriverRecord | null> {
     assertUuid(input.tenantId, "tenantId");
     assertUuid(input.id, "id");
@@ -338,7 +338,7 @@ export class VehicleRepository {
   constructor(private readonly pool: Pool) {}
   async create(
     input: CreateVehicleInput,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<VehicleRecord> {
     assertUuid(input.tenantId, "tenantId");
     if (input.driverId) assertUuid(input.driverId, "driverId");
@@ -381,7 +381,7 @@ export class VehicleRepository {
   }
   async update(
     input: UpdateVehicleInput,
-    audit?: AuditInput,
+    audit: AuditInput,
   ): Promise<VehicleRecord | null> {
     assertUuid(input.tenantId, "tenantId");
     assertUuid(input.id, "id");
