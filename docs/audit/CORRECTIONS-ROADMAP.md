@@ -753,3 +753,11 @@ Correção:
 - AuthGuard: contrato estrutural confirmado; E2/E3 comprovado, E4 Auth0 ainda pendente.
 - CI atual: worker e backup-worker SUCCESS; Vercel API/Web apresentam `build-rate-limit`, portanto não há evidência de build completo do HEAD em Vercel.
 - **Gate P0 DB-04:** permanece BLOCKER. A próxima evidência é uma sessão real `tms_app` com os testes de isolamento definidos no tracker. Não modificar RLS/grants apenas para viabilizar o teste.
+
+## 2026-09-25 — Reconciliação corrente após hardening de autorização
+
+- **HEAD atual de `main`:** `1fd5c97999ac93a334a85065665cfaddeaaa9463`. O conteúdo funcional explicitamente auditado nesta sequência termina em `d304b2cdfacc6d78282648b1d5bd1243811a7b78`; os commits seguintes são de documentação/controle.
+- **Replay:** `freight:replay` está separado de `freight:update`, com criação da permissão em 0034 e concessão administrativa explícita em 0035. O roadmap não deve mais tratar a ausência da permissão dedicada como finding aberto; permanece a prova E4 e a decisão de semântica de repetição.
+- **Diagnósticos:** `ops:diagnostics` está separado das permissões funcionais e concedido explicitamente ao admin. Permanece a prova E4: operador sem a permissão deve receber 403 e admin autorizado deve receber 200.
+- **Frontend Auth0:** a implementação estrutural existe no Web (`@auth0/nextjs-auth0`, cliente Auth0 server-side e rota `api/tms/auth-runtime`). O finding histórico EV-030 de ausência de SDK é datado de 2026-09-16 e não deve ser reutilizado como estado corrente. O gate P0 continua sendo o E4 real Web → Auth0 → API → DB.
+- **DB-04:** permanece o bloqueador P0 prioritário. A próxima ação operacional continua sendo obter uma sessão real `tms_app` e executar os testes de isolamento, sem alterar RLS/grants para facilitar a prova.
