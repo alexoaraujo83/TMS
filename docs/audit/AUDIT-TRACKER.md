@@ -1323,3 +1323,34 @@ A auditoria avançou da superfície de repositories de negócio para as fronteir
 - **DOC-01 — SSOT desatualizado sobre o head de migração:** `docs/SSOT-OPERATIONS.md` ainda afirmava que production/main permanecia em 31 migrations, enquanto a evidência read-only posterior já reconciliou `0001`–`0033` e os checksums de 0032/0033. **Estado: CORRIGIDO DOCUMENTALMENTE.**
 - **API-16 / SEC-03 — idempotência de replay precisa ser distinguida em dois níveis:** o teste REAL existente comprova idempotência do handler para o mesmo `event_id`, mas o endpoint de replay gera deliberadamente uma nova `idempotency_key` por solicitação. Assim, duas solicitações explícitas de replay do mesmo evento podem enfileirar jobs distintos. **Estado: P1 / CONTROLE A DECIDIR.** Antes de alterar comportamento, definir se replay manual deve ser deduplicado por `event_id`/tenant/job_type ou se cada solicitação explícita deve permanecer como nova execução controlada; então cobrir a decisão com teste de integração e controles operacionais adequados.
 - **E4 permanece bloqueado:** nenhuma dessas correções documentais substitui a prova comportamental real sob `tms_app` no Neon alvo.
+
+
+## 2026-09-25 — Limpeza/reconciliação de GitHub Actions e governança
+
+### Resultado da inspeção
+
+- O diretório `.github/workflows/` atualmente contém exatamente três workflows versionados: `ci.yml`, `database-migrate.yml` e `database-migrate-nonprod.yml`.
+- `ci.yml` permanece necessário: executa em push/PR para `main`, valida arquitetura, migrations, RLS/IAM, Durable Jobs, fluxo freight-status, evidência de runtime, formatação, lint, typecheck, testes e build.
+- `database-migrate.yml` permanece necessário: é o caminho automático de migration de produção, limitado por paths de migration/configuração de banco e com environment `production`.
+- `database-migrate-nonprod.yml` permanece necessário: é o caminho manual e explícito para `development` ou `staging`; não há sobreposição operacional que justifique removê-lo.
+- Não foi identificado workflow órfão/redundante que possa ser removido com segurança nesta passada. Portanto, **nenhum arquivo de workflow foi apagado**.
+
+### Histórico de Actions
+
+A limpeza do histórico de runs não pode ser executada pela integração GitHub disponível: ela permite inspeção e reexecução, mas não expõe operação de exclusão de workflow run. Os runs cancelados históricos continuam preservados como evidência; não foram reexecutados artificialmente.
+
+### Governança de main
+
+A leitura de branch protection via API retornou `403 Resource not accessible by integration`; a consulta de rulesets retornou lista vazia. Isso não é evidência suficiente para declarar branch protection configurada. O finding **CI-10 — GOVERNANÇA DE MAIN / P1** permanece aberto até uma verificação administrativa autorizada confirmar required status checks/regras de proteção.
+
+### Reconciliação de HEAD
+
+O HEAD atual de `main` observado diretamente no GitHub é `b16faf77181882c4f796fd9d067fa4f62891992e` (`docs(audit): correct current migration head in SSOT`). Documentos anteriores que ainda exibem SHAs históricos devem ser interpretados como snapshots datados; o HEAD atual passa a ser a referência de controle deste ciclo.
+
+### Próxima frente
+
+1. Obter verificação administrativa de branch protection/required checks.
+2. Validar DB-06 em CI/ambiente controlado.
+3. Resolver API-16/SEC-03 (semântica e permissão de replay).
+4. Retomar DB-04/E4 com sessão runtime real `tms_app`.
+
