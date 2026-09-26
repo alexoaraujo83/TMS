@@ -1633,3 +1633,58 @@ A evidência nova reduz o bloqueio: o caminho de runtime e a proteção contra u
 ### Próxima ação
 
 Priorizar uma execução controlada no próprio caminho do worker que capture, sem segredos, `current_user`, `rolbypassrls` e os resultados de SELECT/INSERT/UPDATE cross-tenant, com rollback integral. Não alterar RLS/grants/roles para viabilizar o teste.
+
+
+## 55. FASE 2 — 2026-09-26 — DB-04: evidência E4 operacional não executável pelo conector; runbook criado
+
+### 55.1 Limitação operacional confirmada
+
+O conjunto de ferramentas disponível permite executar SQL no Neon, mas o executor exposto não permite escolher a role da sessão. A conexão efetiva usada pelo executor continua sendo a privilegiada, portanto ela não pode ser usada para provar o comportamento de `tms_app`.
+
+Também não existe, no conector Railway disponível, um comando remoto de shell/execução de SQL que permita abrir diretamente a sessão real do worker.
+
+Conclusão mantida:
+
+**DB-04 = BLOQUEADO / E4 PENDENTE.**
+
+### 55.2 Artefato operacional criado
+
+Foi criado:
+
+`docs/audit/DB-04-E4-RUNBOOK.md`
+
+O runbook descreve passo a passo a execução com a sessão real `tms_app`, sem expor credenciais, cobrindo:
+
+1. `current_user = tms_app`;
+2. `rolbypassrls = false`;
+3. SELECT do próprio tenant;
+4. SELECT cross-tenant sem vazamento;
+5. INSERT cross-tenant rejeitado;
+6. UPDATE sobre linha de outro tenant sem alteração;
+7. UPDATE de reatribuição A→B rejeitado por `WITH CHECK`;
+8. `ROLLBACK`;
+9. confirmação de nenhuma persistência;
+10. confirmação de que `SET LOCAL app.tenant_id` não vaza após a transação.
+
+### 55.3 Regressão automatizada existente
+
+A auditoria confirmou que `packages/database/test/security.integration.test.ts` já possui uma suíte específica de isolamento multi-tenant usando:
+
+- `DATABASE_ADMIN_URL` apenas para fixtures/limpeza;
+- `DATABASE_URL` para todas as asserções via role de runtime;
+- RLS `FORCE`;
+- SELECT cross-tenant;
+- INSERT com `WITH CHECK`;
+- UPDATE de `tenant_id`;
+- ausência de contexto;
+- escopo transacional de `app.tenant_id`.
+
+Essa suíte é evidência de regressão automatizada, mas não substitui a prova E4 da sessão real de produção.
+
+### 55.4 Próximo passo
+
+Executar o runbook em um terminal/cliente PostgreSQL que consiga abrir a sessão efetiva `tms_app`. Registrar somente os resultados não sensíveis no tracker.
+
+Não registrar senha, connection string completa, JWT, cookie ou token.
+
+Somente após os oito critérios mínimos do runbook serem observados o DB-04 deve ser fechado e a sequência avançada para **AUTH-01**.
