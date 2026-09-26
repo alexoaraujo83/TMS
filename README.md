@@ -36,3 +36,7 @@ No capability is considered complete only because a screen or endpoint exists; t
 ## Release quality
 
 Production promotion requires measured evidence for database integrity, tenant isolation, authorization, application behavior, worker execution, backup/restore, observability and deployment health.
+
+## Release trigger
+
+Web deployment trigger after freight deletion workflow merge.
