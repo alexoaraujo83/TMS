@@ -550,3 +550,29 @@ A auditoria continua sem mutation de produção.
 - `createWithAudit` e `updateWithAudit` agora exigem audit.
 - O contrato de mutação de Freight fica alinhado ao de status: mutações persistentes exigem identidade/auditoria dentro da transação.
 - Próximo passo: validar os contratos endurecidos no CI e continuar a varredura por APIs mutáveis equivalentes.
+
+
+## 2026-09-25 — REPO-04: hardening das mutações financeiras
+
+**Status:** P1 — correção estrutural aplicada; CI/E4 ainda pendentes.
+
+### Alteração
+
+1. tornar FinanceRepository.create() dependente de AuditInput;
+2. registrar finance.entry_created dentro da mesma transação da criação;
+3. tornar FinanceRepository.settle() dependente de AuditInput;
+4. capturar o estado anterior e registrar finance.entry_settled atomicamente com a liquidação;
+5. propagar o contexto de auditoria no FinanceService;
+6. atualizar a suíte de integração financeira para o contrato obrigatório;
+7. remover condicionais redundantes nos repositórios operacionais após o endurecimento de seus contratos.
+
+### Critério de conclusão
+
+- typecheck e testes de integração passam no CI;
+- criação e settlement deixam evidência em audit_events dentro da mesma transação;
+- uma falha na escrita do audit reverte a mutação financeira;
+- nenhuma alteração de RLS/produção é necessária para esta correção.
+
+### Gate preservado
+
+A correção não fecha DB-04/E4. A prova produtiva continua exigindo sessão real tms_app, rolbypassrls=false e testes cross-tenant autorizados sem alterar o ambiente para fabricar evidência.
