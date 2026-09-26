@@ -21,7 +21,7 @@ import { RequirePermission } from "../../common/permission.decorator.js";
 import type { RequestContext } from "../../common/request-context.js";
 import { AssignFreightDto } from "./assignment.dto.js";
 import { AssignmentService } from "./assignment.service.js";
-import { CreateFreightDto, UpdateFreightStatusDto } from "./freight.dto.js";
+import { CreateFreightDto, UpdateFreightDto, UpdateFreightStatusDto } from "./freight.dto.js";
 import { FreightService } from "./freight.service.js";
 import { MatchingService } from "./matching.service.js";
 
@@ -131,6 +131,16 @@ export class FreightController {
       expiresAt: context.oidc?.expiresAt ?? null,
       tenantId: context.tenantId,
     };
+  }
+
+  @Patch(":id")
+  @RequirePermission("freight:update")
+  update(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateFreightDto,
+  ) {
+    return this.service.update(context, id, dto);
   }
 
   @Delete(":id")
