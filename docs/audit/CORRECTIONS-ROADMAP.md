@@ -616,3 +616,8 @@ DB-04/E4 permanece BLOCKER e não é alterado por este avanço.
 ### Gate ainda bloqueado — DB-04/E4
 
 A próxima evidência operacional prioritária continua sendo a execução real sob `tms_app`, incluindo `current_user`, `rolbypassrls` e comportamento cross-tenant de SELECT/INSERT/UPDATE. O bloqueio da ferramenta Neon permanece sem alteração; nenhuma alteração de RLS/grants deve ser feita para contornar o gate.
+
+
+## Atualização — DB-06 implementado
+
+A correção do validator foi aplicada em `packages/database/scripts/migrate.ts`. O próximo passo é somente validação automatizada/operacional: executar o baseline validator e confirmar que um schema incompleto é rejeitado e o schema canônico é aceito. O gate DB-04/E4 permanece independente e aberto.
