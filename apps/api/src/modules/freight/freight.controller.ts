@@ -181,7 +181,7 @@ export class FreightController {
   }
 
   @Post(":id/status-events/:eventId/replay")
-  @RequirePermission("freight:update")
+  @RequirePermission("freight:replay")
   replayStatusChangedEvent(
     @CurrentUser() context: RequestContext,
     @Param("id", new ParseUUIDPipe()) id: string,
