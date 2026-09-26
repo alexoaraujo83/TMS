@@ -1,10 +1,10 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-09-25 23:50 -03:00
+> **Última atualização:** 2026-09-25 23:55 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
-> **HEAD atual de main:** `1fd5c97999ac93a334a85065665cfaddeaaa9463`
+> **HEAD de main verificado antes desta atualização:** `7cdf6b769624f9fed24446dc6ebe47ede4b1a827`
 > **Último HEAD funcional de aplicação explicitamente auditado:** `d304b2cdfacc6d78282648b1d5bd1243811a7b78`  
 > **HEAD de controle/documentação anterior:** `c4fcb3ba598a0218142c11911b52d7a032eb24a4`  
 > **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
@@ -37,7 +37,7 @@ A regra de evidência é:
 | ID | Área | Concreto hoje | Estado | O que fazer | Evidência de encerramento | Prioridade |
 |---|---|---|---|---|---|---|
 | REL-01 | Manifesto de release | API está no HEAD; Web/Worker podem permanecer em SHA anterior porque foram pulados como não afetados | ABERTO | Criar manifesto versionado com SHA do repositório, SHA efetivo de Web/API/Worker, head de migração e referências de configuração | Um único registro reconcilia todos os componentes de produção | P0 |
-| DB-01 | Head de migração Neon | Repositório contém até `0033_durable_job_idempotency.sql`; evidência independente de produção/main continua em 31 migrações / 0031 | BLOQUEADO | Executar verificação read-only autoritativa do `schema_migrations` e dos checksums 0032/0033 | Banco live comprova head e checksums esperados | P0 |
+| DB-01 | Head de migração Neon | Repositório contém até `0035_diagnostics_permission_and_admin_replay.sql`; evidência independente de produção/main continua pendente para o head atual | BLOQUEADO | Executar verificação read-only autoritativa do `schema_migrations` e dos checksums 0032/0033 | Banco live comprova head e checksums esperados | P0 |
 | DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
 | DB-03 | Papel de banco em runtime | Worker verifica em código que o usuário atual deve ser `tms_app`; adoção em runtime de produção ainda não foi comprovada | PARCIAL | Provar identidade do worker e grants efetivos em runtime | Worker em produção confirma papel aprovado e least privilege | P1 |
 | DB-04 | RLS comportamental | RLS/FORCE RLS e `NOBYPASSRLS` estão implementados; teste E4 cross-tenant em produção ainda não foi executado | BLOQUEADO | Executar teste controlado de leitura/escrita cross-tenant com a credencial real de runtime | Operação cross-tenant é negada em produção | P0 |
@@ -158,7 +158,7 @@ Há evidência de qualidade/integração em CI para o fluxo do worker, mas isso 
 
 ## 7. Novos achados da auditoria estrutural
 
-- **DOC-03 — Drift documental concreto:** docs/PROJECT-DOCUMENTATION.md e docs/architecture/FOUNDATION.md ainda descrevem packages/contracts, mas esse diretório não existe no repositório atual e não há pacote @tms/contracts. A documentação corrente também afirma 31 migrações como estado atual, enquanto o repositório contém 0032_observability_audit_context.sql e 0033_durable_job_idempotency.sql. docs/INTEGRATIONS-OPERATIONS.md ainda descreve Railway como destino pretendido do API, enquanto a infraestrutura observada mantém tms-core-api em Vercel. **Estado: DRIFT DOCUMENTAL / P1.**
+- **DOC-03 — Drift documental concreto:** docs/PROJECT-DOCUMENTATION.md e docs/architecture/FOUNDATION.md ainda descrevem packages/contracts, mas esse diretório não existe no repositório atual e não há pacote @tms/contracts. A documentação corrente também afirma 31 migrações como estado atual, enquanto o repositório contém 0032–0035, incluindo observabilidade/audit context, durable-job idempotency, replay permission e diagnostics permission. docs/INTEGRATIONS-OPERATIONS.md ainda descreve Railway como destino pretendido do API, enquanto a infraestrutura observada mantém tms-core-api em Vercel. **Estado: DRIFT DOCUMENTAL / P1.**
 - **CONFIG-01 — Boundary de configuração incompleta:** packages/config implementa loadConfig, mas a busca estrutural não encontrou consumidores runtime; API, Web, Worker, observability e migration script continuam lendo process.env diretamente. Isso reforça SEC-02: o pacote de configuração hoje funciona mais como biblioteca isolada/testada do que como fonte efetiva de configuração do runtime. **Estado: DÍVIDA TÉCNICA / P2.**
 - **BUILD-01 — Toolchain/runtime duplicado e parcialmente divergente:** o repositório fixa Node 24.20.0, CI usa Node 24 e o Dockerfile raiz usado pelo Railway usa Node 24.20.0; porém existe um apps/worker/Dockerfile paralelo com Node 22. O serviço Railway observado usa o Dockerfile raiz, portanto o arquivo Node 22 é uma fonte potencial de drift e deve ser classificado/limpo posteriormente. Além disso, vercel.json/apps/api/vercel.json usam --no-frozen-lockfile, reduzindo a reprodutibilidade do deploy frente ao lockfile versionado. **Estado: PRECISA REVISÃO / P1-P2.**
 - **PKG-01 — Chave JSON duplicada:** package.json contém architecture:check duas vezes. O JSON é aceito pelo parser com prevalência da última chave, mas a duplicidade é uma inconsistência de manutenção e pode mascarar alterações futuras. **Estado: DÍVIDA TÉCNICA / P2.**
@@ -1429,7 +1429,7 @@ A ferramenta Neon disponível continua sem conseguir executar SQL devido ao mism
 
 ## 19. Reconciliação corrente — 2026-09-25
 
-- **HEAD de main corrigido:** o tracker agora distingue o HEAD atual `1fd5c97999ac93a334a85065665cfaddeaaa9463` (documentação/controle) do último HEAD funcional explicitamente auditado `d304b2cdfacc6d78282648b1d5bd1243811a7b78`.
+- **HEAD de main corrigido:** o tracker registra o último HEAD de main verificado antes desta atualização (`7cdf6b769624f9fed24446dc6ebe47ede4b1a827`) e distingue-o do último HEAD funcional explicitamente auditado `d304b2cdfacc6d78282648b1d5bd1243811a7b78`.
 - **Frontend Auth0 — finding histórico reconciliado:** o ledger histórico `EVIDENCE-LEDGER-2026-09-16.md` contém o EV-030 dizendo que o Web não possuía Auth0. Essa afirmação não deve ser usada como estado corrente. No código atual existem `@auth0/nextjs-auth0` em `apps/web/package.json`, `apps/web/src/lib/auth0.ts` e `apps/web/src/app/api/tms/auth-runtime/route.ts`, que usa `createFetcher`/token autenticado para chamar a API. Isso comprova implementação estrutural, mas **não** prova E4 Auth0 em produção.
 - **DB-04 permanece P0/BLOCKER:** a role `tms_app` e seu atributo `NOBYPASSRLS` foram observados, mas ainda falta a sessão real com os seis testes comportamentais de isolamento.
 - **CI/Vercel:** o status atual conhecido continua com Railway worker/backup-worker em SUCCESS e Vercel API/Web em `build-rate-limit`; portanto não declarar build funcional de Vercel do HEAD atual.
