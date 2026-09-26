@@ -1434,3 +1434,16 @@ A ferramenta Neon disponível continua sem conseguir executar SQL devido ao mism
 - **DB-04 permanece P0/BLOCKER:** a role `tms_app` e seu atributo `NOBYPASSRLS` foram observados, mas ainda falta a sessão real com os seis testes comportamentais de isolamento.
 - **CI/Vercel:** o status atual conhecido continua com Railway worker/backup-worker em SUCCESS e Vercel API/Web em `build-rate-limit`; portanto não declarar build funcional de Vercel do HEAD atual.
 - **Regra para o próximo ciclo:** não reabrir EV-030 como finding de ausência de implementação; tratá-lo como evidência histórica datada e executar E4 Web → Auth0 → API → DB quando houver token/ambiente operacional disponível.
+
+## 2026-09-26 — API-04: suíte dedicada de replay adicionada e CI verde
+
+- Adicionado `apps/api/test/freight-replay.service.test.ts` cobrindo:
+  - replay válido com criação de `durable_jobs` + `audit_events` na mesma transação;
+  - rejeição de evento cujo `aggregate_id` não corresponde ao freight solicitado;
+  - rejeição de payload com identificadores inconsistentes;
+  - semântica atual de chamadas repetidas, comprovando que cada replay manual recebe uma chave distinta.
+- CI do novo HEAD `478e2a3e9247a331dc9a31ee172a06f7366daa6d`, run #1247 / `36216015744`, terminou `success`.
+- No mesmo run passaram migration, RLS, IAM, integrações do worker, format, lint, typecheck, test e build.
+- **API-04:** avançou de ABERTO para **TESTES DIRECIONADOS IMPLEMENTADOS / CI COMPROVADO**. A prova HTTP E4 de 403/200 e isolamento tenant permanece pendente.
+- **API-03:** a suíte formaliza a semântica atualmente implementada: replay manual repetido é deliberadamente distinto por solicitação; permanece necessária a decisão operacional/documental sobre controles adicionais (motivo, rate/approval quando aplicável).
+- **CI-01:** a evidência anterior foi atualizada: o run #1247 é a execução verde relevante para este avanço funcional.
