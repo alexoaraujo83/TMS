@@ -883,3 +883,17 @@ A run #1258 (36240846312) foi cancelada por substituição do commit e não repr
 ### Regra preservada
 
 Nenhuma alteração de RLS, grants, roles, credenciais ou configuração de produção deve ser feita para fabricar evidência. A autorização do operador cobre somente o teste controlado e a documentação de seus resultados.
+
+
+## 2026-09-26 — Webhook endpoint contract reconciliado
+
+A auditoria cruzada confirmou que o repositório não implementa um receiver HTTP externo de negócio para os eventos do outbox. `OUTBOX_WEBHOOK_URLS` é uma configuração fornecida pelo consumidor; não existe uma URL TMS/API a ser inferida como destino.
+
+### Regra operacional
+
+- manter `OUTBOX_WEBHOOK_URLS` ausente/vazia quando não houver integração externa ativa;
+- não apontar para `/health` ou `/ready`;
+- `OUTBOX_WEBHOOK_SECRET` é condicionalmente obrigatório: qualquer endpoint configurado exige segredo não vazio e assinatura HMAC;
+- ao ativar uma integração, registrar receiver, ownership e contrato antes de configurar produção.
+
+**Nenhuma variável de produção foi alterada nesta etapa.**
