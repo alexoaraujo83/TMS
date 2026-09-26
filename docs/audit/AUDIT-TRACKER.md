@@ -1979,3 +1979,215 @@ Também foi confirmado que o `run_sql` disponível no conector não oferece par�
 Executar `docs/audit/DB-04-E4-RUNBOOK.md` em um terminal/cliente PostgreSQL capaz de abrir a sessão real do runtime `tms_app`, registrando somente resultados não sensíveis. Em paralelo, obter o Project ID por caminho autorizado se for necessário para auditorias read-only adicionais no Neon.
 
 A sequência de promoção permanece: **DB-04 E4 + AUTH-01 live → token real → Web/API E2E → tenant/RBAC → RLS → manifesto/gates**.
+
+
+## 62. FASE 2 — 2026-09-26 — AUTH-01: first-login Auth0 identity provisioning correction
+
+### Problema confirmado
+
+O fluxo atual permitia criar/autenticar um usuário no Auth0 sem garantir a criação/associação correspondente em TMS/PostgreSQL. O runtime então encontrava um JWT válido, mas check_tenant_membership(sub, tenant) não encontrava o usuário/membership local.
+
+### Correção versionada
+
+PR #94 — fix/auth0-user-provisioning-2026-09-26 foi criado com a seguinte cadeia:
+
+1. migration 0036_auth0_identity_bootstrap.sql cria public.bootstrap_auth0_identity(text,text,text,uuid) como SECURITY DEFINER, com search_path fixo;
+2. a função é idempotente e vincula users.auth0_subject;
+3. conflito de e-mail com outro Auth0 subject é rejeitado;
+4. se a identidade local não possuir memberships, o primeiro tenant válido pode receber a membership operator;
+5. identidades que já possuem membership não recebem uma segunda membership automaticamente;
+6. @tms/database expõe o bootstrap;
+7. AuthGuard executa o bootstrap apenas depois de validar assinatura/issuer/audience e exigir o tenant claim;
+8. o membership é consultado novamente depois do bootstrap;
+9. o Action Auth0 passa a emitir também claims namespaced de e-mail e display name para permitir o bootstrap da identidade local;
+10. foram adicionados testes de segurança cobrindo o primeiro login.
+
+### Segurança
+
+A correção não altera RLS, não concede BYPASSRLS, não usa neondb_owner no runtime e não aceita tenant_id vindo de parâmetro não confiável do navegador. A associação inicial depende do tenant claim emitido pelo fluxo Auth0 e, depois do bootstrap, a autorização continua sendo resolvida pelo PostgreSQL/TMS.
+
+### Estado de validação
+
+- PR #94: OPEN, mergeable.
+- Vercel checks no HEAD: falharam por build-rate-limit no conector Vercel, não por erro de aplicação identificado. O status observado foi failure para Vercel – tms-web e Vercel – tms-core-api, ambos apontando para a limitação de build da conta.
+- CI GitHub: ainda sem workflow run associado ao HEAD no momento da verificação.
+- Auth0 Production: Action/binding ainda precisam ser publicados/reconciliados no tenant live.
+- Neon Production: migration 0036 ainda não foi aplicada; nenhuma mutação live foi executada por esta conexão.
+
+### Gate
+
+AUTH-01 continua P0/E4 PENDENTE, mas a lacuna de implementação Auth0 user → TMS users/membership agora possui correção versionada e testável. O fechamento exige: migration aplicada, Action publicada/binding reconciliado, novo login, primeiro request autenticado, prova de users.auth0_subject, tenant_memberships, idempotência no segundo request e operação tenant-scoped com RLS.
+
+### Próxima ação
+
+Resolver o build-rate-limit/executar CI, revisar o PR #94, aplicar a migration em Production pelo pipeline autorizado e reconciliar a Action Auth0 Production. Somente depois executar o E2E com um usuário Auth0 novo.
+
+
+## 63. FASE 2 — 2026-09-26 — AUTH-01: correção pós-CI do bootstrap de identidade
+
+### Falha encontrada no CI
+
+O CI 1274 executou a suíte completa até `pnpm test` e encontrou 2 falhas em `@tms/api`:
+
+- `rejects a forged tenant without membership`: o bootstrap era chamado quando não havia membership e transformava a ausência de membership em uma tentativa de provisionamento;
+- `bootstraps a first-time Auth0 identity before membership lookup`: o mock não modelava a sequência real lookup → bootstrap → lookup.
+
+### Correção aplicada
+
+1. `0036_auth0_identity_bootstrap.sql` agora distingue identidade local já existente de identidade realmente nova;
+2. uma identidade local existente sem membership **não** recebe uma nova membership apenas por fazer login com um tenant claim;
+3. somente uma identidade local genuinamente nova pode receber a primeira membership durante o bootstrap;
+4. se o tenant não tiver o role `operator` configurado, o bootstrap falha explicitamente em vez de criar uma membership sem role;
+5. EXECUTE da função SECURITY DEFINER foi concedido explicitamente a `tms_app`, corrigindo o risco de `GRANT ... TO current_user` depender do papel executor da migration;
+6. o teste de segurança agora preserva a negação de tenant sem membership e o teste de first-login modela as três consultas esperadas.
+
+### Fundamentação de segurança
+
+A função continua com `SECURITY DEFINER` e `search_path` fixo. PostgreSQL documenta que funções SECURITY DEFINER executam com os privilégios do owner e que o EXECUTE deve ser revogado de PUBLIC e concedido seletivamente; por isso o grant explícito para o role de runtime é necessário. citeturn0search0
+
+### Estado
+
+- PR #94 continua OPEN.
+- O último CI observado foi failure por 2 testes de regressão do próprio PR; portanto o gate não é mais tratado como bloqueio externo apenas.
+- Correção já versionada na branch; novo workflow ainda não apareceu para o último push no momento desta atualização.
+- Vercel continua bloqueado pelo limite de deployments da conta.
+- Neon Production e Auth0 Production continuam sem mutação por esta conexão.
+
+### Gate
+
+AUTH-01 permanece P0/E4 PENDENTE. Não aprovar/mergear enquanto o novo CI não comprovar a correção e enquanto migration + Action/binding não estiverem prontos para promoção controlada.
+
+## 64. FASE 2 — 2026-09-26 — AUTH-01: CI 1276 verde e gate Vercel separado
+
+### Evidência atualizada
+
+- HEAD da PR #94: `4c72cf582f75400ad71bd93e90c0bfd22d4917ac`.
+- GitHub Actions CI #1276: **SUCCESS**.
+- Job `quality`: **SUCCESS**; passou por migration CI, provisionamento/validação do runtime role, RLS runtime, IAM resolver, Durable Jobs/outbox, testes, typecheck e build.
+- O CI verde confirma que as duas regressões identificadas no CI 1274 foram corrigidas.
+- Railway `tms-worker` no ambiente de PR: **SUCCESS**.
+- Vercel `tms-web` e `tms-core-api`: continuam **FAILURE por limite de deployments da conta** (`api-deployments-free-per-day`), sem evidência no check atual de falha de código.
+- PR #94 permanece **OPEN / mergeable**.
+
+### Decisão de gate
+
+O gate de CI do código está **VERDE**. O bloqueio restante é operacional: validação/deploy Vercel ainda não pode ser obtida pelo check automático enquanto a conta estiver no limite de deployments.
+
+Ainda não promover para Production. Antes da promoção controlada permanecem obrigatórios:
+
+1. confirmar a disponibilidade de um deploy/preview Vercel válido para Web/API;
+2. revisar a migration 0036 para as restrições e comportamento concorrente de `users.auth0_subject`, `users.email` e `tenant_memberships`;
+3. aplicar migration 0036 somente pelo pipeline autorizado;
+4. publicar/reconciliar a Action Auth0 e o binding de Post-Login no tenant Production;
+5. executar E2E com usuário Auth0 novo, provando `users`, `tenant_memberships`, idempotência e tenant scoping;
+6. manter DB-04 E4 separado: CI verde não substitui uma sessão real de Production como `tms_app`.
+
+### Próxima ação
+
+Revisar constraints/concorrência da migration 0036 e, em seguida, revalidar o PR contra os gates de deploy. Não mergear nem mutar Auth0/Neon Production nesta etapa.
+
+
+## 65. FASE 2 — 2026-09-26 — AUTH-01: CI 1278 encontrou ambiguidade PL/pgSQL e correção aplicada
+
+### Falha reproduzida
+
+- CI GitHub #1278 executou migration, provisionamento do runtime role e RLS runtime com sucesso.
+- O job quality falhou exclusivamente em `packages/database/test/iam-runtime.integration.test.ts`.
+- A função `public.bootstrap_auth0_identity(...)` falhou no `ON CONFLICT (tenant_id, user_id)` com PostgreSQL `42702`: `tenant_id` ficou ambíguo entre a coluna de `tenant_memberships` e a variável de saída `tenant_id` implícita pelo `RETURNS TABLE`.
+- O restante do teste confirmou que o runtime role continua `NOBYPASSRLS` e com `EXECUTE` controlado.
+
+### Correção
+
+`0036_auth0_identity_bootstrap.sql` foi corrigida para `ON CONFLICT DO NOTHING`, removendo a referência ambígua sem alterar a unicidade/PK usada pelo banco. A unicidade de `(tenant_id, user_id)` continua sendo garantida pelo constraint existente; conflitos concorrentes são tratados pelo próprio PostgreSQL.
+
+### Gate atual
+
+- PR #94 continua OPEN / mergeable.
+- CI #1278: FAILURE, corrigido na branch após análise do log.
+- O commit da correção ainda não possui CI posterior verde; portanto AUTH-01 permanece pendente.
+- Vercel permanece bloqueado pelo limite de deployments da conta.
+- Auth0 Production e Neon Production permanecem sem mutações nesta etapa.
+
+### Próxima ação
+
+Executar/aguardar o próximo CI do HEAD corrigido e revisar todos os jobs. Se verde, atualizar o gate de AUTH-01; depois manter a sequência de promoção controlada (Vercel, migration Production autorizada, Action/binding Auth0, E2E). DB-04 E4 continua independente.
+
+
+## 66. FASE 2 — 2026-09-26 — AUTH-01: correção SQL reaplicada e verificada no HEAD
+
+### Rechecagem
+- A revisão do HEAD da PR #94 mostrou que a referência ambígua ainda estava presente em `0036_auth0_identity_bootstrap.sql`, apesar do registro anterior da seção 65 indicar que ela já havia sido corrigida.
+- A inconsistência documental/código foi corrigida agora no próprio branch.
+- O INSERT de `tenant_memberships` passou de `ON CONFLICT (tenant_id, user_id) DO NOTHING` para `ON CONFLICT DO NOTHING`.
+- Commit da correção efetivamente aplicada: `b34fca7602df2234ff85ac129800de5c47086039`.
+
+### Estado de validação
+- A alteração agora está presente no arquivo do HEAD do branch.
+- Ainda não existe workflow GitHub associado ao HEAD após esta correção; portanto não há evidência de CI verde para este commit.
+- O preview Vercel do `tms-core-api` foi observado como **READY** e o endpoint `/ready` respondeu HTTP 200 com `status=ready`; isso valida disponibilidade básica do deployment, não o fluxo Auth0/JIT completo.
+- Os checks Vercel do PR continuam registrados como falha por `api-deployments-free-per-day`; o deployment READY é uma evidência separada de um preview disponível.
+- Railway `tms-worker` permanece SUCCESS no ambiente do PR.
+- Auth0 Production e Neon Production continuam sem mutações.
+
+### Gate
+AUTH-01 continua **P0 / E4 PENDENTE**. Não mergear nem aplicar migration 0036 em Production até o novo CI validar o HEAD corrigido e os gates de Auth0/DB-04 permanecerem atendidos.
+
+### Próxima ação
+Executar o pipeline CI sobre o novo HEAD (ou aguardar o disparo automático correspondente), revisar todos os jobs e, se verde, avançar para a revisão final do PR e dos gates de promoção.
+
+## 67. FASE 2 — 2026-09-26 — AUTH-01: CI 1281 verde no HEAD corrigido
+
+### Evidência
+- HEAD validado: `17cae7d3841b7f106770276e875d070bc7f8f8f1`.
+- GitHub Actions CI #1281: **SUCCESS**.
+- Job `quality`: **SUCCESS**.
+- Migration CI: SUCCESS.
+- Provisionamento e validação do runtime role: SUCCESS.
+- Validação RLS com role sem bypass: SUCCESS.
+- IAM runtime resolver: SUCCESS.
+- Durable Jobs/outbox e integração `freight.status_changed → durable job`: SUCCESS.
+- Replay/cross-tenant runtime evidence: SUCCESS.
+- Format, lint, typecheck, testes e build: SUCCESS.
+
+### Deploys
+- Railway PR environment: `tms-worker` **SUCCESS**.
+- `tms-backup-worker`: SKIPPED, coerente com serviço não afetado pela PR.
+- Vercel `tms-core-api`: deployment Preview **READY**.
+- Vercel `tms-web`: continua bloqueado por `api-deployments-free-per-day`; não há evidência de falha funcional do código Web neste check.
+
+### Estado do gate
+O gate de qualidade da PR #94 está **VERDE** no HEAD atual. Isso encerra a falha de CI 1278 como corrigida.
+
+AUTH-01, entretanto, permanece **P0 / E4 PENDENTE**, porque CI não prova:
+1. migration 0036 aplicada em Neon Production;
+2. Action Auth0 publicada e binding correto no Post-Login Flow Production;
+3. token Auth0 real contendo os claims esperados;
+4. primeiro login criando `users` + `tenant_memberships` em Production;
+5. operação tenant-scoped completa;
+6. DB-04 E4 com sessão real `tms_app`.
+
+### Decisão
+Não executar merge, migration Production ou mutação Auth0 automaticamente nesta etapa. O próximo avanço é a revisão final do PR e a preparação dos gates de promoção autorizada.
+
+
+## 68. FASE 2 — 2026-09-26 — AUTH-01: revisão final do PR #94
+
+### Revisão realizada
+- PR #94 permanece OPEN, mergeable e sem reviews/threads pendentes no GitHub.
+- Os 10 arquivos alterados foram rechecados, com foco em AuthGuard, claims, Action Auth0, migration 0036 e integração do runtime role.
+- CI #1281 permanece a evidência verde do HEAD validado.
+- Vercel agora registra previews READY para `tms-core-api` e `tms-web`; os failures anteriores por `api-deployments-free-per-day` continuam no histórico e não constituem evidência de falha funcional do código.
+- Railway `tms-worker` no ambiente da PR permanece SUCCESS.
+
+### Achados de segurança
+- A cadeia de autorização continua correta: JWT assinado → issuer/audience → tenant claim → membership PostgreSQL → contexto da requisição.
+- `x-tenant-id` não ganha autoridade própria: quando presente, deve coincidir exatamente com o tenant claim.
+- A função 0036 mantém `SECURITY DEFINER`, `search_path` fixo, `REVOKE ALL FROM PUBLIC` e `GRANT EXECUTE TO tms_app`.
+- Identidade local já existente não recebe uma segunda membership apenas por login; email vinculado a outro Auth0 subject é rejeitado.
+- Não foi encontrado no diff um bypass de RLS, uso de owner runtime, segredo ou tenant hardcoded.
+
+### Cobertura ainda recomendada
+Os testes atuais provam first-login, idempotência e bloqueio de identidade local sem membership, mas a suíte de integração ainda pode ser fortalecida com casos explícitos de: identidade já membro de outro tenant e colisão de e-mail entre subjects. Isso é reforço de cobertura, não evidência de defeito funcional no HEAD atual.
+
+### Gate
+AUTH-01 permanece **P0 / E4 PENDENTE**. O código está com gate CI verde, mas o fechamento operacional exige migration 0036 em Production, Action/binding Auth0 Production, token real, first-login real, operação tenant-scoped e DB-04 E4 com sessão real `tms_app`. Nenhuma mutação Production foi executada nesta revisão.

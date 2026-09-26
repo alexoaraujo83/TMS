@@ -3,10 +3,14 @@ import type { TenantContext } from "@tms/tenancy";
 
 export const TMS_AUTH_CLAIMS_NAMESPACE = "https://tms-platform.io/claims";
 export const TMS_TENANT_ID_CLAIM = `${TMS_AUTH_CLAIMS_NAMESPACE}/tenant_id`;
+export const TMS_EMAIL_CLAIM = `${TMS_AUTH_CLAIMS_NAMESPACE}/email`;
+export const TMS_DISPLAY_NAME_CLAIM = `${TMS_AUTH_CLAIMS_NAMESPACE}/display_name`;
 
 export interface AuthClaims {
   sub: string;
   tenantId?: string;
+  email?: string;
+  name?: string;
   issuer: string;
   audience: string | string[];
   expiresAt?: number;
@@ -26,10 +30,20 @@ function normalizeIssuer(issuer: string): string {
   return issuer.replace(/\/+$/, "");
 }
 
+function extractStringClaim(
+  payload: Record<string, unknown>,
+  names: readonly string[],
+): string | undefined {
+  for (const name of names) {
+    if (typeof payload[name] === "string" && payload[name].trim().length > 0) {
+      return payload[name].trim();
+    }
+  }
+  return undefined;
+}
+
 function extractTenantId(payload: Record<string, unknown>): string | undefined {
-  return typeof payload[TMS_TENANT_ID_CLAIM] === "string"
-    ? payload[TMS_TENANT_ID_CLAIM]
-    : undefined;
+  return extractStringClaim(payload, [TMS_TENANT_ID_CLAIM]);
 }
 
 export async function verifyAccessToken(
@@ -60,6 +74,8 @@ export async function verifyAccessToken(
   return {
     sub: payload.sub,
     tenantId: extractTenantId(payload),
+    email: extractStringClaim(payload, ["email", TMS_EMAIL_CLAIM]),
+    name: extractStringClaim(payload, ["name", TMS_DISPLAY_NAME_CLAIM]),
     issuer: typeof payload.iss === "string" ? payload.iss : issuer,
     audience: payload.aud ?? config.audience,
     expiresAt: payload.exp,
