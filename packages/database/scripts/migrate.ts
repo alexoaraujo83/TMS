@@ -120,8 +120,20 @@ const requiredColumns: Record<string, string[]> = {
     "attempts",
     "max_attempts",
     "lease_token",
+    "idempotency_key",
   ],
-  audit_events: ["id", "tenant_id", "actor_user_id", "action", "created_at"],
+  audit_events: [
+    "id",
+    "tenant_id",
+    "actor_user_id",
+    "actor_subject",
+    "action",
+    "created_at",
+    "correlation_id",
+    "ip_address",
+    "user_agent",
+    "outcome",
+  ],
 };
 
 const client = new Client({ connectionString: databaseUrl });
@@ -254,6 +266,49 @@ async function validateExistingSchema(): Promise<void> {
   if (missingPrimaryKeys.length > 0) {
     throw new Error(
       `Existing schema baseline rejected: missing primary keys: ${missingPrimaryKeys.join(", ")}`,
+    );
+  }
+
+  const requiredConstraints = await client.query<{ constraint_name: string }>(
+    `select constraint_name
+       from information_schema.table_constraints
+      where constraint_schema = 'public'
+        and constraint_type = 'FOREIGN KEY'
+        and constraint_name = any($1::text[])`,
+    [[
+      "compliance_checks_assignment_fk",
+      "gr_requests_assignment_fk",
+      "financial_entries_assignment_fk",
+      "financial_entries_trip_fk",
+    ]],
+  );
+  const foundConstraints = new Set(requiredConstraints.rows.map((row) => row.constraint_name));
+  const requiredConstraintNames = [
+    "compliance_checks_assignment_fk",
+    "gr_requests_assignment_fk",
+    "financial_entries_assignment_fk",
+    "financial_entries_trip_fk",
+  ];
+  const missingConstraints = requiredConstraintNames.filter((name) => !foundConstraints.has(name));
+  if (missingConstraints.length > 0) {
+    throw new Error(
+      `Existing schema baseline rejected: missing tenant-scoped relationship constraints: ${missingConstraints.join(", ")}`,
+    );
+  }
+
+  const requiredIndexes = await client.query<{ indexname: string }>(
+    `select indexname
+       from pg_indexes
+      where schemaname = 'public'
+        and indexname = any($1::text[])`,
+    [[ "durable_jobs_idempotency_idx", "users_auth0_subject_uidx" ]],
+  );
+  const foundIndexes = new Set(requiredIndexes.rows.map((row) => row.indexname));
+  const requiredIndexNames = ["durable_jobs_idempotency_idx", "users_auth0_subject_uidx"];
+  const missingIndexes = requiredIndexNames.filter((name) => !foundIndexes.has(name));
+  if (missingIndexes.length > 0) {
+    throw new Error(
+      `Existing schema baseline rejected: missing critical indexes: ${missingIndexes.join(", ")}`,
     );
   }
 
