@@ -1509,3 +1509,39 @@ A sequência operacional continua:
 **DB-04 → AUTH-01 → SEC-01 → REL-01 → WORK/BAK/DR P1 → P2 de refatoração.**
 
 Nenhuma alteração de RLS, grants, credencial, Auth0, migration de produção ou dado foi executada nesta sequência.
+
+
+## 50. FASE 2 — 2026-09-26 — DB-04: autorização explícita para execução da prova comportamental
+
+O operador **autorizou explicitamente nesta sequência** a execução da prova controlada de DB-04, incluindo os testes comportamentais necessários, desde que sejam usados apenas dados controlados e que nenhuma alteração permanente seja deixada no banco.
+
+### Observação obrigatória
+
+A autorização **não** permite fabricar evidência alterando RLS, grants, roles ou configuração de produção. A prova deve usar o caminho real de conexão de `tms_app` e preservar o estado do banco.
+
+Critérios de fechamento continuam sendo:
+
+1. sessão efetiva com `current_user = tms_app`;
+2. `rolbypassrls = false`;
+3. tenant A acessa seus próprios registros;
+4. tenant A não observa registros de tenant B;
+5. tentativa controlada de INSERT cross-tenant é rejeitada;
+6. tentativa controlada de UPDATE cross-tenant é rejeitada;
+7. qualquer mutação de teste deve terminar sem alteração persistente;
+8. nenhum segredo/credencial deve ser registrado na documentação.
+
+### Evidência live já disponível
+
+A verificação read-only de 2026-09-26 já confirmou estruturalmente:
+
+- `tms_app` com `rolsuper=false`, `rolbypassrls=false`, `rolcanlogin=true`;
+- RLS habilitado e forçado nas 19 tabelas tenant-scoped inspecionadas;
+- policies tenant-scoped vinculadas a `current_setting('app.tenant_id', true)`.
+
+Isso **não fecha DB-04** porque ainda falta a sessão comportamental real. Uma tentativa de `SET ROLE tms_app` via conector Neon foi rejeitada por PostgreSQL.
+
+### Próxima execução
+
+Priorizar a obtenção de uma sessão autenticada diretamente como `tms_app` pelo caminho de runtime existente, sem reutilizar `neondb_owner` como substituto. Se o ambiente conectado não expuser esse caminho autenticado, registrar o bloqueio e avançar apenas para o próximo finding que possa ser comprovado sem inferência.
+
+**Estado: DB-04 = BLOQUEADO / E4 PENDENTE, com execução explicitamente autorizada pelo operador.**
