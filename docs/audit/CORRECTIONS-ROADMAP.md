@@ -554,7 +554,7 @@ A auditoria continua sem mutation de produção.
 
 ## 2026-09-25 — REPO-04: hardening das mutações financeiras
 
-**Status:** P1 — correção estrutural aplicada; CI/E4 ainda pendentes.
+**Status:** P1 — correção estrutural aplicada; CI/regressão ainda pendentes. FinanceRepository.create() e settle() já exigem AuditInput e persistem audit_events na mesma transação; não reabrir esta correção.
 
 ### Alteração
 
