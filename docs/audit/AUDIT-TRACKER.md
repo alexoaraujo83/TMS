@@ -1885,3 +1885,38 @@ Também foi avaliada a referência do Vercel Connect SDK. O SDK de Connect não 
 - **AUTH-01:** P0 / BLOQUEADO / E4 PENDENTE.
 
 Nenhuma alteração de Production foi realizada nesta etapa.
+
+## 61. FASE 2 — 2026-09-26 — Vercel/Auth0: nova verificação do estado efetivo
+
+### Evidência nova
+
+A verificação do projeto Vercel `tms-web` confirmou novamente que existem deployments READY do branch `fix/auth0-production-tenant-contract-2026-09-26`, incluindo o deployment mais recente associado ao commit de controle/documentação `1e6bb120cce9f52d03e109ddd88bb343b6faaea9`. Também permanecem deployments READY anteriores do mesmo branch que contêm diretamente a correção funcional do Auth0 SDK em `29ba3b8b34f17fbd82ebb3208c2afe1f8d5f1aab`.
+
+O deployment atualmente identificado como **Production** continua no branch `main`, commit `08b69301b6d020b6049d0bb395628e8616946da8`. Portanto, a correção do SDK continua sem prova de promoção para Production.
+
+### Runtime Production
+
+Nova consulta aos logs do Web Production encontrou múltiplos `GET /auth/callback 500` no deployment de Production `dpl_A9mP3zZW6a51oAoSyARxywgsbBFc`, inclusive ocorrências às 15:51, 16:00, 16:01 e 16:26 (-03).
+
+A agregação de Runtime Errors das últimas 24h não retornou clusters. Isso não invalida os logs brutos: são superfícies de observabilidade diferentes. Os logs também não expõem `error_description`, portanto não se deve atribuir cada 500 especificamente a `missing_tenant_id` sem evidência adicional.
+
+### Limitação de build-log
+
+A ação de build-log exposta pelo conector Vercel nesta sessão retornou que o recurso não está disponível no servidor conectado. Assim, não será registrado um falso “build log verificado”. O estado `READY` do deployment continua sendo a evidência disponível de conclusão do deployment.
+
+### Auth0
+
+A busca adicional no repositório não encontrou workflow GitHub versionado que faça `auth0-deploy-cli import` automaticamente. A configuração Auth0 permanece manual/documentada. Não há ferramenta Auth0 Management/CLI live disponível nesta conexão para identificar ou corrigir a Action/binding efetivamente ativo no tenant Production.
+
+### Estado
+
+- **AUTH-01:** P0 / BLOQUEADO / E4 PENDENTE.
+- **DB-04:** P0 / BLOQUEADO / E4 PENDENTE.
+- **Web SDK:** correção versionada e validada em Preview.
+- **Vercel Production:** ainda no `main`; não promover automaticamente enquanto o Auth0 Production não estiver reconciliado.
+- **Auth0 Production:** drift/configuração live ainda não reconciliado.
+- **Nenhuma alteração de Production foi executada nesta etapa.**
+
+### Próxima ação
+
+Obter/reconciliar a configuração live do Auth0 Production por caminho autorizado (Action publicada, binding do Post-Login Flow, usuário de teste com `app_metadata.tenant_id`, audience/client) e, somente após essa prova, promover o commit Web corrigido para Production e executar o E2E completo.
