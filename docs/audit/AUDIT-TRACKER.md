@@ -1610,3 +1610,26 @@ O bloqueio agora está mais precisamente delimitado: não é mais falta de ident
 ### Próxima ação
 
 Obter uma sessão direta como `tms_app` pelo runtime real (worker/API ou cliente PostgreSQL operacional autorizado) e executar a matriz da seção 50. Nenhuma alteração de RLS, grants, role ou configuração deve ser feita para contornar este bloqueio.
+
+
+## 54. FASE 2 — 2026-09-26 — Worker production: caminho real `tms_app` confirmado no código e contrato de serviço
+
+### Evidência operacional
+
+A configuração do serviço Railway de produção `tms-worker` usa o repositório `alexoaraujo83/TMS`, branch `main`, e inicia `node apps/worker/dist/main.js`. O contrato de variáveis efetivamente declarado no serviço inclui `DATABASE_URL`, `OUTBOX_TENANT_IDS`, `DURABLE_JOBS_ENABLED` e os parâmetros de polling/batch/timeout; não há `OUTBOX_WEBHOOK_URLS` nem `OUTBOX_WEBHOOK_SECRET` configurados no serviço.
+
+No código do worker, a inicialização cria o `pg.Pool` a partir de `DATABASE_URL` e executa imediatamente `select current_user`. Se o resultado não for exatamente `tms_app`, o processo falha com `DATABASE_RUNTIME_ROLE_INVALID`. Quando a verificação passa, o worker registra o evento operacional `database.runtime_role_verified` com o papel `tms_app`.
+
+### Interpretação
+
+Isso fecha o **caminho de runtime previsto para DB-04**: o worker não aceita silenciosamente uma role privilegiada diferente. A configuração de produção também permanece coerente com a decisão anterior de não configurar webhook sem receiver externo.
+
+### Limite E4
+
+Ainda não foi obtido nesta integração um log histórico que mostre o evento `database.runtime_role_verified` do deployment produtivo, e não foi aberta uma sessão SQL interativa diretamente como `tms_app`. Portanto, **DB-04 continua BLOQUEADO / E4 PENDENTE**.
+
+A evidência nova reduz o bloqueio: o caminho de runtime e a proteção contra uso de role incorreta estão comprovados no código/configuração; falta a execução observável da matriz cross-tenant na sessão real.
+
+### Próxima ação
+
+Priorizar uma execução controlada no próprio caminho do worker que capture, sem segredos, `current_user`, `rolbypassrls` e os resultados de SELECT/INSERT/UPDATE cross-tenant, com rollback integral. Não alterar RLS/grants/roles para viabilizar o teste.
