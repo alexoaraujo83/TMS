@@ -1373,3 +1373,21 @@ A correção reduz o privilégio efetivo, mas ainda exige teste negativo/positiv
 **API-03 permanece separado:** a semântica de repetição do replay continua deliberadamente não decidida. A chave atual usa UUID por solicitação, portanto duas chamadas explícitas continuam sendo duas intenções de replay.
 
 **CI:** a correção deve ser validada em novo run do HEAD atual; os status Vercel observados anteriormente por `build-rate-limit` não são evidência de falha funcional.
+
+
+## 2026-09-25 — API-11/API-06: isolamento da superfície de diagnóstico
+
+A revisão do controller confirmou que os quatro endpoints de diagnóstico (`runtime-context`, `runtime-db-context`, `runtime-rls-isolation`, `runtime-auth-claims`) estavam compartilhando `freight:read`, misturando leitura funcional com observabilidade operacional.
+
+Correção aplicada:
+- criada a permissão dedicada `ops:diagnostics` em `0035_diagnostics_permission_and_admin_replay.sql`;
+- os quatro endpoints passaram a exigir `ops:diagnostics`;
+- `operator` não recebe essa permissão no bootstrap operacional;
+- a mesma migration concede explicitamente `ops:diagnostics` e `freight:replay` aos papéis tenant `admin`, corrigindo também a dependência implícita detectada na migration 0034 (novas permissões não são herdadas retroativamente pelo admin).
+- o teste IAM foi ampliado para provar que `operator` não possui `freight:replay` nem `ops:diagnostics`.
+
+**Estado:** CORREÇÃO DE CÓDIGO APLICADA / E4 PENDENTE.
+
+A exposição de diagnóstico fica separada da autorização de negócio. Continua necessária validação HTTP real: operador sem `ops:diagnostics` → 403; administrador autorizado → 200; tenant e contexto OIDC continuam limitados ao próprio contexto.
+
+A revisão também reconciliou `docs/DATABASE.md` para as migrations 0001–0035, eliminando a referência obsoleta a 31 migrations.
