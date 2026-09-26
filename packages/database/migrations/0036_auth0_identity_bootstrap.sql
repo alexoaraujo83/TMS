@@ -2,8 +2,9 @@
 --
 -- Auth0 remains the identity provider, while TMS/PostgreSQL remains
 -- authoritative for the local user and tenant membership. The function is
--- deliberately idempotent and only creates a first membership when the local
--- identity has no existing tenant memberships.
+-- deliberately idempotent. Only a genuinely new local identity receives
+-- the first tenant membership; an existing local identity without membership
+-- remains unauthorized until an explicit TMS onboarding flow grants one.
 
 create or replace function public.bootstrap_auth0_identity(
   p_auth0_subject text,
@@ -23,6 +24,7 @@ as $$
 declare
   v_user_id uuid;
   v_existing_subject text;
+  v_existing_user boolean := false;
   v_membership_count integer;
   v_role_id uuid;
   v_linked_tenant uuid;
@@ -66,6 +68,8 @@ begin
     values (trim(p_auth0_subject), trim(p_email), trim(p_display_name), 'active')
     returning id into v_user_id;
   else
+    v_existing_user := true;
+
     update users
        set auth0_subject = trim(p_auth0_subject),
            email = trim(p_email),
@@ -89,13 +93,21 @@ begin
         using errcode = '23503';
     end if;
 
-    if v_membership_count = 0 then
+    -- Never turn an already-known local identity into a new tenant member
+    -- merely because an Auth0 token carries a tenant claim. Explicit TMS
+    -- onboarding remains the authority for existing identities.
+    if not v_existing_user and v_membership_count = 0 then
       select r.id
         into v_role_id
         from roles r
        where r.tenant_id = p_tenant_id
          and r.name = 'operator'
        limit 1;
+
+      if v_role_id is null then
+        raise exception 'operator role is not configured for tenant'
+          using errcode = '23503';
+      end if;
 
       insert into tenant_memberships (tenant_id, user_id, role, role_id)
       values (p_tenant_id, v_user_id, 'operator', v_role_id)
@@ -117,7 +129,7 @@ end;
 $$;
 
 revoke all on function public.bootstrap_auth0_identity(text, text, text, uuid) from public;
-grant execute on function public.bootstrap_auth0_identity(text, text, text, uuid) to current_user;
+grant execute on function public.bootstrap_auth0_identity(text, text, text, uuid) to tms_app;
 
 comment on function public.bootstrap_auth0_identity(text, text, text, uuid) is
-'Idempotent Auth0-to-TMS identity bootstrap. Links the first tenant only when the local identity has no existing memberships; subsequent authorization remains PostgreSQL membership authority.';
+'Idempotent Auth0-to-TMS identity bootstrap. A genuinely new local identity may receive its first tenant membership; existing identities never gain a new tenant through login alone. Subsequent authorization remains PostgreSQL membership authority.';
