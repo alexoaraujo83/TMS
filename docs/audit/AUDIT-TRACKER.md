@@ -1585,3 +1585,28 @@ O worker apenas lê `OUTBOX_WEBHOOK_URLS`, valida os destinos e publica o evento
 A documentação de Stage 10.5 foi corrigida para refletir o comportamento efetivo do código: o secret não é simplesmente “optional”; ele é obrigatório sempre que houver endpoint configurado.
 
 **Estado:** ENV-03 / WORK-04 — **RECONCILIADO DOCUMENTALMENTE; sem alteração de produção**.
+
+
+## 53. FASE 2 — 2026-09-26 — DB-04: caminho de sessão `tms_app` identificado, E4 ainda não executável nesta integração
+
+### Avanço
+
+O projeto Neon canônico foi resolvido como `tms / shiny-hall-34679912`, com branch de produção `main / br-lingering-shadow-act0vvi9` e database `neondb`.
+
+Foi obtida, por capacidade autorizada do Neon, a connection string do papel `tms_app`. Isso confirma que a credencial de runtime existe e identifica o caminho de conexão correto.
+
+### Limite técnico atual
+
+A ferramenta Neon disponível para execução SQL consegue executar a consulta no alvo quando usa a conexão da integração, mas essa execução está vinculada à sessão `neondb_owner`. Ela não oferece um parâmetro para escolher o papel da sessão no `run_sql`.
+
+A connection string de `tms_app` foi identificada, mas o ambiente de execução disponível nesta sessão não possui um cliente PostgreSQL utilizável para abrir essa conexão diretamente. Portanto, **não foi fabricada uma sessão tms_app por `SET ROLE` nem reutilizado `neondb_owner` como substituto**.
+
+### Estado
+
+**DB-04 = BLOQUEADO / E4 PENDENTE.**
+
+O bloqueio agora está mais precisamente delimitado: não é mais falta de identificação do projeto/branch nem ausência conhecida da credencial `tms_app`; é falta de um caminho de execução SQL que abra uma sessão real autenticada como `tms_app`.
+
+### Próxima ação
+
+Obter uma sessão direta como `tms_app` pelo runtime real (worker/API ou cliente PostgreSQL operacional autorizado) e executar a matriz da seção 50. Nenhuma alteração de RLS, grants, role ou configuração deve ser feita para contornar este bloqueio.
