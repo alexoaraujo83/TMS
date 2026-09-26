@@ -1215,3 +1215,13 @@ Nenhuma alteração funcional foi aplicada nesta etapa.
 - Foi adicionado teste de integração que força falha de persistência do audit por FK de `actor_user_id` inexistente e verifica rollback do status e ausência de `freight.status_changed` no outbox.
 - Isso fortalece E2/E3 como evidência automatizada de atomicidade, mas **não fecha E4/DB-04**: ainda falta execução contra a sessão PostgreSQL de produção com `tms_app` e prova comportamental cross-tenant.
 - Commits: `af75bb1a291de5ca4968d9c33caef060972fc802` (teste), `4ec2ba72cb07de80e956b608565fc43c9408cbc6` (contrato do repositório).
+
+
+## 2026-09-25 — Mutations operacionais: contrato de auditoria
+
+- Auditoria de consumidores de `CarrierRepository`, `DriverRepository` e `VehicleRepository` encontrou o uso HTTP centralizado em `OperationsService`, com audit explícito em create/update.
+- Apesar disso, os três repositórios aceitavam `audit` opcional, deixando uma superfície de regressão equivalente à encontrada em `PostgresFreightRepository.updateStatus()`.
+- O contrato foi endurecido: create/update de Carrier, Driver e Vehicle agora exigem `AuditInput`.
+- Não foram identificados consumidores internos sem audit nas buscas realizadas.
+- Commit: `6a0d5044007424c4cff8f9439f09a8799c2af41c`.
+- Classificação: P2 de hardening de contrato, sem evidência de exploração atual.
