@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   Body,
   Controller,
+  Delete,
   Inject,
   Get,
   Param,
