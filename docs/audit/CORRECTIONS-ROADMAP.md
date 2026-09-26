@@ -804,3 +804,42 @@ O worker principal recebeu SKIPPED para o HEAD atual e permanece efetivo no SHA 
 ### Regra de evidência preservada
 
 CI verde e deploy SUCCESS/SKIPPED comprovam controle de entrega, não comportamento E4. Backup SUCCESS também não comprova artefato, checksum ou retenção.
+
+
+## 2026-09-26 — Reconciliação de estado após API-04/API-06 e manifesto
+
+Esta atualização corrige a leitura de trechos históricos do roadmap que antecedem o hardening de autorização.
+
+### Estado corrente
+
+1. **Replay**
+   - `freight:replay` é a permissão dedicada para `POST /freights/:id/status-events/:eventId/replay`.
+   - A migration 0034 cria a permissão e a 0035 concede explicitamente ao administrador.
+   - Testes direcionados de replay e repetição passaram no CI #1247 / run `36216015744`.
+   - A semântica atual permanece deliberadamente repetível: cada POST gera `replay:<eventId>:<randomUUID>`. A decisão operacional sobre eventual deduplicação futura permanece separada.
+
+2. **Diagnósticos**
+   - Os endpoints de diagnóstico usam `ops:diagnostics`, não `freight:read`.
+   - O operador não recebe essa permissão por padrão; o administrador recebe explicitamente.
+   - A suíte de autorização do FreightController passou no CI #1250 / run `36216153527`.
+   - A prova HTTP E4 em runtime continua pendente.
+
+3. **Release**
+   - O manifesto `docs/releases/2026-09-26.json` registra os SHAs efetivos de Web/API/Worker/backup-worker e os deployments observados.
+   - Promoção seletiva é comportamento aceito; não alinhar SHAs por força sem evidência de necessidade funcional.
+
+4. **CI**
+   - CI #1251 / run `36216294963` passou no SHA de controle `d00355d81ccd56edf628baf9e114cbe51790f608`.
+   - Isso fecha a evidência automatizada do HEAD de controle, mas não substitui E4 de produção.
+
+### Próximos gates sem mudança de ordem
+
+**DB-04 → AUTH-01 → SEC-01 → REL-01 → WORK/BAK/DR → P2**
+
+- DB-04: sessão real `tms_app`, `rolbypassrls=false`, isolamento cross-tenant.
+- AUTH-01: token Auth0 real atravessando Web → API → DB com tenant/membership reais.
+- REL-01: manter manifesto reconciliado com o runtime efetivo.
+- WORK/BAK/DR: provar execução real do worker, artefato de backup e restore independente.
+- P2: somente depois, centralização efetiva de configuração, remoção de `any` e refatoração do Web.
+
+**Regra:** nenhuma migration, RLS/grant, credencial ou mutação de produção deve ser executada para fabricar evidência de fechamento.
