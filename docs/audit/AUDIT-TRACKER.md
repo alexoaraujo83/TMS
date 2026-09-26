@@ -1206,3 +1206,12 @@ Não existe teste que injete/facilite uma falha especificamente na etapa de `out
 Adicionar teste de integração de falha transacional, preferencialmente por uma condição de banco determinística e isolada, sem mocks que escondam o comportamento real. Também avaliar se `updateStatus()` deve ser removido/privatizado por ser uma API redundante sem consumidores internos, ou se deve passar a exigir audit obrigatório.
 
 Nenhuma alteração funcional foi aplicada nesta etapa.
+
+
+## 2026-09-25 — WORK-02a refinement: status transition contract hardened
+
+- A revisão de referências não encontrou consumidores internos de `PostgresFreightRepository.updateStatus()`; o caminho de produção usa `updateStatusWithAudit()`.
+- A API redundante `updateStatus()` foi removida e `updateStatusWithAudit()` passou a exigir `audit`, eliminando o caminho interno que poderia persistir status sem `outbox_events`.
+- Foi adicionado teste de integração que força falha de persistência do audit por FK de `actor_user_id` inexistente e verifica rollback do status e ausência de `freight.status_changed` no outbox.
+- Isso fortalece E2/E3 como evidência automatizada de atomicidade, mas **não fecha E4/DB-04**: ainda falta execução contra a sessão PostgreSQL de produção com `tms_app` e prova comportamental cross-tenant.
+- Commits: `af75bb1a291de5ca4968d9c33caef060972fc802` (teste), `4ec2ba72cb07de80e956b608565fc43c9408cbc6` (contrato do repositório).
