@@ -36,3 +36,22 @@ Use the runtime's real `tms_app` connection path (or a supported Neon connector 
 ## Evidence file
 
 Full live evidence is recorded in `docs/audit/DB-LIVE-EVIDENCE-2026-09-26.md`.
+
+
+## DB-04 — Authorization note — 2026-09-26
+
+The operator explicitly authorized the controlled behavioral E4 for DB-04 in this audit sequence.
+
+This authorization does **not** authorize changing RLS policies, grants, role attributes, credentials, or production configuration to manufacture a passing result. The test must use the real `tms_app` connection path, controlled tenant data, and rollback/no-persistence for any test mutation.
+
+Required evidence remains:
+- effective `current_user=tms_app`;
+- `rolbypassrls=false`;
+- own-tenant SELECT succeeds;
+- cross-tenant SELECT produces no rows/no disclosure;
+- controlled cross-tenant INSERT is rejected;
+- controlled cross-tenant UPDATE is rejected;
+- no persistent test mutation;
+- no secrets recorded.
+
+The existing `SET ROLE tms_app` attempt is not sufficient because PostgreSQL rejected it with `permission denied to set role "tms_app"`. DB-04 therefore remains OPEN/BLOCKED until an authenticated `tms_app` session is obtained.
