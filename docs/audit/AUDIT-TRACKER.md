@@ -2111,3 +2111,26 @@ Revisar constraints/concorrência da migration 0036 e, em seguida, revalidar o P
 ### Próxima ação
 
 Executar/aguardar o próximo CI do HEAD corrigido e revisar todos os jobs. Se verde, atualizar o gate de AUTH-01; depois manter a sequência de promoção controlada (Vercel, migration Production autorizada, Action/binding Auth0, E2E). DB-04 E4 continua independente.
+
+
+## 66. FASE 2 — 2026-09-26 — AUTH-01: correção SQL reaplicada e verificada no HEAD
+
+### Rechecagem
+- A revisão do HEAD da PR #94 mostrou que a referência ambígua ainda estava presente em `0036_auth0_identity_bootstrap.sql`, apesar do registro anterior da seção 65 indicar que ela já havia sido corrigida.
+- A inconsistência documental/código foi corrigida agora no próprio branch.
+- O INSERT de `tenant_memberships` passou de `ON CONFLICT (tenant_id, user_id) DO NOTHING` para `ON CONFLICT DO NOTHING`.
+- Commit da correção efetivamente aplicada: `b34fca7602df2234ff85ac129800de5c47086039`.
+
+### Estado de validação
+- A alteração agora está presente no arquivo do HEAD do branch.
+- Ainda não existe workflow GitHub associado ao HEAD após esta correção; portanto não há evidência de CI verde para este commit.
+- O preview Vercel do `tms-core-api` foi observado como **READY** e o endpoint `/ready` respondeu HTTP 200 com `status=ready`; isso valida disponibilidade básica do deployment, não o fluxo Auth0/JIT completo.
+- Os checks Vercel do PR continuam registrados como falha por `api-deployments-free-per-day`; o deployment READY é uma evidência separada de um preview disponível.
+- Railway `tms-worker` permanece SUCCESS no ambiente do PR.
+- Auth0 Production e Neon Production continuam sem mutações.
+
+### Gate
+AUTH-01 continua **P0 / E4 PENDENTE**. Não mergear nem aplicar migration 0036 em Production até o novo CI validar o HEAD corrigido e os gates de Auth0/DB-04 permanecerem atendidos.
+
+### Próxima ação
+Executar o pipeline CI sobre o novo HEAD (ou aguardar o disparo automático correspondente), revisar todos os jobs e, se verde, avançar para a revisão final do PR e dos gates de promoção.
