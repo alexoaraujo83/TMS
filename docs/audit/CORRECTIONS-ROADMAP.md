@@ -657,3 +657,33 @@ O SSOT foi corrigido para não repetir a afirmação histórica de 31 migrations
 ### Gate
 
 O bloqueio **DB-04/E4** continua aberto: evidência de código/CI e evidência read-only do schema não substituem a execução controlada com o papel runtime real.
+
+
+## 2026-09-25 — Limpeza/reconciliação de GitHub Actions e governança
+
+### Resultado
+
+A inspeção do `.github/workflows/` confirmou três workflows ativos e justificáveis:
+
+- `ci.yml`: gate técnico principal para push/PR em `main`;
+- `database-migrate.yml`: migration automática de produção, com path filter e environment `production`;
+- `database-migrate-nonprod.yml`: migration manual de `development`/`staging`.
+
+Não foi removido nenhum workflow porque não existe evidência suficiente de redundância/obsolescência. A remoção neste ponto aumentaria risco sem benefício comprovado.
+
+### Histórico de runs
+
+A integração disponível não possui operação de exclusão de workflow runs. Os históricos cancelados permanecem preservados e não serão reexecutados apenas para alterar o estado histórico.
+
+### Governança
+
+A consulta de branch protection não pôde ser concluída por `403 Resource not accessible by integration`; a consulta de rulesets retornou vazio. **CI-10** permanece P1 aberto até confirmação administrativa de required checks/proteção de `main`.
+
+### Próximas ações ordenadas
+
+1. Confirmar branch protection/required checks com acesso administrativo.
+2. Executar validação automatizada de DB-06 em ambiente controlado.
+3. Fechar a decisão de API-16/SEC-03: replay idempotente versus replay manual repetível, incluindo permissão e teste.
+4. Retomar DB-04/E4 com sessão real do papel runtime aprovado.
+5. Somente após isso considerar nova limpeza estrutural de CI/workflows, se evidência concreta surgir.
+
