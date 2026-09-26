@@ -7,6 +7,8 @@ export const TMS_TENANT_ID_CLAIM = `${TMS_AUTH_CLAIMS_NAMESPACE}/tenant_id`;
 export interface AuthClaims {
   sub: string;
   tenantId?: string;
+  email?: string;
+  name?: string;
   issuer: string;
   audience: string | string[];
   expiresAt?: number;
@@ -60,6 +62,8 @@ export async function verifyAccessToken(
   return {
     sub: payload.sub,
     tenantId: extractTenantId(payload),
+    email: typeof payload.email === "string" ? payload.email : undefined,
+    name: typeof payload.name === "string" ? payload.name : undefined,
     issuer: typeof payload.iss === "string" ? payload.iss : issuer,
     audience: payload.aud ?? config.audience,
     expiresAt: payload.exp,
