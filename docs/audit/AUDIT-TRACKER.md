@@ -1296,3 +1296,10 @@ Nenhuma mutation de produção foi executada.
 ### Estado após esta etapa
 
 A auditoria avançou da superfície de repositories de negócio para as fronteiras de persistência operacional. Não foi identificado novo P0 nesta etapa. O principal achado acionável é DB-06 (P1), seguido pela decisão arquitetural P2 sobre duplicação do Outbox store. O gate **DB-04/E4 continua BLOCKER**, pois a inspeção de código não substitui a execução real do teste sob `tms_app` contra o banco alvo.
+
+
+## 17. Correção DB-06 implementada
+
+- `packages/database/scripts/migrate.ts` passou a exigir `durable_jobs.idempotency_key` e os metadados de auditoria de 0032.
+- O baseline existente agora verifica as quatro FKs tenant-scoped de 0030/0031 e o índice `durable_jobs_idempotency_idx`, além do índice Auth0 já validado.
+- **DB-06: CORRIGIDO NO CÓDIGO / validação operacional ainda pendente.** O fechamento definitivo depende de executar o validator em CI/ambiente controlado e registrar o resultado.
