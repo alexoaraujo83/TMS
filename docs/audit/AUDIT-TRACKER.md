@@ -1354,3 +1354,22 @@ O HEAD atual de `main` observado diretamente no GitHub é `b16faf77181882c4f796f
 3. Resolver API-16/SEC-03 (semântica e permissão de replay).
 4. Retomar DB-04/E4 com sessão runtime real `tms_app`.
 
+
+
+## 2026-09-25 — API-02/SEC-03: permissão dedicada de replay
+
+A auditoria estrutural confirmou que o replay manual de `freight.status_changed` era uma mutação de produção protegida apenas por `freight:update`. Isso permitia que um usuário com capacidade genérica de atualização também alcançasse a operação de replay.
+
+Correção aplicada no HEAD atual:
+- criada a migration `0034_freight_replay_permission.sql`;
+- criada a permissão `freight:replay`;
+- a migration não concede essa permissão ao papel `operator` por padrão; o papel `admin` continua herdando as permissões canônicas por seu bootstrap;
+- o endpoint `POST /freights/:id/status-events/:eventId/replay` passou a exigir `freight:replay`.
+
+**Estado API-02/SEC-03:** CORREÇÃO DE CÓDIGO APLICADA / E4 PENDENTE.
+
+A correção reduz o privilégio efetivo, mas ainda exige teste negativo/positivo com identidades reais ou harness de autorização: operador sem `freight:replay` deve receber 403; papel explicitamente autorizado deve conseguir executar replay; isolamento tenant e auditoria devem permanecer preservados.
+
+**API-03 permanece separado:** a semântica de repetição do replay continua deliberadamente não decidida. A chave atual usa UUID por solicitação, portanto duas chamadas explícitas continuam sendo duas intenções de replay.
+
+**CI:** a correção deve ser validada em novo run do HEAD atual; os status Vercel observados anteriormente por `build-rate-limit` não são evidência de falha funcional.
