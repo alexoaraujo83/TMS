@@ -843,3 +843,28 @@ Esta atualização corrige a leitura de trechos históricos do roadmap que antec
 - P2: somente depois, centralização efetiva de configuração, remoção de `any` e refatoração do Web.
 
 **Regra:** nenhuma migration, RLS/grant, credencial ou mutação de produção deve ser executada para fabricar evidência de fechamento.
+
+
+## 2026-09-26 — DB-04: prova comportamental explicitamente autorizada
+
+O operador autorizou a execução da prova E4 de DB-04 nesta sequência.
+
+**Observação de segurança operacional:** a autorização cobre somente a execução controlada do teste. Não está autorizada nenhuma alteração de RLS, grants, roles ou configuração para viabilizar a prova. Qualquer mutação usada para teste deve ser controlada e não deixar estado persistente.
+
+### Evidência já consolidada
+
+A evidência live de 2026-09-26 confirma `tms_app` com `rolbypassrls=false`, RLS `FORCE` nas 19 tabelas tenant-scoped inspecionadas e policies baseadas em `current_setting('app.tenant_id', true)`.
+
+### Próximo passo
+
+Obter sessão efetiva autenticada como `tms_app` pelo caminho de runtime real e executar:
+
+- próprio tenant: SELECT permitido;
+- tenant diferente: SELECT sem vazamento;
+- INSERT cross-tenant: rejeitado;
+- UPDATE cross-tenant: rejeitado;
+- rollback/ausência de persistência para qualquer operação de teste.
+
+Se a integração disponível não permitir autenticação direta como `tms_app`, manter DB-04 como **BLOCKED/E4 PENDENTE**, sem usar `neondb_owner` como substituto.
+
+**Gate:** DB-04 continua anterior a AUTH-01, SEC-01 e REL-01.
