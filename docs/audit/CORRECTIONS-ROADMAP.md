@@ -597,3 +597,22 @@ Foi adicionado teste de rollback da criação financeira quando a gravação de 
 A auditoria deve sair do inventário de repositories de negócio e concentrar-se nas fronteiras SQL restantes: outbox/durable jobs, worker stores/contexto, replay/diagnóstico e scripts de migration. Depois disso, executar a validação CI completa quando a limitação de build-rate-limit deixar de bloquear Vercel.
 
 DB-04/E4 permanece BLOCKER e não é alterado por este avanço.
+
+
+## Continuação — 2026-09-25
+
+### P1 — DB-06: fechar o baseline validator do schema canônico
+
+- Atualizar `packages/database/scripts/migrate.ts` para exigir as colunas adicionadas em 0032 (`actor_subject`, `correlation_id`, `ip_address`, `user_agent`, `outcome`) e em 0033 (`durable_jobs.idempotency_key`).
+- Validar explicitamente as constraints de relacionamento de 0030/0031 (`compliance_checks_assignment_fk`, `gr_requests_assignment_fk`, `financial_entries_assignment_fk`, `financial_entries_trip_fk`) e o índice `durable_jobs_idempotency_idx` antes de registrar uma baseline existente.
+- Executar a validação em CI/ambiente controlado e registrar evidência; não usar produção como alvo de mutação.
+
+### P2 — REPO-09: decidir a fronteira do Outbox worker
+
+- Comparar `apps/worker/src/outbox-store.ts` com `packages/database/src/outbox-repository.ts`.
+- Se a duplicação for intencional, manter o adapter do worker e criar contrato/testes compartilhados para evitar drift de lease/retry/tenant semantics.
+- Se não for necessária, migrar o worker para o repository compartilhado em mudança separada.
+
+### Gate ainda bloqueado — DB-04/E4
+
+A próxima evidência operacional prioritária continua sendo a execução real sob `tms_app`, incluindo `current_user`, `rolbypassrls` e comportamento cross-tenant de SELECT/INSERT/UPDATE. O bloqueio da ferramenta Neon permanece sem alteração; nenhuma alteração de RLS/grants deve ser feita para contornar o gate.
