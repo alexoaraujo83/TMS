@@ -2168,3 +2168,26 @@ AUTH-01, entretanto, permanece **P0 / E4 PENDENTE**, porque CI não prova:
 
 ### Decisão
 Não executar merge, migration Production ou mutação Auth0 automaticamente nesta etapa. O próximo avanço é a revisão final do PR e a preparação dos gates de promoção autorizada.
+
+
+## 68. FASE 2 — 2026-09-26 — AUTH-01: revisão final do PR #94
+
+### Revisão realizada
+- PR #94 permanece OPEN, mergeable e sem reviews/threads pendentes no GitHub.
+- Os 10 arquivos alterados foram rechecados, com foco em AuthGuard, claims, Action Auth0, migration 0036 e integração do runtime role.
+- CI #1281 permanece a evidência verde do HEAD validado.
+- Vercel agora registra previews READY para `tms-core-api` e `tms-web`; os failures anteriores por `api-deployments-free-per-day` continuam no histórico e não constituem evidência de falha funcional do código.
+- Railway `tms-worker` no ambiente da PR permanece SUCCESS.
+
+### Achados de segurança
+- A cadeia de autorização continua correta: JWT assinado → issuer/audience → tenant claim → membership PostgreSQL → contexto da requisição.
+- `x-tenant-id` não ganha autoridade própria: quando presente, deve coincidir exatamente com o tenant claim.
+- A função 0036 mantém `SECURITY DEFINER`, `search_path` fixo, `REVOKE ALL FROM PUBLIC` e `GRANT EXECUTE TO tms_app`.
+- Identidade local já existente não recebe uma segunda membership apenas por login; email vinculado a outro Auth0 subject é rejeitado.
+- Não foi encontrado no diff um bypass de RLS, uso de owner runtime, segredo ou tenant hardcoded.
+
+### Cobertura ainda recomendada
+Os testes atuais provam first-login, idempotência e bloqueio de identidade local sem membership, mas a suíte de integração ainda pode ser fortalecida com casos explícitos de: identidade já membro de outro tenant e colisão de e-mail entre subjects. Isso é reforço de cobertura, não evidência de defeito funcional no HEAD atual.
+
+### Gate
+AUTH-01 permanece **P0 / E4 PENDENTE**. O código está com gate CI verde, mas o fechamento operacional exige migration 0036 em Production, Action/binding Auth0 Production, token real, first-login real, operação tenant-scoped e DB-04 E4 com sessão real `tms_app`. Nenhuma mutação Production foi executada nesta revisão.
