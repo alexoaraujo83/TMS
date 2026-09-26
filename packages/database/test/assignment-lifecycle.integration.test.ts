@@ -289,6 +289,37 @@ if (!enabled) {
       assert.equal(freight?.status, "in_transit");
     });
 
+    it("rolls back the freight status when audit persistence fails", async () => {
+      const freightId = await insertFreight("in_transit");
+      const invalidActorUserId = randomUUID();
+
+      await assert.rejects(
+        freightRepository.updateStatusWithAudit(
+          tenantId,
+          freightId,
+          "in_transit",
+          "cancelled",
+          {
+            ...audit,
+            actorUserId: invalidActorUserId,
+          },
+        ),
+      );
+
+      const freight = await freightRepository.findById(tenantId, freightId);
+      assert.equal(freight?.status, "in_transit");
+
+      const outbox = await tenantQuery<{ count: string }>(
+        `select count(*)::text as count
+           from outbox_events
+          where tenant_id = $1
+            and aggregate_id = $2
+            and event_type = 'freight.status_changed'`,
+        [tenantId, freightId],
+      );
+      assert.equal(outbox.rows[0]?.count, "0");
+    });
+
     it("cancels the assignment when freight is cancelled", async () => {
       await assignmentRepository.assign(
         tenantId,
