@@ -2021,3 +2021,38 @@ AUTH-01 continua P0/E4 PENDENTE, mas a lacuna de implementação Auth0 user → 
 ### Próxima ação
 
 Resolver o build-rate-limit/executar CI, revisar o PR #94, aplicar a migration em Production pelo pipeline autorizado e reconciliar a Action Auth0 Production. Somente depois executar o E2E com um usuário Auth0 novo.
+
+
+## 63. FASE 2 — 2026-09-26 — AUTH-01: correção pós-CI do bootstrap de identidade
+
+### Falha encontrada no CI
+
+O CI 1274 executou a suíte completa até `pnpm test` e encontrou 2 falhas em `@tms/api`:
+
+- `rejects a forged tenant without membership`: o bootstrap era chamado quando não havia membership e transformava a ausência de membership em uma tentativa de provisionamento;
+- `bootstraps a first-time Auth0 identity before membership lookup`: o mock não modelava a sequência real lookup → bootstrap → lookup.
+
+### Correção aplicada
+
+1. `0036_auth0_identity_bootstrap.sql` agora distingue identidade local já existente de identidade realmente nova;
+2. uma identidade local existente sem membership **não** recebe uma nova membership apenas por fazer login com um tenant claim;
+3. somente uma identidade local genuinamente nova pode receber a primeira membership durante o bootstrap;
+4. se o tenant não tiver o role `operator` configurado, o bootstrap falha explicitamente em vez de criar uma membership sem role;
+5. EXECUTE da função SECURITY DEFINER foi concedido explicitamente a `tms_app`, corrigindo o risco de `GRANT ... TO current_user` depender do papel executor da migration;
+6. o teste de segurança agora preserva a negação de tenant sem membership e o teste de first-login modela as três consultas esperadas.
+
+### Fundamentação de segurança
+
+A função continua com `SECURITY DEFINER` e `search_path` fixo. PostgreSQL documenta que funções SECURITY DEFINER executam com os privilégios do owner e que o EXECUTE deve ser revogado de PUBLIC e concedido seletivamente; por isso o grant explícito para o role de runtime é necessário. citeturn0search0
+
+### Estado
+
+- PR #94 continua OPEN.
+- O último CI observado foi failure por 2 testes de regressão do próprio PR; portanto o gate não é mais tratado como bloqueio externo apenas.
+- Correção já versionada na branch; novo workflow ainda não apareceu para o último push no momento desta atualização.
+- Vercel continua bloqueado pelo limite de deployments da conta.
+- Neon Production e Auth0 Production continuam sem mutação por esta conexão.
+
+### Gate
+
+AUTH-01 permanece P0/E4 PENDENTE. Não aprovar/mergear enquanto o novo CI não comprovar a correção e enquanto migration + Action/binding não estiverem prontos para promoção controlada.
