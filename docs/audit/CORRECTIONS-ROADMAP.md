@@ -761,3 +761,13 @@ Correção:
 - **Diagnósticos:** `ops:diagnostics` está separado das permissões funcionais e concedido explicitamente ao admin. Permanece a prova E4: operador sem a permissão deve receber 403 e admin autorizado deve receber 200.
 - **Frontend Auth0:** a implementação estrutural existe no Web (`@auth0/nextjs-auth0`, cliente Auth0 server-side e rota `api/tms/auth-runtime`). O finding histórico EV-030 de ausência de SDK é datado de 2026-09-16 e não deve ser reutilizado como estado corrente. O gate P0 continua sendo o E4 real Web → Auth0 → API → DB.
 - **DB-04:** permanece o bloqueador P0 prioritário. A próxima ação operacional continua sendo obter uma sessão real `tms_app` e executar os testes de isolamento, sem alterar RLS/grants para facilitar a prova.
+
+## 2026-09-26 — API-04: replay tests direcionados aplicados
+
+**Status:** P1 — testes direcionados aplicados; CI verde; E4 HTTP ainda pendente.
+
+- Criado `apps/api/test/freight-replay.service.test.ts`.
+- Cobertos sucesso transacional, aggregate divergente, payload inconsistente e repetição de replay.
+- O teste de repetição documenta a semântica atual: `replay:<eventId>:<randomUUID>`, portanto cada solicitação manual cria uma intenção distinta.
+- CI run #1247 (`36216015744`) no SHA `478e2a3e9247a331dc9a31ee172a06f7366daa6d` concluiu com sucesso, incluindo test/typecheck/build e os controles de migration/RLS/IAM/worker.
+- Próxima etapa: teste HTTP autenticado negativo/positivo e tenant isolation; não alterar a semântica de replay novamente sem decisão operacional explícita.
