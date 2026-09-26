@@ -1,10 +1,11 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-09-25 23:35 -03:00
+> **Última atualização:** 2026-09-25 23:50 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
-> **HEAD da aplicação auditada:** `d304b2cdfacc6d78282648b1d5bd1243811a7b78`  
+> **HEAD atual de main:** `1fd5c97999ac93a334a85065665cfaddeaaa9463`
+> **Último HEAD funcional de aplicação explicitamente auditado:** `d304b2cdfacc6d78282648b1d5bd1243811a7b78`  
 > **HEAD de controle/documentação anterior:** `c4fcb3ba598a0218142c11911b52d7a032eb24a4`  
 > **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
 
@@ -43,11 +44,11 @@ A regra de evidência é:
 | AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; API valida token, subject e membership | ABERTO | Emitir novo token real e rastrear Auth0 → Web → API → DB | Token real com claim de tenant é aceito e operação tenant-scoped funciona; tenant incorreto é negado | P0 |
 | AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
 | API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e permissões específicas por operação | PARCIAL | Criar matriz rota × permissão × validação × tenant e executar smoke tests | Todas as rotas de negócio possuem evidência de proteção e isolamento | P1 |
-| API-02 | Permissão de replay | `POST :id/status-events/:eventId/replay` usa `freight:update` | PRECISA HARDENING | Criar permissão dedicada, por exemplo `freight:replay`, com concessão explícita | Usuário de update comum recebe 403; papel autorizado executa replay | P1 |
+| API-02 | Permissão de replay | Endpoint usa `freight:replay`; migrations 0034/0035 criam e concedem explicitamente a permissão ao admin | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Executar matriz negativa/positiva em runtime | Usuário sem `freight:replay` recebe 403; papel autorizado executa replay | P1 |
 | API-03 | Semântica de replay | Cada replay gera `replay:<eventId>:<randomUUID>`; chamadas repetidas criam jobs distintos | DECISÃO NECESSÁRIA | Definir se replay manual é deliberadamente repetível ou deve ser idempotente | Semântica documentada + teste de chamadas repetidas | P1 |
 | API-04 | Testes do replay | Busca no repositório não encontrou teste dedicado do endpoint/service de replay | ABERTO | Testar sucesso, evento inexistente, aggregate divergente, payload inconsistente, 403, isolamento tenant e repetição | Suite direcionada passa e entra no CI | P1 |
 | API-05 | Documentação do replay | Documentação geral de freight não reflete claramente a nova operação de replay | DRIFT DOCUMENTAL | Atualizar API/ops e controles operacionais | Docs, permissão e operação coincidem | P1 |
-| API-06 | Endpoints de diagnóstico em produção | Existem `runtime-context`, `runtime-db-context`, `runtime-rls-isolation` e `runtime-auth-claims`, protegidos apenas por `freight:read` | PRECISA REVISÃO DE SEGURANÇA | Restringir a diagnóstico/admin, remover de produção ou definir explicitamente o contrato de exposição | Evidência de que dados de contexto/tenant não ficam disponíveis a usuários comuns | P1 |
+| API-06 | Endpoints de diagnóstico em produção | Quatro endpoints usam `ops:diagnostics`; migration 0035 cria a permissão e concede explicitamente ao admin; operator bootstrap não recebe a permissão | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Executar 403 para operador e 200 para admin, mantendo tenant-scoped | Usuário funcional comum recebe 403; operador sem `ops:diagnostics` recebe 403; admin autorizado recebe 200 | P1 |
 | WORK-01 | Deploy do worker | SHA atual foi SKIPPED; worker anterior permanece como versão efetiva | PARCIAL | Confirmar regras de watch e registrar SHA efetivo | Versão do worker é conhecida, intencional e observável | P1 |
 | WORK-02 | Contrato de negócio do worker | Agora existe caminho fonte-controlado: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; há teste de integração CI | E2/E3 COMPROVADO / E4 ABERTO | Reconciliar contrato com Neon/Railway de produção e processar evento real | Evento real percorre todo o fluxo em runtime de produção | P1 |
 | WORK-03 | Prontidão operacional | Worker valida `tms_app` e tenants ativos, mas ainda pode ficar idle quando `OUTBOX_TENANT_IDS` está vazio; métricas de ciclo/último sucesso ainda são insuficientes | ABERTO | Expor readiness/telemetria para processo, DB, role, tenants, outbox, durable jobs e último ciclo | É possível distinguir healthy-idle de unhealthy | P1 |
@@ -1425,3 +1426,11 @@ Executar, sem alterar RLS/grants para fabricar evidência, a sessão controlada 
 6. UPDATE cross-tenant rejeitado.
 
 A ferramenta Neon disponível continua sem conseguir executar SQL devido ao mismatch do parâmetro `project_id`; portanto DB-04 permanece BLOCKER.
+
+## 19. Reconciliação corrente — 2026-09-25
+
+- **HEAD de main corrigido:** o tracker agora distingue o HEAD atual `1fd5c97999ac93a334a85065665cfaddeaaa9463` (documentação/controle) do último HEAD funcional explicitamente auditado `d304b2cdfacc6d78282648b1d5bd1243811a7b78`.
+- **Frontend Auth0 — finding histórico reconciliado:** o ledger histórico `EVIDENCE-LEDGER-2026-09-16.md` contém o EV-030 dizendo que o Web não possuía Auth0. Essa afirmação não deve ser usada como estado corrente. No código atual existem `@auth0/nextjs-auth0` em `apps/web/package.json`, `apps/web/src/lib/auth0.ts` e `apps/web/src/app/api/tms/auth-runtime/route.ts`, que usa `createFetcher`/token autenticado para chamar a API. Isso comprova implementação estrutural, mas **não** prova E4 Auth0 em produção.
+- **DB-04 permanece P0/BLOCKER:** a role `tms_app` e seu atributo `NOBYPASSRLS` foram observados, mas ainda falta a sessão real com os seis testes comportamentais de isolamento.
+- **CI/Vercel:** o status atual conhecido continua com Railway worker/backup-worker em SUCCESS e Vercel API/Web em `build-rate-limit`; portanto não declarar build funcional de Vercel do HEAD atual.
+- **Regra para o próximo ciclo:** não reabrir EV-030 como finding de ausência de implementação; tratá-lo como evidência histórica datada e executar E4 Web → Auth0 → API → DB quando houver token/ambiente operacional disponível.
