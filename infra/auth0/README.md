@@ -62,6 +62,22 @@ pnpm dlx auth0-deploy-cli import \
 
 Auth0 documents that an Action being deployed does not automatically mean it is attached to the Login trigger; the trigger binding must also be applied. This repository therefore keeps the `triggers.post-login` binding in source control.
 
+## TMS Web Application / Connection contract
+
+The Next.js application uses the Auth0 v4 server SDK and starts signup through the SDK-managed `/auth/login?screen_hint=signup` route. The application intentionally does not hard-code an Auth0 Connection because the authoritative Connection-to-application association belongs to the Auth0 tenant configuration.
+
+Before Production sign-off, verify in Auth0 Production that:
+
+1. **TMS Web** is a Regular Web Application.
+2. Its production callback is `https://tms-web-chi.vercel.app/auth/callback`.
+3. Its production logout URL is `https://tms-web-chi.vercel.app`.
+4. The Connection(s) exposed by Universal Login are explicitly enabled for **TMS Web** using the current Auth0 client/connection configuration mechanism.
+5. The signup Connection is the intended user store for this application.
+6. The Post-Login Action **TMS — Tenant Claim** is deployed and bound to the Login Flow.
+7. New/invited users receive `app_metadata.tenant_id` through an authorized onboarding operation; the browser signup URL must never supply the authoritative tenant UUID.
+
+Do not add a guessed Connection name to `tenant.yaml`. The exact Production Connection must first be observed from Auth0. Once identified, its management contract can be versioned deliberately if the selected Auth0 configuration tooling supports it.
+
 ## Required user metadata bridge
 
 For automatic first-login tenant linking, the Auth0 user must have:
