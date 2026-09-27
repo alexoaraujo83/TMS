@@ -92,7 +92,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          auth0 api get triggers/post-login |
+          auth0 api get "actions/triggers/post-login/bindings" |
             jq -c '{
               bindings: (.bindings // [])
             }'
