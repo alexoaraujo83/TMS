@@ -2361,3 +2361,13 @@ Depois da execução, somente o recurso efetivamente divergente deve entrar em p
 2. Se houver falha, analisar o primeiro passo Auth0 que falhar; não aplicar mutações como tentativa de recuperação.
 3. Se houver sucesso, reconciliar somente os recursos realmente observados e preparar, separadamente, qualquer correção Auth0 que exija confirmação explícita.
 4. Em paralelo, manter DB-04 separado: ainda falta a prova comportamental com uma sessão real `tms_app`.
+
+
+## 11. Atualização — revisão do runner Auth0 Production Read-Only
+
+- **AUTH-03 — Runner read-only endurecido:** o workflow `.github/workflows/auth0-production-readonly.yml` foi revisado e corrigido após análise estrutural. Foi adicionada concorrência única para evitar auditorias sobrepostas e o passo de instalação do Auth0 CLI deixou de executar diretamente um script baixado via pipe; o script agora é baixado para o workspace temporário e então executado separadamente. **Estado: CORRIGIDO NO REPOSITÓRIO.**
+- **AUTH-04 — Minimização de dados de logs:** o runner deixou de imprimir `description` livre dos eventos de falha do Auth0, reduzindo o risco de expor PII/detalhes sensíveis nos logs do GitHub Actions. A saída fica limitada aos campos necessários para reconciliação. **Estado: CORRIGIDO NO REPOSITÓRIO.**
+- **AUTH-05 — Execução Production ainda não comprovada:** a correção do workflow não equivale à execução bem-sucedida. Não foi localizada, por esta conexão GitHub, uma execução manual bem-sucedida do workflow contra Auth0 Production. As verificações de Vercel/Railway no commit de correção do runner não substituem a evidência Auth0. **Estado: P0 / BLOQUEADO.**
+- **PR-92:** continua aberto e não-mergeable/dirty; não deve ser mesclado enquanto não for atualizado contra o `main` atual e suas evidências históricas forem reconciliadas. **Estado: ABERTO / AÇÃO MANUAL DE REBASE/ATUALIZAÇÃO NECESSÁRIA.**
+- **PR-85:** continua Draft e deve permanecer fora da promoção enquanto os gates P0 de Auth0 e DB-04 não estiverem encerrados. **Estado: DRAFT / BLOQUEADO POR GATES.**
+- **Próxima sequência P0:** executar manualmente o workflow Auth0 Production Read-Only Audit; se falhar, corrigir somente a primeira falha observada e repetir; se passar, reconciliar TMS Web, Connections/enabled_clients, Post-Login Action/bindings, audience e evidência de login real. DB-04 continua independente e requer sessão PostgreSQL efetiva `tms_app`.
