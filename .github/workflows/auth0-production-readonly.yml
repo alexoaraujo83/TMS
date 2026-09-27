@@ -1,0 +1,120 @@
+name: Auth0 Production Read-Only Audit
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/auth0-production-readonly.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Auth0 Production read-only reconciliation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_CLI_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLI_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLI_CLIENT_SECRET }}
+      AUTH0_AGENT_MODE: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Auth0 machine credentials are configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${AUTH0_DOMAIN}" || { echo "::error::Missing repository/environment secret AUTH0_CLI_DOMAIN"; exit 1; }
+          test -n "${AUTH0_CLIENT_ID}" || { echo "::error::Missing repository/environment secret AUTH0_CLI_CLIENT_ID"; exit 1; }
+          test -n "${AUTH0_CLIENT_SECRET}" || { echo "::error::Missing repository/environment secret AUTH0_CLI_CLIENT_SECRET"; exit 1; }
+
+      - name: Install Auth0 CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/main/install.sh | sh -s -- -b "${RUNNER_TEMP}/auth0-bin"
+          echo "${RUNNER_TEMP}/auth0-bin" >> "${GITHUB_PATH}"
+          "${RUNNER_TEMP}/auth0-bin/auth0" --version
+
+      - name: Authenticate Auth0 CLI with client credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth0 login --domain "${AUTH0_DOMAIN}" --client-id "${AUTH0_CLIENT_ID}" --client-secret "${AUTH0_CLIENT_SECRET}"
+
+      - name: Inspect TMS Web application
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth0 apps list |
+            jq -c '[.[] | select(.name == "TMS Web") | {
+              client_id,
+              name,
+              app_type,
+              callbacks,
+              allowed_logout_urls,
+              allowed_origins,
+              web_origins
+            }]'
+
+      - name: Inspect Production connections
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth0 api get connections |
+            jq -c '[.[] | {
+              id,
+              name,
+              strategy,
+              enabled_clients
+            }]'
+
+      - name: Inspect Post-Login Actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth0 actions list |
+            jq -c '[.[] | select((.supported_triggers // []) | any(.id == "post-login")) | {
+              id,
+              name,
+              status,
+              deployed_version,
+              updated_at,
+              created_at
+            }]'
+
+      - name: Inspect active Post-Login trigger bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth0 api get triggers/post-login |
+            jq -c '{
+              bindings: (.bindings // [])
+            }'
+
+      - name: Inspect recent failed Auth0 events
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth0 logs list --filter "type:f" --number 20 |
+            jq -c '[.[] | {
+              date,
+              type,
+              description,
+              client_id,
+              connection
+            }]'
+
+      - name: Inspect source Action syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check infra/auth0/actions/post-login.js
+
+      - name: Audit completed
+        run: echo "Auth0 Production read-only audit completed. No Auth0 resources were modified."
