@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: auth0-production-readonly
+  cancel-in-progress: true
+
 jobs:
   audit:
     name: Auth0 Production read-only reconciliation
@@ -37,7 +41,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/main/install.sh | sh -s -- -b "${RUNNER_TEMP}/auth0-bin"
+          # Keep the installer download separate from execution so the fetched
+          # script is inspectable in the job workspace before it runs.
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/auth0/auth0-cli/main/install.sh \
+            --output "${RUNNER_TEMP}/auth0-install.sh"
+          sh "${RUNNER_TEMP}/auth0-install.sh" -b "${RUNNER_TEMP}/auth0-bin"
           echo "${RUNNER_TEMP}/auth0-bin" >> "${GITHUB_PATH}"
           "${RUNNER_TEMP}/auth0-bin/auth0" --version
 
@@ -101,13 +110,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Do not emit free-form Auth0 descriptions: they may contain PII or
+          # provider-specific details. Keep only fields needed for reconciliation.
           auth0 logs list --filter "type:f" --number 20 |
             jq -c '[.[] | {
               date,
               type,
-              description,
               client_id,
-              connection
+              connection,
+              event_code: (.details?.error?.code // .details?.error?.type // null)
             }]'
 
       - name: Inspect source Action syntax
