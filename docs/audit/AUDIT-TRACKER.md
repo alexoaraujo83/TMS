@@ -2191,3 +2191,39 @@ Os testes atuais provam first-login, idempotência e bloqueio de identidade loca
 
 ### Gate
 AUTH-01 permanece **P0 / E4 PENDENTE**. O código está com gate CI verde, mas o fechamento operacional exige migration 0036 em Production, Action/binding Auth0 Production, token real, first-login real, operação tenant-scoped e DB-04 E4 com sessão real `tms_app`. Nenhuma mutação Production foi executada nesta revisão.
+
+
+## 69. FASE 2 — 2026-09-26 — promoção PR #94 e reconciliação de runtime
+
+### Evidência operacional nova
+
+- PR #94 foi mesclada em `main` por squash merge.
+- Commit de promoção: `ec4002e99f0fe9e7d4833bc9cb6c9f858f794f78`.
+- Vercel `tms-web`: Production **READY** no commit `ec4002e...`.
+- Vercel `tms-core-api`: Production **READY** no commit `ec4002e...`.
+- Endpoint `/ready` do deployment Production do Core API respondeu HTTP 200 com `{"status":"ready","service":"tms-api"}`.
+- Não foram encontrados runtime errors nos projetos Web/API no intervalo de 1 hora observado.
+- Railway `tms-worker`: deployment `d3c3364c-f6e4-48eb-83c0-c9a7453b6ecb` agora está **SUCCESS** no commit `ec4002e...`; a observação anterior de WAITING ficou superada.
+- Railway `tms-backup-worker`: deployment `1c75a049-2eb6-41ed-a360-b47986740c06` permanece **SUCCESS**.
+- O build do worker confirmou que a migration `0036_auth0_identity_bootstrap.sql` está presente no snapshot de produção.
+- O ambiente Railway ainda possui uma mudança **STAGED** separada que define/atualiza `OUTBOX_WEBHOOK_URLS`. Essa alteração não foi aceita automaticamente porque não faz parte da promoção do PR #94 e requer reconciliação própria antes de commit.
+
+### Neon Production
+
+- A migration `0036_auth0_identity_bootstrap` foi aplicada na branch Production `main` do Neon.
+- Verificação confirmou registro em `schema_migrations`, existência da função `public.bootstrap_auth0_identity` e `EXECUTE` para o role `tms_app`.
+- A verificação também confirmou `tms_app` sem `BYPASSRLS`.
+- A aplicação da migration foi uma execução controlada diretamente no banco Production; o próximo ciclo deve reconciliar esse fato com o mecanismo normal de migration para garantir que checksum/runner permaneçam consistentes.
+
+### Gates ainda abertos
+
+- **AUTH-01:** P0 / E4 pendente. Ainda falta provar Action Auth0 publicada + binding Post-Login + token real com tenant claim + first-login real + operação tenant-scoped.
+- **DB-04:** P0 / E4 pendente. Ainda falta prova comportamental com uma sessão PostgreSQL real do runtime `tms_app`; consultas executadas por owner/conector não substituem essa evidência.
+- **CI do merge commit:** o endpoint de workflow associado diretamente ao merge SHA ainda não retornou workflow run; a última evidência verde continua sendo CI #1281 no HEAD pré-merge.
+
+### Próxima ação P0
+
+1. Reconciliar Auth0 Production por caminho autorizado e executar o E2E real.
+2. Executar DB-04 E4 com sessão real `tms_app`.
+3. Reconciliar o staged `OUTBOX_WEBHOOK_URLS` separadamente, somente após validar seu contrato e necessidade.
+4. Registrar um manifesto de release com SHA efetivo Web/API/Worker + migration head.
