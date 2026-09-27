@@ -73,7 +73,7 @@ if (!runIntegration) {
     }
   });
 
-  it("bootstraps a new Auth0 identity idempotently and does not self-enroll an existing identity", async () => {
+  it("bootstraps new identities idempotently and relinks an orphaned identity exactly once", async () => {
     const client = await ownerPool.connect();
     try {
       await client.query(
@@ -98,30 +98,16 @@ if (!runIntegration) {
     const first = await runtimePool.query(
       `select user_id as "userId", tenant_id as "tenantId", linked
          from public.bootstrap_auth0_identity($1, $2, $3, $4::uuid)`,
-      [
-        bootstrapAuth0Subject,
-        `${bootstrapUserId}@test.local`,
-        "Bootstrap User",
-        bootstrapTenantId,
-      ],
+      [bootstrapAuth0Subject, `${bootstrapUserId}@test.local`, "Bootstrap User", bootstrapTenantId],
     );
-    if (
-      first.rowCount !== 1 ||
-      first.rows[0]?.tenantId !== bootstrapTenantId ||
-      !first.rows[0]?.linked
-    ) {
+    if (first.rowCount !== 1 || first.rows[0]?.tenantId !== bootstrapTenantId || !first.rows[0]?.linked) {
       throw new Error("first Auth0 bootstrap did not create the initial tenant membership");
     }
 
     const second = await runtimePool.query(
       `select user_id as "userId", tenant_id as "tenantId", linked
          from public.bootstrap_auth0_identity($1, $2, $3, $4::uuid)`,
-      [
-        bootstrapAuth0Subject,
-        `${bootstrapUserId}@test.local`,
-        "Bootstrap User",
-        bootstrapTenantId,
-      ],
+      [bootstrapAuth0Subject, `${bootstrapUserId}@test.local`, "Bootstrap User", bootstrapTenantId],
     );
     if (
       second.rowCount !== 1 ||
@@ -132,32 +118,39 @@ if (!runIntegration) {
       throw new Error("second Auth0 bootstrap was not idempotent");
     }
 
-    const existing = await runtimePool.query(
+    const orphan = await runtimePool.query(
       `select user_id as "userId", tenant_id as "tenantId", linked
          from public.bootstrap_auth0_identity($1, $2, $3, $4::uuid)`,
-      [
-        existingAuth0Subject,
-        `${existingUserId}@test.local`,
-        "Existing User",
-        bootstrapTenantId,
-      ],
+      [existingAuth0Subject, `${existingUserId}@test.local`, "Existing User", bootstrapTenantId],
     );
     if (
-      existing.rowCount !== 1 ||
-      existing.rows[0]?.userId !== existingUserId ||
-      existing.rows[0]?.tenantId !== null ||
-      existing.rows[0]?.linked
+      orphan.rowCount !== 1 ||
+      orphan.rows[0]?.userId !== existingUserId ||
+      orphan.rows[0]?.tenantId !== bootstrapTenantId ||
+      !orphan.rows[0]?.linked
     ) {
-      throw new Error("existing local identity gained an implicit tenant membership");
+      throw new Error("orphaned local identity was not relinked to its first tenant");
+    }
+
+    const orphanSecond = await runtimePool.query(
+      `select user_id as "userId", tenant_id as "tenantId", linked
+         from public.bootstrap_auth0_identity($1, $2, $3, $4::uuid)`,
+      [existingAuth0Subject, `${existingUserId}@test.local`, "Existing User", bootstrapTenantId],
+    );
+    if (
+      orphanSecond.rowCount !== 1 ||
+      orphanSecond.rows[0]?.userId !== existingUserId ||
+      orphanSecond.rows[0]?.tenantId !== bootstrapTenantId ||
+      !orphanSecond.rows[0]?.linked
+    ) {
+      throw new Error("orphan relink was not idempotent");
     }
 
     const membershipCount = await ownerPool.query(
-      `select count(*)::int as count
-         from tenant_memberships
-        where tenant_id = $1`,
+      `select count(*)::int as count from tenant_memberships where tenant_id = $1`,
       [bootstrapTenantId],
     );
-    if (membershipCount.rows[0]?.count !== 1) {
+    if (membershipCount.rows[0]?.count !== 2) {
       throw new Error("unexpected bootstrap tenant membership count");
     }
   });
@@ -169,12 +162,8 @@ if (!runIntegration) {
         `select has_function_privilege(current_user, 'public.check_tenant_membership(text, uuid)', 'execute') as executable,
                 has_function_privilege('public', 'public.check_tenant_membership(text, uuid)', 'execute') as public_executable`,
       );
-      if (!privileges.rows[0]?.executable) {
-        throw new Error("runtime role cannot execute membership resolver");
-      }
-      if (privileges.rows[0]?.public_executable) {
-        throw new Error("membership resolver is executable by PUBLIC");
-      }
+      if (!privileges.rows[0]?.executable) throw new Error("runtime role cannot execute membership resolver");
+      if (privileges.rows[0]?.public_executable) throw new Error("membership resolver is executable by PUBLIC");
 
       const result = await client.query(
         `select user_id as "userId", tenant_id as "tenantId", role, active
