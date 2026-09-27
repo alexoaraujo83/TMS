@@ -2227,3 +2227,27 @@ AUTH-01 permanece **P0 / E4 PENDENTE**. O código está com gate CI verde, mas o
 2. Executar DB-04 E4 com sessão real `tms_app`.
 3. Reconciliar o staged `OUTBOX_WEBHOOK_URLS` separadamente, somente após validar seu contrato e necessidade.
 4. Registrar um manifesto de release com SHA efetivo Web/API/Worker + migration head.
+
+
+## 70. FASE 2 — 2026-09-26 — AUTH-01: gap confirmado entre Connection → TMS Web e tenant bootstrap
+
+### Verificação realizada
+
+- A implementação Web inicia o cadastro/login por `/auth/login?screen_hint=signup` e não fixa uma Connection específica no código da aplicação.
+- A configuração versionada em `infra/auth0/tenant.yaml` gerencia somente a Post-Login Action e seu binding; não há contrato versionado para Connections nem para `enabled_clients`.
+- A busca no repositório não encontrou `enabled_clients`, `connections:` ou `Username-Password-Authentication`.
+- Portanto, o repositório não fornece evidência de que a Connection usada pelo signup está explicitamente habilitada para o cliente **TMS Web** em Auth0 Production.
+- Isso é distinto do vínculo local Auth0 → TMS: a existência de uma identidade Auth0 na tabela `users` prova que alguma autenticação alcançou o backend, mas não prova que a Connection está corretamente associada ao aplicativo Web nem que o usuário recebeu `app_metadata.tenant_id`.
+- Na Production foi observado um usuário Auth0 localizado em `users` sem `tenant_memberships`; isso mantém o cenário de first-login/tenant bootstrap aberto e não deve ser interpretado isoladamente como falha de Application/Connection.
+
+### Gate
+
+**AUTH-01 continua P0 / E4 PENDENTE.** Não alterar o AuthGuard, remover a exigência de tenant claim, aceitar tenant vindo do navegador ou criar uma Connection por suposição.
+
+### Próxima ação controlada
+
+1. Inspecionar no Auth0 Production, por caminho autorizado/read-only, quais Connections estão habilitadas para o cliente **TMS Web**.
+2. Identificar qual Connection é efetivamente usada pelo signup e confirmar que ela está em `enabled_clients` para o aplicativo Web.
+3. Confirmar separadamente o Post-Login Action + binding e o `app_metadata.tenant_id` do usuário de teste.
+4. Emitir um novo token real e verificar os claims; somente então executar o E2E de bootstrap/membership.
+5. Se a Connection for um recurso que o Deploy CLI deve governar, adicionar seu contrato ao `tenant.yaml` somente após confirmar o nome/ID exato em Production; não inventar ou assumir o nome da Connection.
