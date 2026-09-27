@@ -2371,3 +2371,31 @@ Depois da execução, somente o recurso efetivamente divergente deve entrar em p
 - **PR-92:** continua aberto e não-mergeable/dirty; não deve ser mesclado enquanto não for atualizado contra o `main` atual e suas evidências históricas forem reconciliadas. **Estado: ABERTO / AÇÃO MANUAL DE REBASE/ATUALIZAÇÃO NECESSÁRIA.**
 - **PR-85:** continua Draft e deve permanecer fora da promoção enquanto os gates P0 de Auth0 e DB-04 não estiverem encerrados. **Estado: DRAFT / BLOQUEADO POR GATES.**
 - **Próxima sequência P0:** executar manualmente o workflow Auth0 Production Read-Only Audit; se falhar, corrigir somente a primeira falha observada e repetir; se passar, reconciliar TMS Web, Connections/enabled_clients, Post-Login Action/bindings, audience e evidência de login real. DB-04 continua independente e requer sessão PostgreSQL efetiva `tms_app`.
+
+## 75. FASE 2 — 2026-09-27 — Auth0 Production Read-Only runner: supply-chain hardening aplicada
+
+### Alterações aplicadas
+
+- O workflow .github/workflows/auth0-production-readonly.yml foi atualizado para actions/checkout@v7, evitando permanecer em uma versão baseada no runtime Node 20 que já entrou em fase de remoção nos runners do GitHub.
+- O Auth0 CLI deixou de ser instalado por um install.sh apontando para main.
+- O runner agora usa a release oficial Auth0 CLI 1.36.0, baixada diretamente do release versionado e verificada pelo SHA-256 publicado para o artefato Linux x86_64.
+- O restante do workflow permanece read-only: autenticação por Client Credentials, leitura de TMS Web, Connections, Actions, binding, falhas recentes e validação sintática da Action; nenhuma chamada de mutação foi adicionada.
+- A versão 1.36.0 do Auth0 CLI é adequada ao runner atual e adiciona saída machine-readable/agent-mode mais robusta, além das superfícies nativas de Connections; o workflow continua usando as chamadas já validadas para reduzir mudança de comportamento.
+
+### Evidência
+
+- Commit aplicado no main: b22ef386a48dc780379a8c07ba76a951c1919c0f.
+- Workflow continua com workflow_dispatch para execução manual.
+- O checksum usado no runner corresponde ao artefato oficial Linux x86_64 da release 1.36.0.
+- A mudança é exclusivamente de cadeia de execução do auditor; não altera Action Auth0, Connection, tenant metadata, AuthGuard, RLS ou Production Auth0.
+
+### Gate
+
+AUTH-01 permanece P0 / E4 PENDENTE. Esta correção aumenta o determinismo e a segurança do auditor, mas não substitui sua execução real contra Auth0 Production.
+
+### Próxima ação P0
+
+1. Executar manualmente Auth0 Production Read-Only Audit no GitHub UI.
+2. Se o primeiro erro for no CLI/runner, corrigir somente esse erro e repetir.
+3. Se o runner completar, reconciliar os recursos observados: TMS Web → Connections/enabled_clients → Actions → Post-Login bindings → causa do missing_tenant_id → audience → usuário de teste → token real → E2E.
+4. Somente depois da evidência read-only, preparar qualquer mutação Auth0 Production; nenhuma mutação deve ser feita por tentativa.
