@@ -2335,3 +2335,29 @@ A próxima execução deve verificar, sem mutar Production:
 5. divergência entre Action live e `infra/auth0/actions/post-login.js`.
 
 Depois da execução, somente o recurso efetivamente divergente deve entrar em plano de correção controlada.
+
+
+## 74. FASE 2 — 2026-09-27 — pós-correção do runner Auth0: workflow ainda sem execução comprovada e PRs abertas reconciliadas
+
+### Evidência
+
+- O commit `af0363953b5bc7130b90fe30892ad69f1d9d673a` contém somente a correção do endpoint do binding Post-Login no workflow read-only.
+- O arquivo efetivo em `main` confirma `auth0 api get "actions/triggers/post-login/bindings"`; não há operação de escrita no tenant.
+- O status combinado do commit registra falhas nos checks Vercel de `tms-core-api` e `tms-web`, enquanto os dois serviços Railway observados permanecem SUCCESS. Esses checks Vercel não constituem, isoladamente, evidência de defeito funcional do runner Auth0; a execução do workflow Auth0 ainda não foi localizada por esta conexão.
+- A ferramenta GitHub disponível para runs por commit não expõe o disparo manual de `workflow_dispatch`. Portanto, não é correto inferir que o runner já executou com o endpoint corrigido.
+- PR #92 (`docs/release-manifest-deploy-contract`) permanece OPEN e `mergeable_state=dirty`, com comentário anterior registrando que a branch está atrás de `main`. O conteúdo é documental e deve ser atualizado/rebaseado antes de qualquer merge.
+- PR #85 (`feat/tms-web-pages`) permanece DRAFT; a revisão existente orienta não promover/mesclar antes dos gates de infraestrutura e alinhamento com o estado atual.
+
+### Decisão operacional
+
+- **AUTH-01: P0 / E4 PENDENTE.** O próximo passo é executar manualmente o workflow **Auth0 Production Read-Only Audit** pelo GitHub UI, com os três secrets M2M autorizados já previstos no contrato. O resultado esperado é obter TMS Web, Connections/\`enabled_clients\`, Actions Post-Login, bindings, falhas recentes e sintaxe da Action.
+- Não alterar Auth0 Production nesta etapa.
+- PR #92 não deve ser mesclada enquanto estiver `dirty`; primeiro atualizar a branch sobre `main` e revalidar.
+- PR #85 deve continuar DRAFT até os gates P0/P1 relevantes estarem fechados e a implementação Web ser revalidada contra o contrato Auth0/API atual.
+
+### Próxima ação P0
+
+1. Executar o workflow read-only via GitHub UI.
+2. Se houver falha, analisar o primeiro passo Auth0 que falhar; não aplicar mutações como tentativa de recuperação.
+3. Se houver sucesso, reconciliar somente os recursos realmente observados e preparar, separadamente, qualquer correção Auth0 que exija confirmação explícita.
+4. Em paralelo, manter DB-04 separado: ainda falta a prova comportamental com uma sessão real `tms_app`.
