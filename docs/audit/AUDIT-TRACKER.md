@@ -2272,3 +2272,34 @@ A configuração de código Web está alinhada ao SDK Auth0 v4. O bloqueio resta
 ### Próxima ação
 
 Usar uma sessão autorizada do Auth0 CLI/Management SDK para obter a configuração Production real e corrigir somente o recurso observado. Depois revalidar o deployment Vercel e executar o E2E completo.
+
+
+## 72. FASE 2 — 2026-09-27 — Auth0 Production: runner read-only criado e execução pendente
+
+### Ação aplicada
+
+- Foi criado no `main` o workflow `.github/workflows/auth0-production-readonly.yml`, commit `23df584b48c9bae7b08ca9101912d218f3de04a1`.
+- O workflow é explicitamente **read-only**: não contém comandos de criação, update, deploy, delete ou rotação de segredo no tenant Auth0.
+- O workflow instala o Auth0 CLI em runner efêmero, autentica por **Client Credentials** usando três secrets do GitHub (`AUTH0_CLI_DOMAIN`, `AUTH0_CLI_CLIENT_ID`, `AUTH0_CLI_CLIENT_SECRET`) e coleta:
+  1. aplicação **TMS Web**;
+  2. Connections e `enabled_clients`;
+  3. Actions Post-Login;
+  4. binding do trigger `post-login`;
+  5. últimos eventos Auth0 de falha;
+  6. validação sintática local da Action versionada.
+- A referência do Auth0 CLI foi revalidada: `auth0 login --domain --client-id --client-secret` é o mecanismo documentado para CI/CD; `auth0 apps list`, `auth0 api get connections`, `auth0 actions list`, `auth0 logs list` e `auth0 api get ...` são superfícies suportadas para inspeção read-only.
+- A consulta GitHub ao commit do workflow não retornou run associado; o wrapper disponível para runs por commit está limitado a runs disparados por pull request. Não há, nesta sessão, uma ferramenta exposta para disparar `workflow_dispatch` diretamente.
+- Portanto, **nenhuma conclusão sobre o tenant Auth0 Production foi inferida a partir da criação do workflow**.
+
+### Gate
+
+**AUTH-01 continua P0 / E4 PENDENTE.**
+
+A próxima evidência necessária é a execução real do workflow com um M2M autorizado ao Management API. Depois disso, reconciliar somente os recursos observados: TMS Web → Connection/`enabled_clients` → Action → binding → causa dos failures (`missing_tenant_id`) → novo token → E2E.
+
+### Segurança
+
+- Não foram adicionados segredos ao repositório.
+- Não foi usada a credencial da aplicação Web como credencial M2M de Management API.
+- Não foi alterado AuthGuard, tenant claim, RLS ou tenant_id por esta etapa.
+- Não foi executada nenhuma mutação no Auth0 Production por esta sessão.
