@@ -2303,3 +2303,35 @@ A próxima evidência necessária é a execução real do workflow com um M2M au
 - Não foi usada a credencial da aplicação Web como credencial M2M de Management API.
 - Não foi alterado AuthGuard, tenant claim, RLS ou tenant_id por esta etapa.
 - Não foi executada nenhuma mutação no Auth0 Production por esta sessão.
+
+
+## 73. FASE 2 — 2026-09-27 — Auth0 Production read-only runner: endpoint de binding corrigido
+
+### Falha reproduzida
+
+- A execução do workflow chegou à etapa de inspeção do Post-Login, autenticada no Auth0 CLI, mas falhou na chamada `auth0 api get triggers/post-login`.
+- O Auth0 Management API respondeu HTTP 404.
+- A falha é de **endpoint incorreto**, não evidência de que o trigger Post-Login não exista e não evidência de falta de permissão.
+- A referência oficial do Auth0 mostra que os bindings do Post-Login são expostos em `actions/triggers/post-login/bindings`.
+
+### Correção aplicada
+
+- O workflow `.github/workflows/auth0-production-readonly.yml` foi atualizado no `main`.
+- Commit da correção: `af0363953b5bc7130b90fe30892ad69f1d9d673a`.
+- A consulta foi corrigida para:
+  `auth0 api get "actions/triggers/post-login/bindings"`.
+- Nenhuma operação de escrita no Auth0 foi adicionada.
+- A correção mantém o escopo read-only do runner.
+
+### Estado
+
+**AUTH-01 permanece P0 / E4 PENDENTE.**
+
+A próxima execução deve verificar, sem mutar Production:
+1. bindings reais e ordem das Actions;
+2. Action/version efetivamente publicada;
+3. Connections e `enabled_clients`;
+4. eventos recentes de falha;
+5. divergência entre Action live e `infra/auth0/actions/post-login.js`.
+
+Depois da execução, somente o recurso efetivamente divergente deve entrar em plano de correção controlada.
