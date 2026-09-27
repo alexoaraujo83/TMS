@@ -2251,3 +2251,24 @@ AUTH-01 permanece **P0 / E4 PENDENTE**. O código está com gate CI verde, mas o
 3. Confirmar separadamente o Post-Login Action + binding e o `app_metadata.tenant_id` do usuário de teste.
 4. Emitir um novo token real e verificar os claims; somente então executar o E2E de bootstrap/membership.
 5. Se a Connection for um recurso que o Deploy CLI deve governar, adicionar seu contrato ao `tenant.yaml` somente após confirmar o nome/ID exato em Production; não inventar ou assumir o nome da Connection.
+
+
+## 71. FASE 2 — 2026-09-26 — Auth0 SDK/Vercel/GitHub: contrato Web endurecido sem assumir Connection
+
+### Ajustes aplicados
+
+- Revalidado o uso do `@auth0/nextjs-auth0` v4 no Web: `Auth0Client`, `proxy.ts` com `auth0.middleware()`, rotas SDK `/auth/*` e emissão de Access Token para a API.
+- Revalidada a Post-Login Action: tenant somente de `event.user.app_metadata.tenant_id`; nenhum tenant vindo de query string ou navegador é aceito.
+- Revalidado o deployment Production do Vercel Web: deployment READY no commit do tracker imediatamente anterior; após o novo commit documental, um novo deployment Production READY foi observado pelo Vercel.
+- O contrato documental de `infra/auth0/README.md` foi reforçado para separar explicitamente: (a) aplicação TMS Web, (b) Connection Auth0 habilitada para a aplicação e (c) metadata/tenant bootstrap.
+- Não foi adicionada uma Connection presumida ao `tenant.yaml`, porque o nome/ID da Connection Production ainda não foi observado por uma ferramenta Auth0 Management autorizada.
+
+### Estado
+
+A configuração de código Web está alinhada ao SDK Auth0 v4. O bloqueio restante é **tenant-side**, não um motivo para alterar o AuthGuard ou relaxar o tenant claim.
+
+**AUTH-01: P0 / E4 PENDENTE** até existir evidência de Connection → TMS Web, Action/binding, `app_metadata.tenant_id`, token real e first-login completo.
+
+### Próxima ação
+
+Usar uma sessão autorizada do Auth0 CLI/Management SDK para obter a configuração Production real e corrigir somente o recurso observado. Depois revalidar o deployment Vercel e executar o E2E completo.
