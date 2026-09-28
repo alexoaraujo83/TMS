@@ -49,8 +49,11 @@ jobs:
           runtime_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
           admin_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create extension if not exists pgcrypto"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "drop role if exists tms_bootstrap"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_bootstrap nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "drop role if exists tms_ci_admin"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_ci_admin login nosuperuser nocreatedb createrole noinherit noreplication nobypassrls password '$admin_password'"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant tms_bootstrap to tms_ci_admin"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant connect on database tms_dev to tms_ci_admin"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant usage, create on schema public to tms_ci_admin"
           printf 'DATABASE_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
@@ -59,6 +62,11 @@ jobs:
           printf 'TEST_OWNER_DATABASE_URL=postgresql://tms:tms@localhost:5432/tms_dev\n' >> "$GITHUB_ENV"
       - name: Run initial schema migration as tms_ci_admin
         run: pnpm --filter @tms/database migrate
+      - name: Revoke CI migration access to bootstrap capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "revoke tms_bootstrap from tms_ci_admin"
       - name: Set ephemeral runtime credential
         shell: bash
         run: |
