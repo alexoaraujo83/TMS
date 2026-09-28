@@ -128,10 +128,10 @@ $$;
 do $grants$
 begin
   if exists (select 1 from pg_roles where rolname = 'tms_bootstrap') then
-    grant select, insert, update on table public.users to tms_bootstrap;
-    grant select, insert on table public.tenant_memberships to tms_bootstrap;
-    grant select on table public.tenants to tms_bootstrap;
-    grant select on table public.roles to tms_bootstrap;
+    execute 'grant select, insert, update on table public.users to tms_bootstrap';
+    execute 'grant select, insert on table public.tenant_memberships to tms_bootstrap';
+    execute 'grant select on table public.tenants to tms_bootstrap';
+    execute 'grant select on table public.roles to tms_bootstrap';
   end if;
 end;
 $grants$;
