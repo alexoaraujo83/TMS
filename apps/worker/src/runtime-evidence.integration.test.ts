@@ -7,20 +7,22 @@ import { createFreightStatusChangedHandler } from "./freight-status-changed.hand
 import type { DurableJob } from "./durable-jobs-worker.js";
 
 const adminUrl = process.env.DATABASE_ADMIN_URL;
+const fixtureOwnerUrl = process.env.TEST_OWNER_DATABASE_URL ?? adminUrl;
 const runtimeUrl = process.env.RUNTIME_DATABASE_URL ?? process.env.DATABASE_URL;
-const enabled = process.env.RUN_DB_INTEGRATION === "true" && Boolean(adminUrl && runtimeUrl);
+const enabled = process.env.RUN_DB_INTEGRATION === "true" && Boolean(fixtureOwnerUrl && runtimeUrl);
 
 test("REAL replay: same event emits idempotent_replay=false then true and keeps one audit row", { skip: !enabled }, async () => {
   const admin = new Pool({ connectionString: adminUrl });
+  const fixtureOwner = new Pool({ connectionString: fixtureOwnerUrl });
   const runtime = new Pool({ connectionString: runtimeUrl });
   const tenantId = randomUUID();
   const freightId = randomUUID();
   const eventId = randomUUID();
   const telemetry: Array<Record<string, unknown>> = [];
   try {
-    await admin.query("insert into tenants (id,name,slug,status) values ($1,'Replay Evidence',$2,'active')",
+    await fixtureOwner.query("insert into tenants (id,name,slug,status) values ($1,'Replay Evidence',$2,'active')",
       [tenantId, `replay-evidence-${tenantId}`]);
-    await admin.query(`insert into freights
+    await fixtureOwner.query(`insert into freights
       (id,tenant_id,status,freight_type,origin_city,origin_state,destination_city,destination_state,cargo_description,quantity,weight_kg)
       values ($1,$2,'open','dedicated','Santos','SP','Campinas','SP','replay evidence',1,100)`,
       [freightId, tenantId]);
@@ -54,24 +56,26 @@ test("REAL replay: same event emits idempotent_replay=false then true and keeps 
     );
     assert.equal(result.rows[0]?.count, 1);
   } finally {
-    await admin.query("delete from audit_events where tenant_id=$1",[tenantId]);
-    await admin.query("delete from freights where tenant_id=$1",[tenantId]);
-    await admin.query("delete from tenants where id=$1",[tenantId]);
+    await fixtureOwner.query("delete from audit_events where tenant_id=$1",[tenantId]);
+    await fixtureOwner.query("delete from freights where tenant_id=$1",[tenantId]);
+    await fixtureOwner.query("delete from tenants where id=$1",[tenantId]);
     await runtime.end();
-    await admin.end();
+    await fixtureOwner.end();
+    await admin?.end();
   }
 });
 
 test("REAL cross-tenant negative: tenant B cannot read, insert, update, or delete tenant A freight", { skip: !enabled }, async () => {
   const admin = new Pool({ connectionString: adminUrl });
+  const fixtureOwner = new Pool({ connectionString: fixtureOwnerUrl });
   const runtime = new Pool({ connectionString: runtimeUrl });
   const tenantA = randomUUID();
   const tenantB = randomUUID();
   const freightA = randomUUID();
   try {
-    await admin.query("insert into tenants (id,name,slug,status) values ($1,'RLS A',$2,'active'),($3,'RLS B',$4,'active')",
+    await fixtureOwner.query("insert into tenants (id,name,slug,status) values ($1,'RLS A',$2,'active'),($3,'RLS B',$4,'active')",
       [tenantA,`rls-a-${tenantA}`,tenantB,`rls-b-${tenantB}`]);
-    await admin.query(`insert into freights
+    await fixtureOwner.query(`insert into freights
       (id,tenant_id,status,freight_type,origin_city,origin_state,destination_city,destination_state,cargo_description,quantity,weight_kg)
       values ($1,$2,'open','dedicated','Santos','SP','Campinas','SP','rls evidence',1,100)`,
       [freightA,tenantA]);
@@ -94,10 +98,11 @@ test("REAL cross-tenant negative: tenant B cannot read, insert, update, or delet
     });
 
   } finally {
-    await admin.query("delete from freights where id=$1",[freightA]);
-    await admin.query("delete from tenants where id in ($1,$2)",[tenantA,tenantB]);
+    await fixtureOwner.query("delete from freights where id=$1",[freightA]);
+    await fixtureOwner.query("delete from tenants where id in ($1,$2)",[tenantA,tenantB]);
     await runtime.end();
-    await admin.end();
+    await fixtureOwner.end();
+    await admin?.end();
   }
 });
 
