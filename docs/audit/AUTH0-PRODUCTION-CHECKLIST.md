@@ -247,6 +247,16 @@ Do not promote/declare Production validated until:
 
 ## Change log
 
+### 2026-09-28 — DB-04 runtime-role source/control verification
+
+- Re-read the Production Railway service contract and current worker source.
+- `apps/worker/src/main.ts` contains a startup guard that executes `select current_user` and fails startup unless the runtime role is exactly `tms_app`; on success it emits `database.runtime_role_verified`.
+- The Production Railway service is still configured from `alexoaraujo83/TMS` / `main`, with `node apps/worker/dist/main.js` as the start command and `DATABASE_URL` defined.
+- Read-only inspection of the successful Production deployment logs did not retrieve the `database.runtime_role_verified` event, so source-level enforcement cannot be promoted to runtime proof.
+- Neon PostgreSQL telemetry is not enabled for the Production region, so it cannot provide an independent session-role trace.
+- DB-04 therefore remains P0/open. No Railway variable, deployment, database role, RLS policy or grant was changed.
+
+
 ### 2026-09-28 — Auth0 read-only export execution path rechecked
 
 - Re-read `.github/workflows/auth0-production-deploy-export.yml` on `main`.
