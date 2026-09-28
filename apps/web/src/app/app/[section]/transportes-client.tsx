@@ -44,7 +44,8 @@ export default function TransportesPage(){
   if(!form)return;
   setCreateSaving(true);setError("");
   try{
-   const payload={...form,originState:form.originState.toUpperCase(),destinationState:form.destinationState.toUpperCase(),quantity:Number(form.quantity),weightKg:Number(form.weightKg),
+   const {status: _status, ...formPayload}=form;
+   const payload={...formPayload,originState:form.originState.toUpperCase(),destinationState:form.destinationState.toUpperCase(),quantity:Number(form.quantity),weightKg:Number(form.weightKg),
     customerPriceCents:form.customerPriceCents?Number(form.customerPriceCents):undefined,driverPriceCents:form.driverPriceCents?Number(form.driverPriceCents):undefined};
    const r=await fetch("/api/tms/freights",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(payload)});
    const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível incluir o frete.");
@@ -55,7 +56,7 @@ export default function TransportesPage(){
   setSaving(id);setError("");
   try{
    const r=await fetch(`/api/tms/freights/${encodeURIComponent(id)}/status`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({status})});
-   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível alterar o status do frete.");
+   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.message||body?.detail||body?.error||"Não foi possível alterar o status do frete.");
    setFreights(v=>v.map(f=>f.id===id?{...f,status:body.status||status}:f));
    setEditing(null);setForm(null);
   }catch(e){setError(e instanceof Error?e.message:"Não foi possível alterar o status do frete.");}finally{setSaving(null);}
