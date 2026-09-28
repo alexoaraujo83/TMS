@@ -247,6 +247,15 @@ Do not promote/declare Production validated until:
 
 ## Change log
 
+### 2026-09-28 — Railway Production runtime log inspection
+
+- Read-only Railway inspection of the current Production `tms-worker` deployment returned SUCCESS and continuous `durable_job.telemetry` events during the deployment's runtime window.
+- The logs confirm the Production worker is actively executing with the expected tenant context and no deployment/runtime failure was observed in the inspected window.
+- These logs do **not** expose or prove the PostgreSQL session role, `current_user`, `rolbypassrls`, or the DB-04 behavioral assertions.
+- Therefore this step strengthens Production worker runtime evidence but does not close DB-04. No deployment, variable, SQL, RLS, grant or AuthGuard mutation was performed.
+- Remaining DB-04 requirement: obtain a safe runtime proof that the actual restricted database session is `tms_app`, then execute the complete behavioral suite.
+
+
 ### 2026-09-28 — Vercel Production deployment reconciliation
 
 - Read-only Vercel inspection confirmed the `tms-web` Production deployment for `main` is READY and points to the latest checklist commit `a1ee105e...`.
