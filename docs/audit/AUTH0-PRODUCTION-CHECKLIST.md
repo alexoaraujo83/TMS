@@ -247,6 +247,14 @@ Do not promote/declare Production validated until:
 
 ## Change log
 
+### 2026-09-28 — Auth0 read-only export execution path rechecked
+
+- Re-read `.github/workflows/auth0-production-deploy-export.yml` on `main`.
+- Confirmed the workflow is explicitly `workflow_dispatch` only, uses the protected `production-auth0-readonly` environment, dedicated Deploy CLI credentials, excludes client/connection secrets from exports, performs an Auth0 Deploy CLI **export only**, compares the export with the source contract, and publishes short-retention evidence.
+- Re-checked the connected GitHub Actions tool surface: it exposes run/job/artifact retrieval but no workflow-dispatch operation. No Auth0 Production export was therefore triggered or fabricated from this session.
+- AUTH-01 remains P0/open until an actual read-only Production export artifact is retrieved and reconciled. No Auth0 configuration mutation was performed.
+
+
 ### 2026-09-28 — Railway Production runtime log inspection
 
 - Read-only Railway inspection of the current Production `tms-worker` deployment returned SUCCESS and continuous `durable_job.telemetry` events during the deployment's runtime window.
