@@ -23,6 +23,8 @@
 - [x] Post-Login Action source is versioned.
 - [x] Post-Login binding is versioned in `infra/auth0/tenant.yaml`.
 - [~] Production Action/binding has not yet been independently proven against live Auth0.
+- [~] Live Production token/runtime evidence now proves issuer, Production audience, subject and tenant claim for a controlled authenticated session.
+- [~] Behavioral RLS evidence now proves tenant-A visibility and synthetic tenant-B isolation for the supplied probe, but the complete DB-04 suite is not yet closed.
 - [!] AUTH-01 E4 is still open.
 - [!] DB-04 behavioral RLS proof remains a production gate.
 
@@ -40,7 +42,7 @@
 - [ ] Confirm live binding matches `infra/auth0/tenant.yaml`.
 - [ ] Do not modify AuthGuard, RLS or grants to work around Auth0 behavior.
 
-**Step result:** BLOCKED/PENDING — live Auth0 state cannot be verified from the connected GitHub/Vercel tooling alone. The repository does contain a safe read-only export workflow, but no workflow dispatch/run/artifact is accessible through the currently exposed GitHub connector.
+**Step result:** BLOCKED/PENDING — the supplied runtime evidence proves a successful authenticated Production token path, but does not identify the live Action/binding configuration. Live Auth0 configuration still requires read-only export/Management evidence.
 
 ## 2. TMS Web Application contract
 
@@ -55,7 +57,7 @@
 - [ ] Confirm exact production domain.
 - [ ] Remove obsolete production callback/logout/origin entries when safe.
 
-**Step result:** PARTIAL — code/config contract exists; live Auth0 application settings remain to be verified.
+**Step result:** PARTIAL — successful authenticated runtime evidence exists; live application URI configuration remains unverified.
 
 ## 3. Connection → TMS Web
 
@@ -74,12 +76,13 @@
 - [x] Action emits `https://tms-platform.io/claims/tenant_id`.
 - [x] Action does not assign tenant from an untrusted signup URL.
 - [x] API treats PostgreSQL membership as authoritative.
-- [ ] Verify controlled test user has the intended `app_metadata.tenant_id`.
+- [~] Fresh authenticated Production runtime evidence contains tenant ID `19d9a5a4-2d50-4b78-a910-1fdea96fd12e`.
+- [ ] Verify controlled test user has the intended `app_metadata.tenant_id` directly in Auth0.
 - [ ] Verify tenant UUID corresponds to an active TMS tenant.
 - [ ] Verify corresponding local membership exists or first-login bootstrap is exercised.
 - [ ] Do not persist the user's token/cookie in evidence.
 
-**Step result:** PARTIAL — source behavior verified; live user metadata still requires controlled validation.
+**Step result:** PARTIAL — tenant claim is proven in the authenticated runtime path; direct Auth0 user metadata and local membership evidence remain pending.
 
 ## 5. Auth0 API / token contract
 
@@ -91,13 +94,15 @@
 - [x] API uses JWKS.
 - [x] API restricts JWT verification to RS256.
 - [x] API requires `sub`.
-- [ ] Verify live TMS API Production audience.
-- [ ] Verify live issuer.
-- [ ] Verify live JWKS endpoint.
-- [ ] Verify fresh Production token contains the tenant claim.
-- [ ] Verify token is accepted by Production API.
+- [x] Live authenticated runtime reports issuer `https://tms-platform.us.auth0.com/`.
+- [x] Live authenticated runtime reports Production audience `urn:tms:api:production`.
+- [x] Live authenticated runtime reports subject `auth0|6aad217effa00aa441cb0b3f`.
+- [x] Live authenticated runtime reports tenant claim `19d9a5a4-2d50-4b78-a910-1fdea96fd12e`.
+- [ ] Verify live JWKS endpoint independently.
+- [ ] Verify the raw fresh Production token claim set without storing the token.
+- [~] Verify token is accepted by Production runtime/API path — authenticated runtime evidence confirms the protected path is operating, but the exact API endpoint/request evidence is not included in this evidence bundle.
 
-**Step result:** PARTIAL — implementation is verified; live Production token evidence is pending.
+**Step result:** VERIFIED/PARTIAL — issuer, Production audience, subject and tenant ID are now evidenced from the authenticated Production runtime. Raw token/JWKS and exact protected API request evidence remain to be captured.
 
 ## 6. TMS Web → TMS API
 
@@ -105,11 +110,11 @@
 - [x] Authenticated fetch uses `fetchWithAuth`.
 - [x] `NEXT_PUBLIC_API_BASE_URL` is the configured API origin.
 - [~] Latest Production deployment is on `main` at commit `ac1997fd699dae5ee2c7a5c67794e115b2edddd3`; this proves the checklist commit is deployed, not that Production environment variables are correct.
+- [~] Authenticated Production runtime path is proven by the supplied `authenticated: true` evidence.
 - [ ] Verify no Preview/Development origin is used by Production.
-- [ ] Verify fresh login reaches `/api/tms/auth-runtime`.
-- [ ] Verify protected API request succeeds with a valid token.
+- [ ] Verify protected API request succeeds with a valid token and record endpoint-level evidence.
 
-**Step result:** PARTIAL — latest Production deployment is READY and points to the current checklist commit; deployed E2E and environment-variable verification remain pending.
+**Step result:** PARTIAL — authenticated Production runtime is now evidenced; environment separation and endpoint-level API proof remain pending.
 
 ## 7. Tenant authorization
 
@@ -118,12 +123,13 @@
 - [x] `x-tenant-id` cannot override authenticated tenant claim.
 - [x] API checks `sub + tenant` membership.
 - [x] Inactive/missing membership is denied after bootstrap rules.
+- [~] Supplied isolation probe shows tenant A is visible and synthetic tenant B is not visible.
 - [ ] Run controlled wrong-tenant header test.
 - [ ] Run controlled missing-tenant-claim test.
 - [ ] Run controlled inactive-membership test.
-- [ ] Confirm no cross-tenant resource access.
+- [ ] Confirm no cross-tenant resource access across the required protected endpoints.
 
-**Step result:** PARTIAL — code path verified; negative runtime evidence is pending.
+**Step result:** PARTIAL — one tenant-isolation probe is evidenced; the complete negative authorization suite remains pending.
 
 ## 8. First-login identity bootstrap
 
@@ -137,23 +143,24 @@
 - [ ] Verify second request is idempotent.
 - [ ] Verify duplicate/conflicting Auth0 subject/email cases are denied.
 
-**Step result:** PARTIAL — implementation exists; runtime proof is pending.
+**Step result:** PARTIAL — the authenticated subject is known, but the supplied evidence does not prove that first-login bootstrap executed or that the local identity/membership was created by bootstrap.
 
 ## 9. PostgreSQL / RLS gate DB-04
 
 - [x] Tenant context is part of the API request context.
 - [x] Repository architecture installs tenant context transactionally.
 - [x] RLS is documented as the final isolation boundary.
-- [ ] Obtain a real `tms_app` session in Production.
-- [ ] Execute the six DB-04 behavioral isolation tests.
-- [ ] Prove same-tenant access.
-- [ ] Prove cross-tenant read denial.
+- [~] Supplied probe proves same-tenant visibility: `tenantAVisible=true`.
+- [~] Supplied probe proves cross-tenant visibility isolation: `tenantBVisible=false` for synthetic tenant B.
+- [ ] Obtain/record a real `tms_app` session in Production.
+- [ ] Execute the complete six DB-04 behavioral isolation tests.
+- [ ] Prove cross-tenant read denial independently.
 - [ ] Prove cross-tenant write denial.
 - [ ] Prove missing tenant context denial.
 - [ ] Prove role cannot bypass RLS.
 - [ ] Record only safe evidence.
 
-**Step result:** BLOCKER/P0 — DB-04 remains open.
+**Step result:** BLOCKER/P0 — meaningful RLS isolation evidence is now present, including tenant-A visibility and synthetic tenant-B non-visibility, but DB-04 cannot close until the remaining behavioral tests and session evidence are captured.
 
 ## 10. Production environment separation
 
@@ -174,30 +181,32 @@
 - [x] Repository contract says secrets must not be committed.
 - [x] TMS Web client secret is server-side.
 - [x] Auth0 Deploy CLI contract uses a dedicated M2M application.
+- [x] Supplied evidence contains no access token, cookie or full connection string.
 - [ ] Audit Git history for exposed secrets.
 - [ ] Audit Vercel environment variables.
 - [ ] Audit Railway environment variables.
 - [ ] Rotate any credential that has been exposed outside secret storage.
 - [ ] Verify no secrets/tokens/cookies are included in audit evidence.
 
-**Step result:** PENDING — secret exposure/rotation audit remains required.
+**Step result:** PARTIAL — the supplied runtime evidence is safe at the content level; the broader historical secret-exposure and rotation audit remains pending.
 
 ## 12. Production smoke test
 
-- [ ] Fresh login.
-- [ ] Callback succeeds.
-- [ ] Session established.
-- [ ] Access token obtained server-side.
-- [ ] Tenant claim present.
-- [ ] API accepts token.
-- [ ] Membership resolves.
-- [ ] PostgreSQL tenant context is set.
-- [ ] Same-tenant operation succeeds.
-- [ ] Cross-tenant operation is denied.
+- [x] Authenticated Production runtime path.
+- [x] Access-token-backed tenant identity is evidenced.
+- [~] Same-tenant operation/visibility is evidenced by the probe.
+- [~] Cross-tenant isolation is evidenced by the probe.
+- [ ] Fresh login callback evidence.
+- [ ] Session establishment evidence from login through callback.
+- [ ] Server-side access token acquisition endpoint evidence.
+- [ ] Protected API endpoint response evidence.
+- [ ] Membership resolution evidence.
+- [ ] PostgreSQL tenant context evidence.
+- [ ] Cross-tenant write denial.
 - [ ] Logout succeeds.
 - [ ] Re-login succeeds.
 
-**Step result:** BLOCKED until live Auth0, API and DB evidence is available.
+**Step result:** PARTIAL — authentication and tenant-isolation behavior are evidenced, but the full smoke test sequence is not closed.
 
 ## 13. AUTH-01 closure gate
 
@@ -206,12 +215,12 @@ AUTH-01 may be marked CLOSED only when all are proven:
 - [ ] Live Action/version identified.
 - [ ] Live Post-Login binding identified.
 - [ ] Source/live diff resolved.
-- [ ] Test user's tenant metadata verified.
-- [ ] Fresh token tenant claim verified.
+- [~] Fresh Production runtime tenant claim verified.
+- [ ] Test user's Auth0 `app_metadata.tenant_id` verified directly.
 - [ ] API membership verification verified.
-- [ ] Tenant-scoped DB operation verified.
-- [ ] Negative tenant test verified.
-- [ ] No secrets/tokens persisted in repository or evidence.
+- [~] Tenant-scoped DB visibility/isolation probe verified.
+- [ ] Negative tenant authorization suite verified.
+- [x] No secrets/tokens persisted in the supplied evidence.
 
 **Current status:** [!] OPEN / P0.
 
@@ -233,24 +242,27 @@ Do not promote/declare Production validated until:
 
 ## Change log
 
-### 2026-09-28 — Read-only Auth0 export workflow gate
+### 2026-09-28 — Authenticated Production + tenant-isolation runtime evidence
 
-Verified:
-- `.github/workflows/auth0-production-deploy-export.yml` is manually dispatched only (`workflow_dispatch`).
-- The workflow uses the protected `production-auth0-readonly` environment and three dedicated Deploy CLI secrets; secret values are not present in source.
-- The workflow exports Production configuration with Auth0 Deploy CLI, validates the export shape, compares it with `infra/auth0/tenant.yaml` and `infra/auth0/actions/post-login.js`, and uploads a short-lived evidence artifact.
-- The workflow explicitly does not perform Auth0 import/update/create/delete operations.
-- `infra/auth0/DEPLOY-CLI-PRODUCTION.md` defines the required dedicated M2M/Management API setup and explicitly forbids reusing the TMS Web client.
-- Repository search found the workflow and its artifact definition, but no committed export artifact and no accessible workflow run/artifact through the currently exposed GitHub connector.
+Evidence supplied for the controlled Production session shows:
+- `authenticated=true`.
+- Auth0 issuer is the Production tenant issuer.
+- Audience includes `urn:tms:api:production` and the Auth0 userinfo audience.
+- A concrete Auth0 subject is present.
+- A concrete tenant ID is present in the authenticated runtime context.
+- The tenant-isolation probe reports tenant A visible and synthetic tenant B not visible.
+- The probe reports `rlsIsolation=true`.
+- The identity payload contains the same Auth0 subject and the user's profile email/name fields.
+- The evidence does not include a raw token or cookie.
 
-Result:
-- [x] Source-controlled read-only reconciliation mechanism is defined.
-- [!] Live Auth0 Production evidence remains blocked pending execution/access to the workflow run artifact or an equivalent read-only Auth0 Management/Deploy export.
-- [!] AUTH-01 remains P0/open.
-- [!] DB-04 remains P0/open.
+Checklist impact:
+- Live issuer/audience/subject/tenant runtime evidence moved from pending to verified.
+- Tenant-A visibility and synthetic tenant-B isolation moved to partial DB-04 evidence.
+- Full DB-04 remains open because the supplied bundle does not prove cross-tenant writes, missing tenant context denial, role-bypass resistance, or a recorded real `tms_app` session.
+- AUTH-01 remains open because live Action/binding/Connection configuration and direct Auth0 `app_metadata.tenant_id` evidence are still absent.
+- No Auth0 mutation is authorized by this evidence alone.
 
 Next operational step:
-1. Execute `Auth0 Production Deploy Config Export` via GitHub Actions with the protected `production-auth0-readonly` environment.
-2. Download `auth0-production-export-evidence`.
-3. Compare the live `tenant.yaml` and Action source with the source-controlled contract.
-4. Update this checklist with the actual live Action/binding/Connection evidence before any mutation.
+1. Preserve this runtime evidence as safe audit evidence without storing tokens/cookies.
+2. Capture the remaining DB-04 behavioral tests, especially cross-tenant write, missing tenant context, and role-bypass resistance.
+3. In parallel, obtain the read-only Auth0 Production export to prove the live Action/binding/Connection configuration.
