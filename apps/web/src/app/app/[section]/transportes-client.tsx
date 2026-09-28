@@ -10,7 +10,7 @@ type Freight={
  driverPriceCents:string|number|null;
 };
 type FormState={
- freightType:string; originCity:string; originState:string; destinationCity:string;
+ freightType:string; status:string; originCity:string; originState:string; destinationCity:string;
  destinationState:string; cargoDescription:string; quantity:string; weightKg:string;
  customerPriceCents:string; driverPriceCents:string;
 };
@@ -18,10 +18,10 @@ type FormState={
 const labels:Record<string,string>={draft:"Rascunho",open:"Aberto",matching:"Matching",negotiating:"Negociando",assigned:"Atribuído",in_transit:"Em trânsito",delivered:"Entregue",cancelled:"Cancelado"};
 const freightTypes=[["dedicated","Dedicado"],["shared","Fracionado"],["complement","Complemento"],["urgent","Urgente"]];
 
-const emptyForm:FormState={freightType:"dedicated",originCity:"",originState:"",destinationCity:"",destinationState:"",cargoDescription:"",quantity:"1",weightKg:"",customerPriceCents:"",driverPriceCents:""};
+const emptyForm:FormState={freightType:"dedicated",status:"draft",originCity:"",originState:"",destinationCity:"",destinationState:"",cargoDescription:"",quantity:"1",weightKg:"",customerPriceCents:"",driverPriceCents:""};
 
 function formFrom(f:Freight):FormState{return{
- freightType:f.freightType,originCity:f.originCity,originState:f.originState,destinationCity:f.destinationCity,
+ freightType:f.freightType,status:f.status,originCity:f.originCity,originState:f.originState,destinationCity:f.destinationCity,
  destinationState:f.destinationState,cargoDescription:f.cargoDescription||"",quantity:String(f.quantity??1),weightKg:String(f.weightKg??""),
  customerPriceCents:f.customerPriceCents==null?"":String(f.customerPriceCents),driverPriceCents:f.driverPriceCents==null?"":String(f.driverPriceCents)
 };}
@@ -50,6 +50,15 @@ export default function TransportesPage(){
    const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível incluir o frete.");
    setFreights(v=>[body,...v]);cancelEdit();
   }catch(e){setError(e instanceof Error?e.message:"Não foi possível incluir o frete.");}finally{setCreateSaving(false);}
+ }
+ async function updateStatus(id:string,status:string){
+  setSaving(id);setError("");
+  try{
+   const r=await fetch(`/api/tms/freights/${encodeURIComponent(id)}/status`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({status})});
+   const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível alterar o status do frete.");
+   setFreights(v=>v.map(f=>f.id===id?{...f,status:body.status||status}:f));
+   setEditing(null);setForm(null);
+  }catch(e){setError(e instanceof Error?e.message:"Não foi possível alterar o status do frete.");}finally{setSaving(null);}
  }
  async function save(id:string){
   if(!form)return;
@@ -95,6 +104,7 @@ export default function TransportesPage(){
       <div className="edit-form-head"><div><span className="eyebrow">EDIÇÃO</span><h3>Alterar transporte {f.id.slice(0,8).toUpperCase()}</h3></div><span className={`status-pill ${f.status}`}>{labels[f.status]||f.status}</span></div>
       <div className="edit-grid">
        <label>Tipo<select value={form.freightType} onChange={e=>change("freightType",e.target.value)}>{freightTypes.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+       <label>Status<select value={form.status} onChange={e=>change("status",e.target.value)}>{Object.entries(labels).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
        <label>Origem<input value={form.originCity} onChange={e=>change("originCity",e.target.value)} /></label>
        <label>UF origem<input maxLength={2} value={form.originState} onChange={e=>change("originState",e.target.value)} /></label>
        <label>Destino<input value={form.destinationCity} onChange={e=>change("destinationCity",e.target.value)} /></label>
@@ -105,7 +115,7 @@ export default function TransportesPage(){
        <label>Preço cliente (centavos)<input type="number" min="1" value={form.customerPriceCents} onChange={e=>change("customerPriceCents",e.target.value)} /></label>
        <label>Preço motorista (centavos)<input type="number" min="1" value={form.driverPriceCents} onChange={e=>change("driverPriceCents",e.target.value)} /></label>
       </div>
-      <div className="freight-actions"><button className="button button-secondary" onClick={cancelEdit} disabled={saving===f.id}>Cancelar</button><button className="button button-primary" onClick={()=>void save(f.id)} disabled={saving===f.id}>{saving===f.id?"Salvando…":"Salvar alterações"}</button></div>
+      <div className="freight-actions"><button className="button button-secondary" onClick={cancelEdit} disabled={saving===f.id}>Cancelar</button><button className="button button-secondary" onClick={()=>void updateStatus(f.id,form.status)} disabled={saving===f.id||form.status===f.status}>{saving===f.id?"Salvando…":"Alterar status"}</button><button className="button button-primary" onClick={()=>void save(f.id)} disabled={saving===f.id}>{saving===f.id?"Salvando…":"Salvar alterações"}</button></div>
     </div>:<>
       <div className="freight-main"><label className="freight-checkbox"><input type="checkbox" checked={selected.has(f.id)} onChange={()=>toggleSelected(f.id)} disabled={loading||createSaving||!!saving||!!deleting||bulkDeleting}/></label><span className="transport-id">{f.id.slice(0,8).toUpperCase()}</span><div><strong>{f.originCity} <i>{f.originState}</i> <span className="route-arrow">→</span> {f.destinationCity} <i>{f.destinationState}</i></strong><small>{f.freightType} · {labels[f.status]||f.status}</small></div></div>
       <div className="freight-actions"><span className={`status-pill ${f.status}`}>{labels[f.status]||f.status}</span><button className="button button-secondary" onClick={()=>startEdit(f)} disabled={!!deleting||!!saving}>Alterar</button><button className="button button-danger" onClick={()=>void remove(f.id)} disabled={deleting===f.id||!!saving}>{deleting===f.id?"Excluindo…":"Excluir"}</button></div>
