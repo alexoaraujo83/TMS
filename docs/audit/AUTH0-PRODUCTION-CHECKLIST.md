@@ -110,12 +110,12 @@
 - [x] TMS Web uses Auth0 SDK `createFetcher`.
 - [x] Authenticated fetch uses `fetchWithAuth`.
 - [x] `NEXT_PUBLIC_API_BASE_URL` is the configured API origin.
-- [~] Latest Production deployment is on `main` at commit `ac1997fd699dae5ee2c7a5c67794e115b2edddd3`; this proves the checklist commit is deployed, not that Production environment variables are correct.
+- [x] Latest Vercel Production deployment is READY and runs `main` commit `a1ee105ef8ba0078277670096dadcc91cb931bc6`; this proves the latest checklist changes are deployed, not that Production environment variables are correct.
 - [~] Authenticated Production runtime path is proven by the supplied `authenticated: true` evidence.
 - [ ] Verify no Preview/Development origin is used by Production.
 - [ ] Verify protected API request succeeds with a valid token and record endpoint-level evidence.
 
-**Step result:** PARTIAL — authenticated Production runtime is now evidenced; environment separation and endpoint-level API proof remain pending.
+**Step result:** PARTIAL — latest checklist is deployed to a READY Vercel Production deployment; environment separation and endpoint-level API proof remain pending.
 
 ## 7. Tenant authorization
 
@@ -246,6 +246,13 @@ Do not promote/declare Production validated until:
 ---
 
 ## Change log
+
+### 2026-09-28 — Vercel Production deployment reconciliation
+
+- Read-only Vercel inspection confirmed the `tms-web` Production deployment for `main` is READY and points to the latest checklist commit `a1ee105e...`.
+- The prior Production deployment from the DB-04 checklist commit was superseded; no rollback or deployment mutation was performed.
+- This verifies deployment propagation only; Vercel Production/Preview/Development environment-variable values still require reconciliation.
+
 
 ### 2026-09-28 — Railway Production worker variable contract checked
 
