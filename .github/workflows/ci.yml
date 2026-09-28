@@ -51,6 +51,7 @@ jobs:
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create extension if not exists pgcrypto"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "drop role if exists tms_bootstrap"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_bootstrap nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant usage, create on schema public to tms_bootstrap"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "drop role if exists tms_ci_admin"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_ci_admin login nosuperuser nocreatedb createrole noinherit noreplication nobypassrls password '$admin_password'"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant tms_bootstrap to tms_ci_admin"
