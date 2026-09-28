@@ -123,6 +123,21 @@ if (!runIntegration) {
       await client.query("delete from tenant_memberships");
       await client.query("delete from users");
       await client.query("delete from tenants");
+      for (const table of [
+        "audit_events",
+        "freights",
+        "vehicles",
+        "drivers",
+        "carriers",
+        "role_permissions",
+        "roles",
+        "tenant_memberships",
+        "users",
+        "tenants",
+      ]) {
+        await client.query(`alter table ${table} enable row level security`);
+        await client.query(`alter table ${table} force row level security`);
+      }
       await client.query("commit");
     } finally {
       client.release();
