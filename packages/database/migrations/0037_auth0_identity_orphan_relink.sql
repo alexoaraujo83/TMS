@@ -123,6 +123,8 @@ begin
 end;
 $$;
 
+alter function public.bootstrap_auth0_identity(text, text, text, uuid) owner to tms_bootstrap;
+
 revoke all on function public.bootstrap_auth0_identity(text, text, text, uuid) from public;
 grant execute on function public.bootstrap_auth0_identity(text, text, text, uuid) to tms_app;
 
