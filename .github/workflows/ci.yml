@@ -71,6 +71,19 @@ jobs:
         run: pnpm --filter @tms/database build && pnpm --filter @tms/worker exec tsx --test src/freight-status-flow.integration.test.ts
       - name: Validate worker replay and cross-tenant runtime evidence
         run: pnpm --filter @tms/database build && pnpm --filter @tms/worker exec tsx --test src/runtime-evidence.integration.test.ts
+      - name: Run database integration suite and save result
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          set -o pipefail
+          RUN_DB_INTEGRATION=true pnpm --filter @tms/database test 2>&1 | tee artifacts/database-integration-test.txt
+      - name: Upload database integration result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-integration-test-result
+          path: artifacts/database-integration-test.txt
+          if-no-files-found: error
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
