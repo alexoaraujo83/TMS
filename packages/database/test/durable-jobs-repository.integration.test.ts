@@ -158,9 +158,13 @@ if (!enabled) {
   });
 
   it("keeps tenant jobs isolated", async () => {
-    await jobs.enqueue({ tenantId, jobType: "integration.isolated" });
+    const job = await jobs.enqueue({ tenantId, jobType: "integration.isolated" });
     const claimed = await jobs.claimPending(otherTenantId, 10);
     assert.equal(claimed.length, 0);
+
+    const [ownedJob] = await jobs.claimPending(tenantId, 10);
+    assert.equal(ownedJob.id, job.id);
+    await jobs.complete(tenantId, job.id, ownedJob.leaseToken);
   });
 
   it("rejects stale lease completion after reclaim", async () => {
