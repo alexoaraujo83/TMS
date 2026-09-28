@@ -259,11 +259,11 @@ if (!enabled) {
       assert.equal(result.rows.length, 2);
       assert.match(
         result.rows[0].definition + result.rows[1].definition,
-        /FOREIGN KEY \\(tenant_id, freight_id, assignment_id\\)/,
+        /FOREIGN KEY \(tenant_id, freight_id, assignment_id\)/,
       );
       assert.match(
         result.rows[0].definition + result.rows[1].definition,
-        /FOREIGN KEY \\(tenant_id, freight_id, trip_id\\)/,
+        /FOREIGN KEY \(tenant_id, freight_id, trip_id\)/,
       );
     } finally {
       client.release();
