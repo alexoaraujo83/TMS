@@ -266,6 +266,18 @@ Do not promote/declare Production validated until:
 **Step result:** VERIFIED/BOUNDARY — the complete behavioral matrix exists and passes in CI with `tms_app`; Production E4 remains the only missing execution environment for DB-04. The correct next action is a controlled execution against the real Production runtime connection, preserving rollback/no-persistence and safe evidence only.
 
 
+### 2026-09-28 — Production DB-04 execution-path inventory
+
+- Re-read the versioned GitHub Actions workflows on `main` to identify an existing controlled path capable of executing Production database checks.
+- `.github/workflows/database-migrate.yml` is protected by the `production` environment and has `workflow_dispatch`, but its purpose is migrations only; it does not execute the DB-04 behavioral suite.
+- `.github/workflows/ci.yml` executes `packages/database/test/rls-runtime.integration.test.ts` with a generated non-bypass `tms_app` runtime credential, but its PostgreSQL target is an ephemeral GitHub Actions service, not Neon Production.
+- The DB-04 integration test itself requires separate `DATABASE_ADMIN_URL` and `RUNTIME_DATABASE_URL` values, creates isolated temporary tenant/fixture rows through the admin connection, runs restricted-role assertions, and cleans up after completion.
+- The connected GitHub tool surface still has no workflow-dispatch operation. Therefore no Production DB-04 run was triggered from this session, and no Production credential was created, rotated, substituted, or exposed.
+- This inventory confirms that the repository already has the correct test implementation and a protected workflow pattern, but there is currently no executable connected path from this session to run that suite against Neon Production.
+
+**Step result:** VERIFIED/BOUNDARY — implementation and non-Production execution path are present; Production DB-04 E4 remains pending until the suite is executed with the real restricted Production runtime connection and safe administrative fixture access.
+
+
 ---
 
 ## Change log
