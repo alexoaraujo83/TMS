@@ -4,16 +4,35 @@ This directory is the source-controlled Auth0 contract. The Production export wo
 
 ## Dedicated Management API application
 
-Create a dedicated Auth0 Machine-to-Machine application for the Deploy CLI. Do **not** reuse the TMS Web client or any runtime application.
+Create a **dedicated Auth0 Machine-to-Machine application** for the Deploy CLI. Do **not** reuse the TMS Web client or any runtime application.
 
-The requested authorization profile for the dedicated application is:
+The Deploy CLI authenticates against Auth0 using the OAuth 2.0 **Client Credentials grant**. Therefore the dedicated application configured in the GitHub Actions environment must allow the `client_credentials` grant and must have a valid client ID/secret pair.
+
+The current TMS Web client contract is intentionally different: its Client Credentials grant remains disabled because the web application uses Authorization Code + PKCE. Enabling Client Credentials on the TMS Web client is **not** the correction for Deploy CLI.
+
+The dedicated Deploy CLI application must also be authorized to call the Auth0 Management API. The requested authorization profile is:
 
 - `read:*`
 - `create:*`
 - `update:*`
 - `delete:*`
 
-Auth0 documents that `delete:*` is required for deletion operations and that the Deploy CLI operates within the scopes granted to its dedicated Management API application. citeturn0view0
+Auth0 documents that `delete:*` is required for deletion operations and that the Deploy CLI operates within the scopes granted to its dedicated Management API application.
+
+If the Production export reports:
+
+`Grant type 'client_credentials' not allowed for the client.`
+
+treat that as an **Auth0 client-configuration/authentication gate**, not as an export-file or workflow JSON failure. Verify, in this order:
+
+1. `AUTH0_DEPLOY_CLIENT_ID` identifies the dedicated Deploy CLI M2M application.
+2. The application allows the Client Credentials grant.
+3. The client secret belongs to that same application.
+4. The application has an authorized Management API client grant.
+5. The Management API scopes required by the export are available to that grant.
+6. If connection options are exported, verify the current Management API connection-options permissions required by Auth0 for deployment tooling.
+
+Do not enable Client Credentials on the TMS Web application as a workaround.
 
 The repository never stores these credentials. Configure these GitHub Actions secrets in the protected `production-auth0-readonly` environment:
 
@@ -51,4 +70,4 @@ Never make Production import the default branch-push behavior.
 
 ## Official capability
 
-The official Deploy CLI supports YAML export/import and manages Actions, Applications, Connections, APIs and other tenant resources. citeturn0view0turn0view1
+The official Deploy CLI supports YAML export/import and manages Actions, Applications, Connections, APIs and other tenant resources.
