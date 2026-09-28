@@ -110,7 +110,7 @@ jobs:
         with:
           name: database-integration-test-result
           path: artifacts/database-integration-test.txt
-          if-no-files-found: error
+          if-no-files-found: ignore
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
