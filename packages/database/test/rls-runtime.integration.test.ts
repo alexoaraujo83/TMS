@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { after, before, describe, it } from "node:test";
 
-const ownerUrl = process.env.DATABASE_ADMIN_URL;
+const ownerUrl = process.env.TEST_OWNER_DATABASE_URL ?? process.env.DATABASE_ADMIN_URL;
 const runtimeUrl = process.env.RUNTIME_DATABASE_URL;
 const runIntegration = Boolean(ownerUrl && runtimeUrl);
 
