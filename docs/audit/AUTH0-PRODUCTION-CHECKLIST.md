@@ -160,7 +160,7 @@
 - [ ] Prove role cannot bypass RLS.
 - [ ] Record only safe evidence.
 
-**Step result:** BLOCKER/P0 — meaningful RLS isolation evidence is now present, including tenant-A visibility and synthetic tenant-B non-visibility, but DB-04 cannot close until the remaining behavioral tests and session evidence are captured.
+**Step result:** BLOCKER/P0 — CI run #651 is useful regression evidence, but its runtime database was the ephemeral GitHub Actions PostgreSQL service, not Production Neon. DB-04 still requires a real restricted Production session and the complete behavioral suite.
 
 ## 10. Production environment separation
 
@@ -241,6 +241,15 @@ Do not promote/declare Production validated until:
 ---
 
 ## Change log
+
+### 2026-09-28 — DB-04 CI provenance reconciliation
+
+- Re-checked CI run #651 and its quality job.
+- Confirmed the security integration suite was enabled with the integration flag and separate admin/runtime variables.
+- Confirmed the runtime database URL in that run targeted the ephemeral GitHub Actions PostgreSQL service.
+- Therefore CI success does not close Production DB-04.
+- No Production SQL mutation was executed and no AuthGuard, RLS policy or grant was weakened.
+
 
 ### 2026-09-28 — Authenticated Production + tenant-isolation runtime evidence
 
