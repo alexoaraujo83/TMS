@@ -2399,3 +2399,45 @@ AUTH-01 permanece P0 / E4 PENDENTE. Esta correção aumenta o determinismo e a s
 2. Se o primeiro erro for no CLI/runner, corrigir somente esse erro e repetir.
 3. Se o runner completar, reconciliar os recursos observados: TMS Web → Connections/enabled_clients → Actions → Post-Login bindings → causa do missing_tenant_id → audience → usuário de teste → token real → E2E.
 4. Somente depois da evidência read-only, preparar qualquer mutação Auth0 Production; nenhuma mutação deve ser feita por tentativa.
+
+
+## 76. FASE 2 — 2026-09-27 — Auth0 Deploy CLI: export Production + reconciliação declarativa
+
+### Alterações aplicadas
+
+- Adicionado `.github/workflows/auth0-production-deploy-export.yml`, acionado somente por `workflow_dispatch`.
+- O workflow usa o **Auth0 Deploy CLI 8.41.0** em Node 20.19.0 e executa exclusivamente `export`; não usa `--export_secrets`.
+- Adicionado `scripts/auth0/compare-production-export.mjs` para comparar o Action **TMS — Tenant Claim**, seu código, trigger Post-Login v3 e binding contra o contrato versionado.
+- O comparador falha explicitamente em drift e rejeita regressões contendo `api.access.deny` ou `missing_tenant_id`.
+- Adicionado `infra/auth0/DEPLOY-CLI-PRODUCTION.md` documentando a credencial M2M dedicada e o gate separado para futuro import.
+- O perfil solicitado para a aplicação dedicada é `read:*`, `create:*`, `update:*` e `delete:*`. A documentação oficial confirma que `delete:*` é necessário para operações de exclusão e que o Deploy CLI fica limitado aos escopos concedidos.
+
+### Limite de segurança
+
+A credencial pode possuir os privilégios administrativos solicitados, mas **esta etapa não executa import/update/create/delete**. O workflow export-only força `allow_import=false` e define `AUTH0_ALLOW_DELETE=false`.
+
+O futuro import Production deverá ser um workflow separado, protegido por Environment com aprovação explícita, precedido pelo mesmo export/diff e seguido por reconciliação read-only.
+
+### Evidência
+
+- Branch de implementação: `audit/auth0-deploy-cli-production-export-2026-09-27`.
+- Workflow, comparador e documentação foram adicionados nessa branch.
+- `node --check` do comparador passou localmente.
+- Não foram adicionados segredos ao repositório.
+- Nenhuma mutação foi executada no Auth0 Production.
+
+### Configuração externa ainda necessária
+
+Criar/autorizar no Auth0 Production uma **aplicação M2M dedicada ao Deploy CLI** e armazenar seus três valores como secrets do Environment protegido `production-auth0-readonly`:
+
+- `AUTH0_DEPLOY_DOMAIN`
+- `AUTH0_DEPLOY_CLIENT_ID`
+- `AUTH0_DEPLOY_CLIENT_SECRET`
+
+A aplicação não deve ser a TMS Web nem qualquer credencial runtime.
+
+### Gate
+
+**AUTH-01 permanece P0 / E4 PENDENTE.**
+
+A execução real do export contra Production ainda é necessária. O resultado será a primeira evidência declarativa para responder se o Action/binding em Production diverge do contrato versionado e para orientar qualquer import posterior.
