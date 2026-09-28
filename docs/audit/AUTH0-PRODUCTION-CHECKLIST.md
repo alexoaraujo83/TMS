@@ -175,7 +175,7 @@
 - [ ] Verify Vercel Production variables.
 - [ ] Verify Vercel Preview variables.
 - [ ] Verify Vercel Development variables.
-- [ ] Verify Railway Production API/worker variables.
+- [x] Verify Railway Production worker variable names: `APP_ENV`, `DATABASE_URL`, `NODE_ENV`, durable-jobs/outbox settings and Railway runtime identifiers are present; values remain redacted.
 - [ ] Confirm no Production deployment points to Staging/Development API.
 - [ ] Confirm Preview cannot accidentally use Production credentials unless explicitly intended.
 
@@ -246,6 +246,13 @@ Do not promote/declare Production validated until:
 ---
 
 ## Change log
+
+### 2026-09-28 — Railway Production worker variable contract checked
+
+- Read-only inspection of the Production `tms-worker` environment confirmed the expected runtime variable names are present, including `DATABASE_URL`, `APP_ENV` and `NODE_ENV`.
+- Variable values were withheld/redacted and were not written to audit evidence.
+- This confirms variable presence, not that the runtime database session is `tms_app`; DB-04 therefore remains open.
+
 
 ### 2026-09-28 — Production Neon target identified; restricted-session gate preserved
 
