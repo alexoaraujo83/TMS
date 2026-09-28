@@ -29,6 +29,7 @@
 ## 1. Auth0 Production live configuration — READ ONLY FIRST
 
 - [ ] Identify live Post-Login Action name and ID.
+  - [!] No connected Auth0 Management/Deploy tool is available in this workspace; live Auth0 inspection cannot be truthfully marked complete from repository/Vercel evidence alone.
 - [ ] Record deployed/published status.
 - [ ] Record trigger runtime/version.
 - [ ] Record binding order.
@@ -40,7 +41,7 @@
 - [ ] Confirm live binding matches `infra/auth0/tenant.yaml`.
 - [ ] Do not modify AuthGuard, RLS or grants to work around Auth0 behavior.
 
-**Step result:** PENDING — live Auth0 inspection is required.
+**Step result:** BLOCKED/PENDING — source contract is available, but this workspace currently has no connected Auth0 Management/Deploy read API. Do not infer live Action/binding/Connection state from source or Vercel deployment evidence.
 
 ## 2. TMS Web Application contract
 
@@ -104,12 +105,12 @@
 - [x] TMS Web uses Auth0 SDK `createFetcher`.
 - [x] Authenticated fetch uses `fetchWithAuth`.
 - [x] `NEXT_PUBLIC_API_BASE_URL` is the configured API origin.
-- [ ] Verify Production Web calls Production API.
+- [~] Latest Production deployment is on `main` at commit `ac1997fd699dae5ee2c7a5c67794e115b2edddd3`; this proves the checklist commit is deployed, not that Production environment variables are correct.
 - [ ] Verify no Preview/Development origin is used by Production.
 - [ ] Verify fresh login reaches `/api/tms/auth-runtime`.
 - [ ] Verify protected API request succeeds with a valid token.
 
-**Step result:** PARTIAL — source path verified; deployed E2E remains pending.
+**Step result:** PARTIAL — latest Production deployment is READY and points to the current checklist commit; deployed E2E and environment-variable verification remain pending.
 
 ## 7. Tenant authorization
 
@@ -233,7 +234,7 @@ Do not promote/declare Production validated until:
 
 ## Change log
 
-### 2026-09-28 — Initial operational checklist
+### 2026-09-28 — Live deployment/runtime reconciliation
 
 Verified against the current source-controlled TMS contract:
 - Auth0 v4 Web SDK integration exists.
@@ -247,4 +248,10 @@ Verified against the current source-controlled TMS contract:
 - AUTH-01 remains P0/open.
 - DB-04 remains P0/open.
 
-Next operational step: **read-only reconciliation of live Auth0 Production Action, Post-Login binding, Connection → TMS Web, Production audience and controlled test-user tenant metadata.**
+Evidence added:
+- Vercel `tms-web` has a READY Production deployment for the current `main` checklist commit.
+- Production runtime logs for the last 24 hours returned no error/warning entries.
+- Historical runtime error clusters show prior Auth0 configuration failures on older deployments; these are not treated as current failures because their last occurrence predates the current deployment.
+- No Auth0 Management/Deploy connector is exposed to this workspace, so live Action/binding/Connection metadata remains unverified.
+
+Next operational step: **obtain read-only Auth0 Production evidence (Action, binding, Connection, application and API contract) through the Auth0 Management/Deploy surface, then update this checklist before any mutation.**
