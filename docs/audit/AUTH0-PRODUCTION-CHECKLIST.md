@@ -255,6 +255,17 @@ Do not promote/declare Production validated until:
 **Step result:** PARTIAL — the existing diagnostic surface is sufficient to prove tenant-scoped SELECT isolation when invoked with a real authenticated session, but the complete DB-04 behavioral suite still requires a restricted `tms_app` session and controlled write/rollback assertions.
 
 
+### 2026-09-28 — DB-04 CI matrix reviewed; Production execution boundary confirmed
+
+- Re-read `.github/workflows/ci.yml` and `packages/database/test/rls-runtime.integration.test.ts` references in the audit trail.
+- CI provisions a dedicated non-bypass `tms_app` runtime role with a generated ephemeral password and runs the RLS integration suite through the restricted runtime connection, while the administrative connection is kept separate for fixtures/cleanup.
+- The recorded successful CI run #1259 / 36240857560 covers cross-tenant SELECT, INSERT, UPDATE, DELETE and tenant-context isolation. This is strong evidence that the RLS contract is implemented and continuously tested with a non-bypass role.
+- The CI PostgreSQL instance is an ephemeral runner service, not the Neon Production database. Its success therefore cannot be promoted to Production DB-04 evidence.
+- No existing connected GitHub tool can dispatch a new workflow from this session, and no safe authenticated Production `tms_app` credential is exposed to the connector. No attempt was made to substitute `neondb_owner`, inject credentials, or create a Production test credential.
+
+**Step result:** VERIFIED/BOUNDARY — the complete behavioral matrix exists and passes in CI with `tms_app`; Production E4 remains the only missing execution environment for DB-04. The correct next action is a controlled execution against the real Production runtime connection, preserving rollback/no-persistence and safe evidence only.
+
+
 ---
 
 ## Change log
