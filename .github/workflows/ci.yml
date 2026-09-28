@@ -56,6 +56,7 @@ jobs:
           printf 'DATABASE_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
           printf 'RUNTIME_DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'DATABASE_ADMIN_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
+          printf 'TEST_OWNER_DATABASE_URL=postgresql://postgres@localhost:5432/tms_dev\n' >> "$GITHUB_ENV"
       - name: Run initial schema migration as tms_ci_admin
         run: pnpm --filter @tms/database migrate
       - name: Set ephemeral runtime credential
