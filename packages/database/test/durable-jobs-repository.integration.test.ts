@@ -169,7 +169,9 @@ if (!enabled) {
       jobType: "integration.stale",
     });
     const [first] = await jobs.claimPending(tenantId, 1);
-    const client = await pool.connect();
+    // Lease expiry is test setup; perform it with the admin connection so RLS
+    // cannot silently reject the synthetic expiry update.
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query("select set_config($1, $2, true)", [
