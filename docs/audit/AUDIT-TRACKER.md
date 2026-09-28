@@ -1,7 +1,7 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-09-25 23:55 -03:00
+> **Última atualização:** 2026-09-28 00:00 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
 > **HEAD de main verificado antes desta atualização:** `7cdf6b769624f9fed24446dc6ebe47ede4b1a827`
@@ -497,8 +497,7 @@ Os hashes acima são **baseline de código**, não evidência do banco live. O f
 
 Nenhuma migration foi aplicada, nenhuma branch foi criada/resetada/deletada e nenhum dado de produção foi alterado nesta etapa. O próximo passo continua sendo uma consulta read-only de `schema_migrations` assim que a conexão Neon puder receber o identificador do projeto de forma compatível.
 
-### 32.5 Próximo avanço P0
-1. Resolver a incompatibilidade do conector Neon para executar a consulta read-only no projeto `shiny-hall-34679912`.
+### 32.5 Próximo avanço P01. Resolver a incompatibilidade do conector Neon para executar a consulta read-only no projeto `shiny-hall-34679912`.
 2. Registrar head, checksums e `current_user`/database somente como evidência mínima necessária.
 3. Se houver drift de checksum/head, interromper qualquer migration automática e abrir correção específica; não equalizar SHA cegamente.
 4. Com DB-01 fechado, avançar para DB-04 comportamental.
@@ -997,8 +996,7 @@ O fechamento continua condicionado a evidência executada como tms_app demonstra
 1. current_user = tms_app;
 2. rolbypassrls = false;
 3. leitura do tenant próprio funciona;4. leitura cross-tenant não retorna dados;
-5. INSERT cross-tenant é rejeitado;
-6. UPDATE cross-tenant é rejeitado.
+5. INSERT cross-tenant é rejeitado;6. UPDATE cross-tenant é rejeitado.
 
 CI/RLS estrutural e configuração de NOBYPASSRLS não substituem esse teste comportamental.
 
@@ -1497,8 +1495,7 @@ Estado corrente comprovado pelo código e pelos testes mais recentes:
 
 - **WORK-01:** worker principal continua em SHA anterior por promoção seletiva; o último deployment do HEAD atual foi SKIPPED. Não forçar deploy apenas para alinhar SHAs.
 - **WORK-02/03:** contrato de outbox → durable jobs → handler está comprovado em CI; E4 do runtime produtivo continua pendente.
-- **BAK-01 / DR-01:** deploy SUCCESS não prova artefato, checksum, retenção ou restore independente.
-- **CI-10:** branch protection/required checks continua sem confirmação administrativa suficiente.
+- **BAK-01 / DR-01:** deploy SUCCESS não prova artefato, checksum, retenção ou restore independente.- **CI-10:** branch protection/required checks continua sem confirmação administrativa suficiente.
 - **API-03:** semântica de replay repetível permanece documentada; não alterar novamente sem decisão operacional explícita.
 - **DOC-03 / CONFIG-01:** drift documental e centralização efetiva de configuração permanecem P1/P2 conforme classificação existente.
 
@@ -1997,8 +1994,7 @@ PR #94 — fix/auth0-user-provisioning-2026-09-26 foi criado com a seguinte cade
 4. se a identidade local não possuir memberships, o primeiro tenant válido pode receber a membership operator;
 5. identidades que já possuem membership não recebem uma segunda membership automaticamente;
 6. @tms/database expõe o bootstrap;
-7. AuthGuard executa o bootstrap apenas depois de validar assinatura/issuer/audience e exigir o tenant claim;
-8. o membership é consultado novamente depois do bootstrap;
+7. AuthGuard executa o bootstrap apenas depois de validar assinatura/issuer/audience e exigir o tenant claim;8. o membership é consultado novamente depois do bootstrap;
 9. o Action Auth0 passa a emitir também claims namespaced de e-mail e display name para permitir o bootstrap da identidade local;
 10. foram adicionados testes de segurança cobrindo o primeiro login.
 
@@ -2440,4 +2436,4 @@ A aplicação não deve ser a TMS Web nem qualquer credencial runtime.
 
 **AUTH-01 permanece P0 / E4 PENDENTE.**
 
-A execução real do export contra Production ainda é necessária. O resultado será a primeira evidência declarativa para responder se o Action/binding em Production diverge do contrato versionado e para orientar qualquer import posterior.
+A execução real do export contra Production ainda é necessária. O resultado será a primeira evidência declarativa para responder se o Action/binding em Production diverge do contrato versionado e para orientar qualquer import posterior.\n\n## 77. FASE 2 — 2026-09-28 — Auth0 Deploy CLI: PR #95 promovido e gates de CI reconciliados\n\n### Evidência\n\n- PR #95, `feat(auth0): add production Deploy CLI export reconciliation`, foi mesclado em `main` após revisão e checks de Vercel Web/Core API em `success`.\n- Commit de merge: `1494cfd5d216eb3fcb921d459daff334773cae04`.\n- Após o merge, os checks observados no commit incluem `tms-worker`, `tms-backup-worker`, Vercel Web e Vercel Core API, todos em `success`.\n- O workflow `.github/workflows/auth0-production-deploy-export.yml` permanece manual (`workflow_dispatch`) e somente leitura.\n- Nenhuma operação Auth0 Production de import, update, create ou delete foi executada por esta etapa.\n\n### Reconcilição do gate\n\n- A infraestrutura de auditoria está incorporada ao `main`, mas **AUTH-01 não está encerrado**: ainda falta uma execução real do export contra Auth0 Production com a credencial M2M dedicada configurada no Environment protegido.\n- A ausência dessa execução não deve ser convertida em evidência de conformidade nem em evidência de drift.\n- O próximo artefato exigido é o export real e o resultado do comparador contra `infra/auth0/tenant.yaml` e `infra/auth0/actions/post-login.js`.\n\n### Próxima ação P0\n\n1. Executar manualmente o workflow de export no GitHub Actions.\n2. Se falhar, corrigir somente a primeira falha observada e repetir; não alterar Auth0 Production como tentativa de recuperação.\n3. Se completar, preservar o artefato de evidência e reconciliar Action, trigger, binding e qualquer drift de código.\n4. Depois, emitir novo login/token e completar o E2E Auth0 → Web → API → membership → DB/RLS.\n5. Manter DB-04 independente: continua exigindo sessão PostgreSQL efetiva `tms_app` para a prova comportamental.\n\n### Segurança\n\n- A aplicação M2M do Deploy CLI deve continuar separada da TMS Web e dos runtimes.\n- Nenhuma credencial, token ou segredo deve ser gravado no repositório ou no tracker.\n- O futuro import Production continua condicionado a export/diff, detecção de mudança concorrente e aprovação humana explícita.\n
