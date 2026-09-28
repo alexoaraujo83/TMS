@@ -247,6 +247,17 @@ Do not promote/declare Production validated until:
 
 ## Change log
 
+### 2026-09-28 — DB-04 runtime identity proof via Production `/ready`
+
+- Production API project `tms-core-api` was resolved in Vercel and the live Production `GET /ready` endpoint was invoked at 07:50:29Z.
+- The response was HTTP 200 `{"status":"ready","service":"tms-api"}`.
+- Source review confirms `/ready` executes `select current_user` on the API database pool and returns readiness only when `current_user === "tms_app"`; otherwise it returns service unavailable.
+- Vercel runtime logs independently recorded the same Production `GET /ready` request as HTTP 200 on deployment `dpl_8k2m41GzpeFURSBZvhd8RABdQSht` (main).
+- This closes the **runtime identity** portion of DB-04: Production API runtime reached PostgreSQL as `tms_app` at the observed request.
+- It does **not** by itself close the full DB-04 behavioral suite. Cross-tenant SELECT/INSERT/UPDATE, rollback/no-persistence and complete RLS evidence remain required.
+- No secrets, tokens, connection strings, roles, grants, policies or application code were changed.
+
+
 ### 2026-09-28 — DB-04 runtime-role source/control verification
 
 - Re-read the Production Railway service contract and current worker source.
