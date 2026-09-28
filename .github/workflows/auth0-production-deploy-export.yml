@@ -87,14 +87,17 @@ jobs:
               connections: ["options.client_secret"],
             },
           };
+          const file = process.env.RUNNER_TEMP + "/auth0-deploy-config.json";
           fs.writeFileSync(
-            process.env.RUNNER_TEMP + "/auth0-deploy-config.json",
-            JSON.stringify(config, null, 2) + "\\n",
+            file,
+            JSON.stringify(config, null, 2) + "\n",
             { mode: 0o600 },
           );
+          JSON.parse(fs.readFileSync(file, "utf8"));
           NODE
 
       - name: Export Production tenant configuration
+        id: export
         shell: bash
         run: |
           set -euo pipefail
@@ -106,6 +109,7 @@ jobs:
             --output_folder="${RUNNER_TEMP}/auth0-export"
 
       - name: Validate export shape
+        if: ${{ steps.export.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -121,7 +125,7 @@ jobs:
           }
 
       - name: Compare exported configuration with source contract
-        if: ${{ inputs.compare_contract }}
+        if: ${{ steps.export.outcome == 'success' && inputs.compare_contract }}
         shell: bash
         env:
           AUTH0_DEPLOY_NODE_MODULES: ${{ runner.temp }}/auth0-deploy-cli/node_modules
@@ -133,7 +137,7 @@ jobs:
             "infra/auth0/actions/post-login.js"
 
       - name: Publish comparison evidence
-        if: always()
+        if: ${{ steps.export.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: auth0-production-export-evidence
@@ -144,6 +148,7 @@ jobs:
           retention-days: 7
 
       - name: Safety assertion
+        if: ${{ steps.export.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
