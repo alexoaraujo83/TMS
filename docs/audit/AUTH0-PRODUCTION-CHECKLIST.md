@@ -243,6 +243,18 @@ Do not promote/declare Production validated until:
 - [ ] Deployment commit identified.
 - [ ] Production deployment verified after promotion.
 
+### 2026-09-28 — DB-04 diagnostic surface revalidated
+
+- Re-read the Production diagnostic endpoints in `apps/api/src/modules/freight/freight.controller.ts`.
+- `GET /freights/runtime-db-context` is protected by `AuthGuard` + `ops:diagnostics` and executes its query inside `withTenantContext`; it exposes the effective tenant setting and row count without exposing database credentials.
+- `GET /freights/runtime-rls-isolation` is protected by the same guards and performs a tenant-scoped **SELECT-only** probe: it reads one freight under tenant A, switches the transaction-local `app.tenant_id` to a synthetic tenant B, and verifies that the same freight is hidden.
+- The endpoint does **not** test cross-tenant INSERT/UPDATE/DELETE, missing-context denial, rollback/no-persistence, or role-bypass resistance. It therefore cannot by itself close DB-04.
+- The Web route `/api/tms/runtime-context` uses the Auth0 server-side fetcher to call the protected RLS endpoint, so an authenticated browser session can exercise the probe without exposing a token to client code. The connected GitHub/Vercel tooling in this session does not provide that user's browser session for an authenticated invocation.
+- No application code, AuthGuard, RLS policy, grant, role, credential or Production data was changed.
+
+**Step result:** PARTIAL — the existing diagnostic surface is sufficient to prove tenant-scoped SELECT isolation when invoked with a real authenticated session, but the complete DB-04 behavioral suite still requires a restricted `tms_app` session and controlled write/rollback assertions.
+
+
 ---
 
 ## Change log
