@@ -53,12 +53,17 @@ jobs:
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_ci_admin login nosuperuser nocreatedb createrole noinherit noreplication nobypassrls password '$admin_password'"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant connect on database tms_dev to tms_ci_admin"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant usage, create on schema public to tms_ci_admin"
-          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "alter role tms_app password '$runtime_password'"
           printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'RUNTIME_DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'DATABASE_ADMIN_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
       - name: Run initial schema migration as tms_ci_admin
         run: pnpm --filter @tms/database migrate
+      - name: Set ephemeral runtime credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_password="$(printf '%s' "$RUNTIME_DATABASE_URL" | sed -E 's#^postgresql://tms_app:([^@]+)@.*#\1#')"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "alter role tms_app password '$runtime_password'"
       - name: Validate generated CI database identities
         shell: bash
         run: |
