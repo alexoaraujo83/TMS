@@ -177,7 +177,7 @@ if (!enabled) {
         tenantId,
       ]);
       await client.query(
-        "update durable_jobs set available_at = now() where id = $1",
+        "update durable_jobs set available_at = now() - interval '1 second' where id = $1",
         [job.id],
       );
       await client.query("commit");
