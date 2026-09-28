@@ -69,6 +69,31 @@ jobs:
             "auth0-deploy-cli@${AUTH0_DEPLOY_CLI_VERSION}"
           "${RUNNER_TEMP}/auth0-deploy-cli/node_modules/.bin/a0deploy" --help >/dev/null
 
+      - name: Prepare Deploy CLI configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require("node:fs");
+          const config = {
+            AUTH0_DOMAIN: process.env.AUTH0_DOMAIN,
+            AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
+            AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
+            AUTH0_AGENT_MODE: process.env.AUTH0_AGENT_MODE,
+            AUTH0_EXPORT_IDENTIFIERS: process.env.AUTH0_EXPORT_IDENTIFIERS,
+            AUTH0_ALLOW_DELETE: process.env.AUTH0_ALLOW_DELETE,
+            EXCLUDED_PROPS: {
+              clients: ["client_secret"],
+              connections: ["options.client_secret"],
+            },
+          };
+          fs.writeFileSync(
+            process.env.RUNNER_TEMP + "/auth0-deploy-config.json",
+            JSON.stringify(config, null, 2) + "\\n",
+            { mode: 0o600 },
+          );
+          NODE
+
       - name: Export Production tenant configuration
         shell: bash
         run: |
@@ -76,9 +101,9 @@ jobs:
           rm -rf "${RUNNER_TEMP}/auth0-export"
           mkdir -p "${RUNNER_TEMP}/auth0-export"
           "${RUNNER_TEMP}/auth0-deploy-cli/node_modules/.bin/a0deploy" export \
+            --config_file="${RUNNER_TEMP}/auth0-deploy-config.json" \
             --format=yaml \
-            --output_folder="${RUNNER_TEMP}/auth0-export" \
-            --env=false
+            --output_folder="${RUNNER_TEMP}/auth0-export"
 
       - name: Validate export shape
         shell: bash
