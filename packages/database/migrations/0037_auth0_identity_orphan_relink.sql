@@ -132,6 +132,8 @@ begin
     execute 'grant select, insert on table public.tenant_memberships to tms_bootstrap';
     execute 'grant select on table public.tenants to tms_bootstrap';
     execute 'grant select on table public.roles to tms_bootstrap';
+    execute 'grant select on table public.role_permissions to tms_bootstrap';
+    execute 'grant select on table public.permissions to tms_bootstrap';
   end if;
 end;
 $grants$;
@@ -156,3 +158,21 @@ begin
   end if;
 end;
 $migration$;
+
+-- The authoritative Auth0 membership resolver is also SECURITY DEFINER and
+-- reads the same FORCE RLS tables. Keep its production owner unchanged, but
+-- use the CI bootstrap owner when present so the runtime proof exercises the
+-- real resolver rather than an RLS-empty result.
+do $resolver$
+begin
+  if exists (select 1 from pg_roles where rolname = 'tms_bootstrap') then
+    execute 'grant select on table public.users to tms_bootstrap';
+    execute 'grant select on table public.tenant_memberships to tms_bootstrap';
+    execute 'grant select on table public.tenants to tms_bootstrap';
+    execute 'grant select on table public.roles to tms_bootstrap';
+    execute 'grant select on table public.role_permissions to tms_bootstrap';
+    execute 'grant select on table public.permissions to tms_bootstrap';
+    execute 'alter function public.check_tenant_membership(text, uuid) owner to tms_bootstrap';
+  end if;
+end;
+$resolver$;
