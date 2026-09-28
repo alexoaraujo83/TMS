@@ -50,7 +50,7 @@ jobs:
           admin_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create extension if not exists pgcrypto"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "drop role if exists tms_ci_admin"
-          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_ci_admin login nosuperuser nocreatedb createrole noinherit noreplication bypassrls password '$admin_password'"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_ci_admin login nosuperuser nocreatedb createrole noinherit noreplication nobypassrls password '$admin_password'"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant connect on database tms_dev to tms_ci_admin"
           PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant usage, create on schema public to tms_ci_admin"
           printf 'DATABASE_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
@@ -71,7 +71,7 @@ jobs:
           set -euo pipefail
           test "$(psql "$DATABASE_ADMIN_URL" -Atqc 'select current_user')" = "tms_ci_admin"
           test "$(psql "$DATABASE_URL" -Atqc 'select current_user')" = "tms_app"
-          test "$(psql "$DATABASE_ADMIN_URL" -Atqc "select rolsuper, rolbypassrls from pg_roles where rolname = 'tms_ci_admin'")" = "f|t"
+          test "$(psql "$DATABASE_ADMIN_URL" -Atqc "select rolsuper, rolbypassrls from pg_roles where rolname = 'tms_ci_admin'")" = "f|f"
           psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select current_user, current_schema(), has_schema_privilege(current_user, 'public', 'USAGE') as schema_usage"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select current_user, current_schema(), has_schema_privilege(current_user, 'public', 'USAGE') as schema_usage"
       - name: Validate runtime role attributes
