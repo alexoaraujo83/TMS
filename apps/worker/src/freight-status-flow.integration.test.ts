@@ -11,10 +11,12 @@ import { OutboxProcessor } from "./outbox-worker.js";
 import { PgOutboxStore } from "./outbox-store.js";
 
 const adminDatabaseUrl = process.env.DATABASE_ADMIN_URL;
+const fixtureOwnerDatabaseUrl = process.env.TEST_OWNER_DATABASE_URL ?? adminDatabaseUrl;
 const runtimeDatabaseUrl = process.env.DATABASE_URL;
 const runIntegration =
   process.env.RUN_DB_INTEGRATION === "true" &&
   Boolean(adminDatabaseUrl) &&
+  Boolean(fixtureOwnerDatabaseUrl) &&
   Boolean(runtimeDatabaseUrl);
 
 test(
@@ -22,6 +24,7 @@ test(
   { skip: !runIntegration },
   async () => {
     const adminPool = new Pool({ connectionString: adminDatabaseUrl });
+    const fixtureOwnerPool = new Pool({ connectionString: fixtureOwnerDatabaseUrl });
     const runtimePool = new Pool({ connectionString: runtimeDatabaseUrl });
     const tenantId = randomUUID();
     const freightId = randomUUID();
@@ -29,18 +32,18 @@ test(
     const telemetry: Array<{ event: string; details: Record<string, unknown> }> = [];
 
     try {
-      await adminPool.query(
+      await fixtureOwnerPool.query(
         "insert into tenants (id, name, slug, status) values ($1, 'Worker Flow Tenant', $2, 'active')",
         [tenantId, `worker-flow-${tenantId}`],
       );
-      await adminPool.query(
+      await fixtureOwnerPool.query(
         `insert into freights (
            id, tenant_id, status, freight_type, origin_city, origin_state,
            destination_city, destination_state, cargo_description, quantity, weight_kg
          ) values ($1, $2, 'in_transit', 'dedicated', 'Santos', 'SP', 'Campinas', 'SP', 'worker flow', 1, 100)`,
         [freightId, tenantId],
       );
-      await adminPool.query(
+      await fixtureOwnerPool.query(
         `insert into outbox_events (
            id, tenant_id, aggregate_type, aggregate_id, event_type, payload
          ) values ($1, $2, 'freight', $3, 'freight.status_changed', $4::jsonb)`,
@@ -143,12 +146,13 @@ test(
       assert.equal(telemetry[1]?.details.event_id, eventId);
       assert.equal(telemetry[1]?.details.idempotent_replay, true);
     } finally {
-      await adminPool.query("delete from audit_events where tenant_id = $1", [tenantId]);
-      await adminPool.query("delete from outbox_events where tenant_id = $1", [tenantId]);
-      await adminPool.query("delete from durable_jobs where tenant_id = $1", [tenantId]);
-      await adminPool.query("delete from freights where tenant_id = $1", [tenantId]);
-      await adminPool.query("delete from tenants where id = $1", [tenantId]);
+      await fixtureOwnerPool.query("delete from audit_events where tenant_id = $1", [tenantId]);
+      await fixtureOwnerPool.query("delete from outbox_events where tenant_id = $1", [tenantId]);
+      await fixtureOwnerPool.query("delete from durable_jobs where tenant_id = $1", [tenantId]);
+      await fixtureOwnerPool.query("delete from freights where tenant_id = $1", [tenantId]);
+      await fixtureOwnerPool.query("delete from tenants where id = $1", [tenantId]);
       await runtimePool.end();
+      await fixtureOwnerPool.end();
       await adminPool.end();
     }
   },
