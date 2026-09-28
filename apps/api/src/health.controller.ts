@@ -11,6 +11,11 @@ import { DATABASE_POOL } from "./common/database.provider.js";
 export class HealthController {
   constructor(@Inject(DATABASE_POOL) private readonly pool: Pool) {}
 
+  @Get("/")
+  root() {
+    return { status: "ok", service: "tms-api", message: "TMS Core API" };
+  }
+
   @Get("/health")
   health() {
     return { status: "ok", service: "tms-api" };
