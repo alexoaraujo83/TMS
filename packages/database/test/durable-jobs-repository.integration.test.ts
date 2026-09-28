@@ -24,7 +24,10 @@ if (!enabled) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseAdminUrl,
+      },
       stdio: "inherit",
     });
     const client = await adminPool.connect();
@@ -64,6 +67,10 @@ if (!enabled) {
         tenantId,
         otherTenantId,
       ]);
+      await client.query("alter table durable_jobs enable row level security");
+      await client.query("alter table durable_jobs force row level security");
+      await client.query("alter table tenants enable row level security");
+      await client.query("alter table tenants force row level security");
       await client.query("commit");
     } finally {
       client.release();
