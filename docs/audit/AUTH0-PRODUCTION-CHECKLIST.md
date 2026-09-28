@@ -30,6 +30,7 @@
 
 - [ ] Identify live Post-Login Action name and ID.
   - [!] No connected Auth0 Management/Deploy tool is available in this workspace; live Auth0 inspection cannot be truthfully marked complete from repository/Vercel evidence alone.
+  - [~] Repository contains a read-only Production export workflow and comparator, but no committed live export/evidence artifact was found in the repository.
 - [ ] Record deployed/published status.
 - [ ] Record trigger runtime/version.
 - [ ] Record binding order.
@@ -236,6 +237,10 @@ Do not promote/declare Production validated until:
 
 ### 2026-09-28 — Live deployment/runtime reconciliation
 
+Additional evidence:
+- The repository contains `.github/workflows/auth0-production-deploy-export.yml` and `scripts/auth0/compare-production-export.mjs` for read-only Production export/reconciliation.
+- No committed Production export artifact was found through repository search, so the live Auth0 state remains unproven.
+
 Verified against the current source-controlled TMS contract:
 - Auth0 v4 Web SDK integration exists.
 - Server-side Auth0 client exists.
@@ -254,4 +259,4 @@ Evidence added:
 - Historical runtime error clusters show prior Auth0 configuration failures on older deployments; these are not treated as current failures because their last occurrence predates the current deployment.
 - No Auth0 Management/Deploy connector is exposed to this workspace, so live Action/binding/Connection metadata remains unverified.
 
-Next operational step: **obtain read-only Auth0 Production evidence (Action, binding, Connection, application and API contract) through the Auth0 Management/Deploy surface, then update this checklist before any mutation.**
+Next operational step: **obtain read-only Auth0 Production export evidence through the repository's existing export workflow or an Auth0 Management/Deploy surface, then compare it with `infra/auth0/tenant.yaml` and `infra/auth0/actions/post-login.js` before any mutation.**
