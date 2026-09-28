@@ -31,8 +31,6 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
-      DATABASE_ADMIN_URL: postgresql://tms:tms@localhost:5432/tms_dev
-      DATABASE_URL: postgresql://tms:tms@localhost:5432/tms_dev
       RUN_DB_INTEGRATION: "true"
     steps:
       - uses: actions/checkout@v5
@@ -44,7 +42,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Validate versioned architecture documentation
         run: pnpm architecture:check
-      - run: pnpm --filter @tms/database migrate
+      - name: Run initial schema migration as CI bootstrap admin
+        env:
+          DATABASE_URL: postgresql://tms:tms@localhost:5432/tms_dev
+        run: pnpm --filter @tms/database migrate
       - name: Provision CI database roles
         shell: bash
         run: |
@@ -57,6 +58,14 @@ jobs:
           printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'RUNTIME_DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'DATABASE_ADMIN_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
+      - name: Validate generated CI database identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(psql "$DATABASE_ADMIN_URL" -Atqc 'select current_user')" = "tms_ci_admin"
+          test "$(psql "$DATABASE_URL" -Atqc 'select current_user')" = "tms_app"
+          psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select current_user, current_schema(), has_schema_privilege(current_user, 'public', 'USAGE') as schema_usage"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select current_user, current_schema(), has_schema_privilege(current_user, 'public', 'USAGE') as schema_usage"
       - name: Validate runtime role attributes
         run: |
           psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select rolname, rolsuper, rolbypassrls, rolcanlogin from pg_roles where rolname = 'tms_app'"
