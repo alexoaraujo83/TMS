@@ -29,8 +29,6 @@
 ## 1. Auth0 Production live configuration — READ ONLY FIRST
 
 - [ ] Identify live Post-Login Action name and ID.
-  - [!] No connected Auth0 Management/Deploy tool is available in this workspace; live Auth0 inspection cannot be truthfully marked complete from repository/Vercel evidence alone.
-  - [~] Repository contains a read-only Production export workflow and comparator, but no committed live export/evidence artifact was found in the repository.
 - [ ] Record deployed/published status.
 - [ ] Record trigger runtime/version.
 - [ ] Record binding order.
@@ -42,7 +40,7 @@
 - [ ] Confirm live binding matches `infra/auth0/tenant.yaml`.
 - [ ] Do not modify AuthGuard, RLS or grants to work around Auth0 behavior.
 
-**Step result:** BLOCKED/PENDING — source contract is available, but this workspace currently has no connected Auth0 Management/Deploy read API. Do not infer live Action/binding/Connection state from source or Vercel deployment evidence.
+**Step result:** BLOCKED/PENDING — live Auth0 state cannot be verified from the connected GitHub/Vercel tooling alone. The repository does contain a safe read-only export workflow, but no workflow dispatch/run/artifact is accessible through the currently exposed GitHub connector.
 
 ## 2. TMS Web Application contract
 
@@ -235,28 +233,24 @@ Do not promote/declare Production validated until:
 
 ## Change log
 
-### 2026-09-28 — Live deployment/runtime reconciliation
+### 2026-09-28 — Read-only Auth0 export workflow gate
 
-Additional evidence:
-- The repository contains `.github/workflows/auth0-production-deploy-export.yml` and `scripts/auth0/compare-production-export.mjs` for read-only Production export/reconciliation.
-- No committed Production export artifact was found through repository search, so the live Auth0 state remains unproven.
+Verified:
+- `.github/workflows/auth0-production-deploy-export.yml` is manually dispatched only (`workflow_dispatch`).
+- The workflow uses the protected `production-auth0-readonly` environment and three dedicated Deploy CLI secrets; secret values are not present in source.
+- The workflow exports Production configuration with Auth0 Deploy CLI, validates the export shape, compares it with `infra/auth0/tenant.yaml` and `infra/auth0/actions/post-login.js`, and uploads a short-lived evidence artifact.
+- The workflow explicitly does not perform Auth0 import/update/create/delete operations.
+- `infra/auth0/DEPLOY-CLI-PRODUCTION.md` defines the required dedicated M2M/Management API setup and explicitly forbids reusing the TMS Web client.
+- Repository search found the workflow and its artifact definition, but no committed export artifact and no accessible workflow run/artifact through the currently exposed GitHub connector.
 
-Verified against the current source-controlled TMS contract:
-- Auth0 v4 Web SDK integration exists.
-- Server-side Auth0 client exists.
-- Access-token fetcher path exists.
-- API JWT verification exists with issuer/audience/JWKS/RS256.
-- Tenant claim namespace exists.
-- Post-Login Action and binding are versioned.
-- First-login identity bootstrap exists.
-- Tenant membership is re-checked by the API.
-- AUTH-01 remains P0/open.
-- DB-04 remains P0/open.
+Result:
+- [x] Source-controlled read-only reconciliation mechanism is defined.
+- [!] Live Auth0 Production evidence remains blocked pending execution/access to the workflow run artifact or an equivalent read-only Auth0 Management/Deploy export.
+- [!] AUTH-01 remains P0/open.
+- [!] DB-04 remains P0/open.
 
-Evidence added:
-- Vercel `tms-web` has a READY Production deployment for the current `main` checklist commit.
-- Production runtime logs for the last 24 hours returned no error/warning entries.
-- Historical runtime error clusters show prior Auth0 configuration failures on older deployments; these are not treated as current failures because their last occurrence predates the current deployment.
-- No Auth0 Management/Deploy connector is exposed to this workspace, so live Action/binding/Connection metadata remains unverified.
-
-Next operational step: **obtain read-only Auth0 Production export evidence through the repository's existing export workflow or an Auth0 Management/Deploy surface, then compare it with `infra/auth0/tenant.yaml` and `infra/auth0/actions/post-login.js` before any mutation.**
+Next operational step:
+1. Execute `Auth0 Production Deploy Config Export` via GitHub Actions with the protected `production-auth0-readonly` environment.
+2. Download `auth0-production-export-evidence`.
+3. Compare the live `tenant.yaml` and Action source with the source-controlled contract.
+4. Update this checklist with the actual live Action/binding/Connection evidence before any mutation.
