@@ -396,14 +396,14 @@ if (!enabled) {
           freightA,
           driverId,
           vehicleId,
-          audit,
+          { ...audit, requestId: randomUUID() },
         ),
         assignmentRepository.assign(
           tenantId,
           freightB,
           driverId,
           vehicleId,
-          audit,
+          { ...audit, requestId: randomUUID() },
         ),
       ]);
 
