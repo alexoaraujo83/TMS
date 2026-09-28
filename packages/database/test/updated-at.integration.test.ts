@@ -84,7 +84,7 @@ if (!runIntegration) {
 
   describe("database timestamp authority", () => {
     it("updates carrier.updated_at when the row changes", async () => {
-      const client = await pool.connect();
+      const client = await adminPool.connect();
       try {
         await client.query("begin");
         await client.query("alter table carriers disable row level security");
