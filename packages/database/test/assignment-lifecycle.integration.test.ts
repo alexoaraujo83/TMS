@@ -418,6 +418,10 @@ if (!enabled) {
       assert.equal(
         results.filter((result) => result.status === "fulfilled").length,
         1,
+        results
+          .filter((result) => result.status === "rejected")
+          .map((result) => String(result.reason))
+          .join("\\n"),
       );
       assert.equal(
         results.filter((result) => result.status === "rejected").length,
