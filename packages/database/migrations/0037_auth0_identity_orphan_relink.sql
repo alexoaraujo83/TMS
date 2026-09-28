@@ -123,7 +123,20 @@ begin
 end;
 $$;
 
-alter function public.bootstrap_auth0_identity(text, text, text, uuid) owner to tms_bootstrap;
+do $migration$
+begin
+  if exists (select 1 from pg_roles where rolname = 'tms_bootstrap') then
+    execute 'alter function public.bootstrap_auth0_identity(text, text, text, uuid) owner to tms_bootstrap';
+  elsif not exists (
+    select 1
+      from pg_roles
+     where rolname = current_user
+       and (rolbypassrls or rolsuper)
+  ) then
+    raise exception 'tms_bootstrap role is required when migration executor does not bypass RLS';
+  end if;
+end;
+$migration$;
 
 revoke all on function public.bootstrap_auth0_identity(text, text, text, uuid) from public;
 grant execute on function public.bootstrap_auth0_identity(text, text, text, uuid) to tms_app;
