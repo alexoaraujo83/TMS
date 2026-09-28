@@ -123,6 +123,12 @@ begin
 end;
 $$;
 
+revoke all on function public.bootstrap_auth0_identity(text, text, text, uuid) from public;
+grant execute on function public.bootstrap_auth0_identity(text, text, text, uuid) to tms_app;
+
+comment on function public.bootstrap_auth0_identity(text, text, text, uuid) is
+'Idempotent Auth0-to-TMS identity bootstrap. A trusted tenant claim may complete the first membership for a local identity with zero memberships; existing memberships are never expanded implicitly.';
+
 do $migration$
 begin
   if exists (select 1 from pg_roles where rolname = 'tms_bootstrap') then
@@ -137,9 +143,3 @@ begin
   end if;
 end;
 $migration$;
-
-revoke all on function public.bootstrap_auth0_identity(text, text, text, uuid) from public;
-grant execute on function public.bootstrap_auth0_identity(text, text, text, uuid) to tms_app;
-
-comment on function public.bootstrap_auth0_identity(text, text, text, uuid) is
-'Idempotent Auth0-to-TMS identity bootstrap. A trusted tenant claim may complete the first membership for a local identity with zero memberships; existing memberships are never expanded implicitly.';
