@@ -35,7 +35,10 @@ if (!enabled) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseAdminUrl,
+      },
       stdio: "inherit",
     });
 
