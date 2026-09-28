@@ -202,7 +202,7 @@ if (!enabled) {
         );
         assert.match(
           row.definition,
-          /freight_assignments \(tenant_id, freight_id, id\)/,
+          /freight_assignments\(tenant_id, freight_id, id\)/,
         );
       }
     } finally {
