@@ -27,6 +27,7 @@
 - [~] Behavioral RLS evidence now proves tenant-A visibility and synthetic tenant-B isolation for the supplied probe, but the complete DB-04 suite is not yet closed.
 - [!] AUTH-01 E4 is still open.
 - [!] DB-04 behavioral RLS proof remains a production gate.
+- [x] Neon Production project `tms / shiny-hall-34679912` and primary `main` branch were identified read-only.
 
 ## 1. Auth0 Production live configuration — READ ONLY FIRST
 
@@ -153,6 +154,10 @@
 - [~] Supplied probe proves same-tenant visibility: `tenantAVisible=true`.
 - [~] Supplied probe proves cross-tenant visibility isolation: `tenantBVisible=false` for synthetic tenant B.
 - [ ] Obtain/record a real `tms_app` session in Production.
+- [~] Direct Neon read-only inspection reached the primary Production branch, but the connector session is `neondb_owner`, not `tms_app`.
+- [x] `tms_app` is `rolcanlogin=true`, `rolbypassrls=false`, `rolsuper=false` in Production.
+- [x] `neondb_owner` is `rolbypassrls=true`; therefore owner-session queries are not valid DB-04 RLS proof.
+- [x] `neondb_owner` cannot `SET ROLE tms_app` because the role membership has `set_option=false`; this prevents treating the connector session as a real `tms_app` session.
 - [ ] Execute the complete six DB-04 behavioral isolation tests.
 - [ ] Prove cross-tenant read denial independently.
 - [ ] Prove cross-tenant write denial.
@@ -160,7 +165,7 @@
 - [ ] Prove role cannot bypass RLS.
 - [ ] Record only safe evidence.
 
-**Step result:** BLOCKER/P0 — CI run #651 is useful regression evidence, but its runtime database was the ephemeral GitHub Actions PostgreSQL service, not Production Neon. DB-04 still requires a real restricted Production session and the complete behavioral suite.
+**Step result:** BLOCKER/P0 — the Production Neon project/primary branch is now identified and directly inspected read-only. The connector authenticated as `neondb_owner`, which bypasses RLS, and cannot `SET ROLE tms_app`; therefore this evidence cannot close DB-04. A real restricted `tms_app` runtime session is still required for the behavioral suite.
 
 ## 10. Production environment separation
 
@@ -241,6 +246,16 @@ Do not promote/declare Production validated until:
 ---
 
 ## Change log
+
+### 2026-09-28 — Production Neon target identified; restricted-session gate preserved
+
+- Identified the versioned Production Neon project as `tms / shiny-hall-34679912` and its primary `main` branch read-only.
+- Verified the connector reached the primary branch, but the SQL session is `neondb_owner`, not `tms_app`.
+- Verified `tms_app` has login capability and `rolbypassrls=false`; verified `neondb_owner` has `rolbypassrls=true`.
+- Verified the `neondb_owner → tms_app` membership has `set_option=false`, so `SET ROLE tms_app` is not a valid substitute for a real restricted session.
+- No Production data mutation was executed; no RLS policy, grant, AuthGuard or tenant authorization behavior was changed.
+- DB-04 remains P0/open until a real `tms_app` runtime session can execute the required behavioral tests.
+
 
 ### 2026-09-28 — DB-04 CI provenance reconciliation
 
