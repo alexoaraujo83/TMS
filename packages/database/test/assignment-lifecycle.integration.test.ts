@@ -385,6 +385,14 @@ if (!enabled) {
         candidatesAfter.some((candidate) => candidate.driverId === driverId),
         false,
       );
+
+      await freightRepository.updateStatusWithAudit(
+        tenantId,
+        freightId,
+        "assigned",
+        "cancelled",
+        audit,
+      );
     });
 
     it("allows only one of two concurrent assignments for the same driver and vehicle", async () => {
