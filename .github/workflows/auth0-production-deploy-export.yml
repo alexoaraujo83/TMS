@@ -8,11 +8,6 @@ on:
         required: true
         default: true
         type: boolean
-      allow_import:
-        description: "Reserved for a protected production deployment workflow; must remain false here"
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -36,18 +31,15 @@ jobs:
       AUTH0_ALLOW_DELETE: "false"
       NODE_VERSION: "20.19.0"
       AUTH0_DEPLOY_CLI_VERSION: "8.41.0"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Validate inputs and credentials
+      - name: Validate credentials
         shell: bash
         run: |
           set -euo pipefail
-          test "${{ inputs.allow_import }}" = "false" || {
-            echo "::error::This workflow is export-only. Production import is intentionally blocked."
-            exit 1
-          }
           test -n "${AUTH0_DOMAIN}" || { echo "::error::Missing AUTH0_DEPLOY_DOMAIN"; exit 1; }
           test -n "${AUTH0_CLIENT_ID}" || { echo "::error::Missing AUTH0_DEPLOY_CLIENT_ID"; exit 1; }
           test -n "${AUTH0_CLIENT_SECRET}" || { echo "::error::Missing AUTH0_DEPLOY_CLIENT_SECRET"; exit 1; }
@@ -61,7 +53,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npm install             --prefix "${RUNNER_TEMP}/auth0-deploy-cli"             --no-save             --no-audit             --no-fund             "auth0-deploy-cli@${AUTH0_DEPLOY_CLI_VERSION}"
+          npm install \
+            --prefix "${RUNNER_TEMP}/auth0-deploy-cli" \
+            --no-save \
+            --no-audit \
+            --no-fund \
+            "auth0-deploy-cli@${AUTH0_DEPLOY_CLI_VERSION}"
           "${RUNNER_TEMP}/auth0-deploy-cli/node_modules/.bin/a0deploy" --help >/dev/null
 
       - name: Export Production tenant configuration
@@ -70,7 +67,25 @@ jobs:
           set -euo pipefail
           rm -rf "${RUNNER_TEMP}/auth0-export"
           mkdir -p "${RUNNER_TEMP}/auth0-export"
-          "${RUNNER_TEMP}/auth0-deploy-cli/node_modules/.bin/a0deploy" export             --format=yaml             --output_folder="${RUNNER_TEMP}/auth0-export"             --env=false
+          "${RUNNER_TEMP}/auth0-deploy-cli/node_modules/.bin/a0deploy" export \
+            --format=yaml \
+            --output_folder="${RUNNER_TEMP}/auth0-export" \
+            --env=false
+
+      - name: Validate export shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "${RUNNER_TEMP}/auth0-export/tenant.yaml" || {
+            echo "::error::Auth0 Deploy CLI did not produce tenant.yaml"
+            find "${RUNNER_TEMP}/auth0-export" -maxdepth 3 -type f -print
+            exit 1
+          }
+          test -d "${RUNNER_TEMP}/auth0-export/actions" || {
+            echo "::error::Auth0 Deploy CLI export did not produce the expected actions directory"
+            find "${RUNNER_TEMP}/auth0-export" -maxdepth 3 -type d -print
+            exit 1
+          }
 
       - name: Compare exported configuration with source contract
         if: ${{ inputs.compare_contract }}
@@ -79,7 +94,10 @@ jobs:
           AUTH0_DEPLOY_NODE_MODULES: ${{ runner.temp }}/auth0-deploy-cli/node_modules
         run: |
           set -euo pipefail
-          node scripts/auth0/compare-production-export.mjs             "${RUNNER_TEMP}/auth0-export/tenant.yaml"             "infra/auth0/tenant.yaml"             "infra/auth0/actions/post-login.js"
+          node scripts/auth0/compare-production-export.mjs \
+            "${RUNNER_TEMP}/auth0-export/tenant.yaml" \
+            "infra/auth0/tenant.yaml" \
+            "infra/auth0/actions/post-login.js"
 
       - name: Publish comparison evidence
         if: always()
@@ -89,7 +107,7 @@ jobs:
           path: |
             ${{ runner.temp }}/auth0-export/tenant.yaml
             ${{ runner.temp }}/auth0-export/actions
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
       - name: Safety assertion
