@@ -9,29 +9,33 @@ const integrationEnabled = process.env.RUN_DB_INTEGRATION === "true";
 
 test("durable job real PostgreSQL path claims, publishes and finalizes", { skip: !integrationEnabled }, async (t) => {
   const adminUrl = process.env.DATABASE_ADMIN_URL;
+  const fixtureOwnerUrl = process.env.TEST_OWNER_DATABASE_URL ?? adminUrl;
   const runtimeUrl = process.env.DATABASE_URL ?? process.env.RUNTIME_DATABASE_URL;
 
   assert.ok(adminUrl, "DATABASE_ADMIN_URL must be configured when RUN_DB_INTEGRATION=true");
+  assert.ok(fixtureOwnerUrl, "TEST_OWNER_DATABASE_URL or DATABASE_ADMIN_URL must be configured when RUN_DB_INTEGRATION=true");
   assert.ok(runtimeUrl, "DATABASE_URL or RUNTIME_DATABASE_URL must be configured when RUN_DB_INTEGRATION=true");
 
   const admin = new Pool({ connectionString: adminUrl });
+  const fixtureOwner = new Pool({ connectionString: fixtureOwnerUrl });
   const runtime = new Pool({ connectionString: runtimeUrl });
   const tenantId = crypto.randomUUID();
   const jobId = crypto.randomUUID();
   const requests: Array<{ idempotencyKey: string | null; body: string }> = [];
 
   t.after(async () => {
-    await admin.query("delete from durable_jobs where id = $1", [jobId]);
-    await admin.query("delete from tenants where id = $1", [tenantId]);
+    await fixtureOwner.query("delete from durable_jobs where id = $1", [jobId]);
+    await fixtureOwner.query("delete from tenants where id = $1", [tenantId]);
     await runtime.end();
+    await fixtureOwner.end();
     await admin.end();
   });
 
-  await admin.query(
+  await fixtureOwner.query(
     "insert into tenants (id, name, slug, status) values ($1, $2, $3, 'active')",
     [tenantId, "Durable Jobs Integration", `durable-jobs-${tenantId}`],
   );
-  await admin.query(
+  await fixtureOwner.query(
     `insert into durable_jobs (id, tenant_id, job_type, payload, status, attempts, max_attempts)
      values ($1, $2, 'external.webhook', $3::jsonb, 'pending', 0, 3)`,
     [
@@ -81,7 +85,7 @@ test("durable job real PostgreSQL path claims, publishes and finalizes", { skip:
   assert.equal(completed.status, "completed");
   assert.equal(completed.leaseToken, null);
 
-  const persisted = await admin.query(
+  const persisted = await fixtureOwner.query(
     "select status, attempts, lease_token, completed_at from durable_jobs where id = $1",
     [jobId],
   );

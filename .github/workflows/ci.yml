@@ -31,8 +31,6 @@ jobs:
           --health-timeout=5s
           --health-retries=5
     env:
-      DATABASE_ADMIN_URL: postgresql://tms:tms@localhost:5432/tms_dev
-      DATABASE_URL: postgresql://tms:tms@localhost:5432/tms_dev
       RUN_DB_INTEGRATION: "true"
     steps:
       - uses: actions/checkout@v5
@@ -44,19 +42,48 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Validate versioned architecture documentation
         run: pnpm architecture:check
-      - run: pnpm --filter @tms/database migrate
-      - name: Provision CI database roles
+      - name: Provision ephemeral CI admin and runtime roles
         shell: bash
         run: |
           set -euo pipefail
           runtime_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
           admin_password="$(node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))")"
-          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev"             -v ON_ERROR_STOP=1             -c "ALTER ROLE tms_app PASSWORD '$runtime_password'"
-          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev"             -v ON_ERROR_STOP=1             -c "DROP ROLE IF EXISTS tms_ci_admin"
-          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev"             -v ON_ERROR_STOP=1             -c "CREATE ROLE tms_ci_admin LOGIN SUPERUSER PASSWORD '$admin_password'"
-          printf 'DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create extension if not exists pgcrypto"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "drop role if exists tms_bootstrap"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_bootstrap nologin nosuperuser nocreatedb nocreaterole noinherit noreplication bypassrls"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant usage, create on schema public to tms_bootstrap"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "drop role if exists tms_ci_admin"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "create role tms_ci_admin login nosuperuser nocreatedb createrole noinherit noreplication nobypassrls password '$admin_password'"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant tms_bootstrap to tms_ci_admin"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant connect on database tms_dev to tms_ci_admin"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "grant usage, create on schema public to tms_ci_admin"
+          printf 'DATABASE_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
           printf 'RUNTIME_DATABASE_URL=postgresql://tms_app:%s@localhost:5432/tms_dev\n' "$runtime_password" >> "$GITHUB_ENV"
           printf 'DATABASE_ADMIN_URL=postgresql://tms_ci_admin:%s@localhost:5432/tms_dev\n' "$admin_password" >> "$GITHUB_ENV"
+          printf 'TEST_OWNER_DATABASE_URL=postgresql://tms:tms@localhost:5432/tms_dev\n' >> "$GITHUB_ENV"
+      - name: Run initial schema migration as tms_ci_admin
+        run: pnpm --filter @tms/database migrate
+      - name: Revoke CI migration access to bootstrap capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "revoke tms_bootstrap from tms_ci_admin"
+      - name: Set ephemeral runtime credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_password="$(printf '%s' "$RUNTIME_DATABASE_URL" | sed -E 's#^postgresql://tms_app:([^@]+)@.*#\1#')"
+          PGPASSWORD=tms psql "postgresql://tms@localhost:5432/tms_dev" -v ON_ERROR_STOP=1 -c "alter role tms_app password '$runtime_password'"
+          printf 'DATABASE_URL=%s\n' "$RUNTIME_DATABASE_URL" >> "$GITHUB_ENV"
+      - name: Validate generated CI database identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(psql "$DATABASE_ADMIN_URL" -Atqc 'select current_user')" = "tms_ci_admin"
+          test "$(psql "$DATABASE_URL" -Atqc 'select current_user')" = "tms_app"
+          test "$(psql "$DATABASE_ADMIN_URL" -Atqc "select rolsuper, rolbypassrls from pg_roles where rolname = 'tms_ci_admin'")" = "f|f"
+          psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select current_user, current_schema(), has_schema_privilege(current_user, 'public', 'USAGE') as schema_usage"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "select current_user, current_schema(), has_schema_privilege(current_user, 'public', 'USAGE') as schema_usage"
       - name: Validate runtime role attributes
         run: |
           psql "$DATABASE_ADMIN_URL" -v ON_ERROR_STOP=1 -c "select rolname, rolsuper, rolbypassrls, rolcanlogin from pg_roles where rolname = 'tms_app'"
@@ -71,6 +98,19 @@ jobs:
         run: pnpm --filter @tms/database build && pnpm --filter @tms/worker exec tsx --test src/freight-status-flow.integration.test.ts
       - name: Validate worker replay and cross-tenant runtime evidence
         run: pnpm --filter @tms/database build && pnpm --filter @tms/worker exec tsx --test src/runtime-evidence.integration.test.ts
+      - name: Run database integration suite and save result
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          set -o pipefail
+          RUN_DB_INTEGRATION=true pnpm --filter @tms/database test 2>&1 | tee artifacts/database-integration-test.txt
+      - name: Upload database integration result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-integration-test-result
+          path: artifacts/database-integration-test.txt
+          if-no-files-found: ignore
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint

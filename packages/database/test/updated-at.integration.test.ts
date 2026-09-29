@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import { after, before, describe, it } from "node:test";
 
 const databaseUrl = process.env.DATABASE_URL;
+const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
 const runIntegration =
   process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
 
@@ -13,6 +14,7 @@ if (!runIntegration) {
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
+  const adminPool = new Pool({ connectionString: databaseAdminUrl });
   const tenantId = randomUUID();
   const userId = randomUUID();
   let carrierId = "";
@@ -20,11 +22,14 @@ if (!runIntegration) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseAdminUrl,
+      },
       stdio: "inherit",
     });
 
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of ["carriers", "users", "tenants"]) {
@@ -58,7 +63,7 @@ if (!runIntegration) {
   });
 
   after(async () => {
-    const client = await pool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       for (const table of ["carriers", "users", "tenants"]) {
@@ -73,12 +78,13 @@ if (!runIntegration) {
     } finally {
       client.release();
       await pool.end();
+      await adminPool.end();
     }
   });
 
   describe("database timestamp authority", () => {
     it("updates carrier.updated_at when the row changes", async () => {
-      const client = await pool.connect();
+      const client = await adminPool.connect();
       try {
         await client.query("begin");
         await client.query("alter table carriers disable row level security");

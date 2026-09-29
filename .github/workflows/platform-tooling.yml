@@ -1,0 +1,41 @@
+name: platform-tooling
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Verify pnpm
+        run: pnpm --version
+
+      - name: Install Vercel, Neon and Railway CLIs
+        run: npm install --global vercel neon @railway/cli
+
+      - name: Install Auth0 CLI
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/main/install.sh | sh -s -- -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify platform CLI contract
+        run: node scripts/check-platform-tooling.mjs
+
+      - name: Verify repository package metadata
+        run: node -e "const p=require('./package.json'); if(p.packageManager!=='pnpm@11.24.0'||p.engines.node!=='24.20.0') process.exit(1)"

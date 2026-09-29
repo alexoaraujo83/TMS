@@ -6,16 +6,18 @@ import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 const databaseAdminUrl = process.env.DATABASE_ADMIN_URL ?? databaseUrl;
+const fixtureOwnerUrl = process.env.TEST_OWNER_DATABASE_URL ?? databaseAdminUrl;
 const enabled =
-  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl);
+  process.env.RUN_DB_INTEGRATION === "true" && Boolean(databaseUrl && fixtureOwnerUrl);
 
 if (!enabled) {
   describe("IAM role bootstrap integration", () => {
-    it("is disabled unless RUN_DB_INTEGRATION=true and DATABASE_URL is configured", () => {});
+    it("is disabled unless RUN_DB_INTEGRATION=true and database URLs are configured", () => {});
   });
 } else {
   const pool = new Pool({ connectionString: databaseUrl });
   const adminPool = new Pool({ connectionString: databaseAdminUrl });
+  const fixtureOwnerPool = new Pool({ connectionString: fixtureOwnerUrl });
   const tenantId = randomUUID();
   const userId = randomUUID();
   let operatorRoleId: string;
@@ -23,11 +25,14 @@ if (!enabled) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: fixtureOwnerUrl,
+      },
       stdio: "inherit",
     });
 
-    const client = await adminPool.connect();
+    const client = await fixtureOwnerPool.connect();
     try {
       await client.query("begin");
       operatorRoleId = randomUUID();
@@ -63,7 +68,7 @@ if (!enabled) {
   });
 
   after(async () => {
-    const client = await adminPool.connect();
+    const client = await fixtureOwnerPool.connect();
     try {
       await client.query("begin");
       await client.query(
@@ -80,6 +85,7 @@ if (!enabled) {
     } finally {
       client.release();
       await pool.end();
+      await fixtureOwnerPool.end();
       await adminPool.end();
     }
   });

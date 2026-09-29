@@ -56,7 +56,10 @@ if (!enabled) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseAdminUrl,
+      },
       stdio: "inherit",
     });
     const client = await adminPool.connect();
@@ -115,10 +118,10 @@ if (!enabled) {
         )
       ).rows[0].id;
       await client.query("commit");
-      await query("alter table trips enable row level security");
-      await query("alter table trips force row level security");
-      await query("alter table freight_assignments enable row level security");
-      await query("alter table freight_assignments force row level security");
+      await adminPool.query("alter table trips enable row level security");
+      await adminPool.query("alter table trips force row level security");
+      await adminPool.query("alter table freight_assignments enable row level security");
+      await adminPool.query("alter table freight_assignments force row level security");
       await assignments.assign(tenantId, freightId, driverId, vehicleId, {
         ...audit,
         entityType: "freight_assignment",

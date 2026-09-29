@@ -70,7 +70,10 @@ if (!enabled) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseAdminUrl,
+      },
       stdio: "inherit",
     });
     const client = await adminPool.connect();
@@ -382,6 +385,14 @@ if (!enabled) {
         candidatesAfter.some((candidate) => candidate.driverId === driverId),
         false,
       );
+
+      await freightRepository.updateStatusWithAudit(
+        tenantId,
+        freightId,
+        "assigned",
+        "cancelled",
+        audit,
+      );
     });
 
     it("allows only one of two concurrent assignments for the same driver and vehicle", async () => {
@@ -393,20 +404,24 @@ if (!enabled) {
           freightA,
           driverId,
           vehicleId,
-          audit,
+          { ...audit, requestId: randomUUID() },
         ),
         assignmentRepository.assign(
           tenantId,
           freightB,
           driverId,
           vehicleId,
-          audit,
+          { ...audit, requestId: randomUUID() },
         ),
       ]);
 
       assert.equal(
         results.filter((result) => result.status === "fulfilled").length,
         1,
+        results
+          .filter((result) => result.status === "rejected")
+          .map((result) => String(result.reason))
+          .join("\\n"),
       );
       assert.equal(
         results.filter((result) => result.status === "rejected").length,

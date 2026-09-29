@@ -23,7 +23,10 @@ if (!enabled) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseAdminUrl,
+      },
       stdio: "inherit",
     });
 
@@ -39,11 +42,12 @@ if (!enabled) {
       );
       await client.query(
         `insert into freights (
-          id, tenant_id, lifecycle, freight_type, origin, destination,
-          cargo_description, quantity, weight_kg, volume_m3, linear_meters,
-          company_price, driver_price
-        ) values ($1, $2, 'draft', 'dedicated', 'Origin', 'Destination',
-          'Compliance fixture', 1, 100, 1, 1, 100, 80)`,
+          id, tenant_id, status, freight_type, origin_city, origin_state,
+          destination_city, destination_state, cargo_description, quantity,
+          weight_kg, volume_m3, linear_meters, customer_price_cents,
+          driver_price_cents
+        ) values ($1, $2, 'open', 'dedicated', 'Origin', 'MG', 'Destination',
+          'SP', 'Compliance fixture', 1, 100, 1, 1, 10000, 8000)`,
         [freightId, tenantId],
       );
       await client.query("commit");
@@ -75,6 +79,15 @@ if (!enabled) {
       ]);
       await client.query("delete from freights where id = $1", [freightId]);
       await client.query("delete from tenants where id = $1", [tenantId]);
+      for (const table of [
+        "compliance_checks",
+        "gr_requests",
+        "freights",
+        "tenants",
+      ]) {
+        await client.query(`alter table ${table} enable row level security`);
+        await client.query(`alter table ${table} force row level security`);
+      }
       await client.query("commit");
     } finally {
       client.release();
@@ -189,7 +202,7 @@ if (!enabled) {
         );
         assert.match(
           row.definition,
-          /freight_assignments \(tenant_id, freight_id, id\)/,
+          /freight_assignments\(tenant_id, freight_id, id\)/,
         );
       }
     } finally {

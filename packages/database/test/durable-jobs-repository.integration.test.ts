@@ -24,7 +24,10 @@ if (!enabled) {
   before(async () => {
     execFileSync("pnpm", ["migrate"], {
       cwd: process.cwd(),
-      env: process.env,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseAdminUrl,
+      },
       stdio: "inherit",
     });
     const client = await adminPool.connect();
@@ -64,6 +67,10 @@ if (!enabled) {
         tenantId,
         otherTenantId,
       ]);
+      await client.query("alter table durable_jobs enable row level security");
+      await client.query("alter table durable_jobs force row level security");
+      await client.query("alter table tenants enable row level security");
+      await client.query("alter table tenants force row level security");
       await client.query("commit");
     } finally {
       client.release();
@@ -151,9 +158,13 @@ if (!enabled) {
   });
 
   it("keeps tenant jobs isolated", async () => {
-    await jobs.enqueue({ tenantId, jobType: "integration.isolated" });
+    const job = await jobs.enqueue({ tenantId, jobType: "integration.isolated" });
     const claimed = await jobs.claimPending(otherTenantId, 10);
     assert.equal(claimed.length, 0);
+
+    const [ownedJob] = await jobs.claimPending(tenantId, 10);
+    assert.equal(ownedJob.id, job.id);
+    await jobs.complete(tenantId, job.id, ownedJob.leaseToken);
   });
 
   it("rejects stale lease completion after reclaim", async () => {
@@ -162,7 +173,9 @@ if (!enabled) {
       jobType: "integration.stale",
     });
     const [first] = await jobs.claimPending(tenantId, 1);
-    const client = await pool.connect();
+    // Lease expiry is test setup; perform it with the admin connection so RLS
+    // cannot silently reject the synthetic expiry update.
+    const client = await adminPool.connect();
     try {
       await client.query("begin");
       await client.query("select set_config($1, $2, true)", [
@@ -170,7 +183,7 @@ if (!enabled) {
         tenantId,
       ]);
       await client.query(
-        "update durable_jobs set available_at = now() where id = $1",
+        "update durable_jobs set available_at = now() - interval '1 second' where id = $1",
         [job.id],
       );
       await client.query("commit");
