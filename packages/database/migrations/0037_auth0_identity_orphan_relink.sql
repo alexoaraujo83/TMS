@@ -123,56 +123,8 @@ begin
 end;
 $$;
 
--- SECURITY DEFINER executes with the owner's privileges. Keep the bootstrap
--- owner narrowly scoped to the tables this function actually touches.
-do $grants$
-begin
-  if exists (select 1 from pg_roles where rolname = 'tms_bootstrap') then
-    execute 'grant select, insert, update on table public.users to tms_bootstrap';
-    execute 'grant select, insert on table public.tenant_memberships to tms_bootstrap';
-    execute 'grant select on table public.tenants to tms_bootstrap';
-    execute 'grant select on table public.roles to tms_bootstrap';
-    execute 'grant select on table public.role_permissions to tms_bootstrap';
-    execute 'grant select on table public.permissions to tms_bootstrap';
-  end if;
-end;
-$grants$;
-
 revoke all on function public.bootstrap_auth0_identity(text, text, text, uuid) from public;
 grant execute on function public.bootstrap_auth0_identity(text, text, text, uuid) to tms_app;
 
 comment on function public.bootstrap_auth0_identity(text, text, text, uuid) is
 'Idempotent Auth0-to-TMS identity bootstrap. A trusted tenant claim may complete the first membership for a local identity with zero memberships; existing memberships are never expanded implicitly.';
-
-do $migration$
-begin
-  if exists (select 1 from pg_roles where rolname = 'tms_bootstrap') then
-    execute 'alter function public.bootstrap_auth0_identity(text, text, text, uuid) owner to tms_bootstrap';
-  elsif not exists (
-    select 1
-      from pg_roles
-     where rolname = current_user
-       and (rolbypassrls or rolsuper)
-  ) then
-    raise exception 'tms_bootstrap role is required when migration executor does not bypass RLS';
-  end if;
-end;
-$migration$;
-
--- The authoritative Auth0 membership resolver is also SECURITY DEFINER and
--- reads the same FORCE RLS tables. Keep its production owner unchanged, but
--- use the CI bootstrap owner when present so the runtime proof exercises the
--- real resolver rather than an RLS-empty result.
-do $resolver$
-begin
-  if exists (select 1 from pg_roles where rolname = 'tms_bootstrap') then
-    execute 'grant select on table public.users to tms_bootstrap';
-    execute 'grant select on table public.tenant_memberships to tms_bootstrap';
-    execute 'grant select on table public.tenants to tms_bootstrap';
-    execute 'grant select on table public.roles to tms_bootstrap';
-    execute 'grant select on table public.role_permissions to tms_bootstrap';
-    execute 'grant select on table public.permissions to tms_bootstrap';
-    execute 'alter function public.check_tenant_membership(text, uuid) owner to tms_bootstrap';
-  end if;
-end;
-$resolver$;
