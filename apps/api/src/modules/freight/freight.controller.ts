@@ -120,6 +120,152 @@ export class FreightController {
     });
   }
 
+  @Get("runtime-rls-evidence")
+  @RequirePermission("ops:diagnostics")
+  async runtimeRlsEvidence(@CurrentUser() context: RequestContext) {
+    return withTenantContext(this.pool, context.tenantId, async (client) => {
+      const identity = await client.query<{
+        currentUser: string;
+        bypassRls: boolean;
+        superuser: boolean;
+      }>(
+        `select current_user as "currentUser",
+                r.rolbypassrls as "bypassRls",
+                r.rolsuper as "superuser"
+         from pg_roles r
+         where r.rolname = current_user`,
+      );
+
+      const role = identity.rows[0];
+      const own = await client.query<{ id: string }>(
+        "select id from public.freights order by created_at asc limit 1",
+      );
+      const ownFreightId = own.rows[0]?.id ?? null;
+
+      if (!ownFreightId) {
+        return {
+          generatedAt: new Date().toISOString(),
+          authenticated: true,
+          tenantId: context.tenantId,
+          session: {
+            currentUser: role?.currentUser ?? null,
+            rolbypassrls: role?.bypassRls ?? null,
+            rolsuper: role?.superuser ?? null,
+          },
+          checks: {
+            ownTenantSelect: { passed: false, detail: "No freight available for the runtime probe" },
+            crossTenantSelect: { passed: false, detail: "No freight available for the runtime probe" },
+            crossTenantInsert: { passed: false, detail: "No fixture available" },
+            crossTenantUpdate: { passed: false, detail: "No fixture available" },
+            rollbackGuard: { passed: true, detail: "No write was attempted because the probe had no fixture" },
+          },
+          overall: false,
+        };
+      }
+
+      const ownVisible = await client.query(
+        "select id, tenant_id from public.freights where id = $1",
+        [ownFreightId],
+      );
+
+      const tenantB = randomUUID();
+      await client.query("savepoint db04_cross_select");
+      await client.query("select set_config($1, $2, true)", ["app.tenant_id", tenantB]);
+      const hidden = await client.query(
+        "select id from public.freights where id = $1",
+        [ownFreightId],
+      );
+      await client.query("rollback to savepoint db04_cross_select");
+      await client.query("select set_config($1, $2, true)", ["app.tenant_id", context.tenantId]);
+
+      await client.query("savepoint db04_cross_insert");
+      let insertPassed = false;
+      let insertDetail = "cross-tenant INSERT was accepted";
+      try {
+        await client.query(
+          `insert into public.freights
+             (id, tenant_id, status, freight_type, origin_city, origin_state,
+              destination_city, destination_state, cargo_description, quantity, weight_kg)
+           values ($1,$2,'open','dedicated','Santos','SP','São Paulo','SP',
+                   'DB-04 evidence probe',1,100)`,
+          [randomUUID(), tenantB],
+        );
+      } catch (error) {
+        const code = error && typeof error === "object" && "code" in error
+          ? String((error as { code?: string }).code ?? "")
+          : "";
+        insertPassed = code === "42501";
+        insertDetail = insertPassed
+          ? "Rejected by PostgreSQL/RLS (SQLSTATE 42501)"
+          : "Rejected, but not with SQLSTATE 42501";
+      }
+      await client.query("rollback to savepoint db04_cross_insert");
+
+      await client.query("savepoint db04_cross_update");
+      let updatePassed = false;
+      let updateDetail = "cross-tenant tenant_id reassignment was accepted";
+      try {
+        await client.query(
+          "update public.freights set tenant_id = $1 where id = $2",
+          [tenantB, ownFreightId],
+        );
+      } catch (error) {
+        const code = error && typeof error === "object" && "code" in error
+          ? String((error as { code?: string }).code ?? "")
+          : "";
+        updatePassed = code === "42501";
+        updateDetail = updatePassed
+          ? "Rejected by PostgreSQL/RLS (SQLSTATE 42501)"
+          : "Rejected, but not with SQLSTATE 42501";
+      }
+      await client.query("rollback to savepoint db04_cross_update");
+
+      const contextAfterRollback = await client.query<{ tenant: string | null }>(
+        "select nullif(current_setting('app.tenant_id', true), '') as tenant",
+      );
+
+      const checks = {
+        sessionIdentity: {
+          passed: role?.currentUser === "tms_app" && role?.bypassRls === false && role?.superuser === false,
+          detail: `current_user=${role?.currentUser ?? "unknown"}; rolbypassrls=${String(role?.bypassRls)}; rolsuper=${String(role?.superuser)}`,
+        },
+        ownTenantSelect: {
+          passed: ownVisible.rowCount === 1 && ownVisible.rows[0]?.tenant_id === context.tenantId,
+          detail: `visibleRows=${ownVisible.rowCount ?? 0}`,
+        },
+        crossTenantSelect: {
+          passed: hidden.rowCount === 0,
+          detail: `visibleRowsAfterSyntheticTenantSwitch=${hidden.rowCount ?? 0}`,
+        },
+        crossTenantInsert: { passed: insertPassed, detail: insertDetail },
+        crossTenantUpdate: { passed: updatePassed, detail: updateDetail },
+        rollbackGuard: {
+          passed: contextAfterRollback.rows[0]?.tenant === context.tenantId,
+          detail: "All mutation probes were isolated behind savepoints and rolled back",
+        },
+      };
+
+      return {
+        generatedAt: new Date().toISOString(),
+        authenticated: true,
+        tenantId: context.tenantId,
+        probeFreightId: ownFreightId,
+        syntheticTenantB: tenantB,
+        session: {
+          currentUser: role?.currentUser ?? null,
+          rolbypassrls: role?.bypassRls ?? null,
+          rolsuper: role?.superuser ?? null,
+        },
+        checks,
+        overall: Object.values(checks).every((check) => check.passed),
+        safety: {
+          persistentWrite: false,
+          note: "The endpoint only attempts cross-tenant writes and rolls each attempt back to a savepoint.",
+        },
+      };
+    });
+  }
+
   @Get("runtime-auth-claims")
   @RequirePermission("ops:diagnostics")
   runtimeAuthClaims(@CurrentUser() context: RequestContext) {
