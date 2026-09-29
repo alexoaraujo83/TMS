@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth0 } from "../../../../../lib/auth0";
+import { auth0 } from "../../../../lib/auth0";
 
 export async function GET(request: Request) {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/+$/, "");
