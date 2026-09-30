@@ -21,14 +21,32 @@ const exported = yaml.load(fs.readFileSync(exportedFile, "utf8")) || {};
 const contract = yaml.load(fs.readFileSync(contractFile, "utf8")) || {};
 
 const expectedName = "TMS — Tenant Claim";
-const exportedActions = Array.isArray(exported.actions) ? exported.actions : [];
-const contractActions = Array.isArray(contract.actions) ? contract.actions : [];
+
+const normalizeActions = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") {
+    return Object.entries(value).map(([name, action]) => ({
+      ...(action && typeof action === "object" ? action : {}),
+      name: action?.name || name,
+    }));
+  }
+  return [];
+};
+
+const exportedActions = normalizeActions(exported.actions);
+const contractActions = normalizeActions(contract.actions);
 
 const exportedAction = exportedActions.find((action) => action?.name === expectedName);
 const contractAction = contractActions.find((action) => action?.name === expectedName);
 
-if (!exportedAction) throw new Error(`Production export does not contain expected Action: ${expectedName}`);
-if (!contractAction) throw new Error(`Source contract does not contain expected Action: ${expectedName}`);
+if (!exportedAction) {
+  const available = exportedActions.map((action) => action?.name).filter(Boolean).join(", ");
+  throw new Error(
+    "Production export does not contain expected Action: " + expectedName + ". " +
+    "Exported Actions: " + (available || "(none)")
+  );
+}
+if (!contractAction) throw new Error("Source contract does not contain expected Action: " + expectedName);
 
 const normalizeCode = (value) => String(value ?? "").replace(/\r\n/g, "\n").trim();
 const exportedCodePath = exportedAction.code;
