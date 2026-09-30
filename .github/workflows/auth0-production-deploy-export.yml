@@ -137,7 +137,7 @@ jobs:
             "infra/auth0/actions/post-login.js"
 
       - name: Publish comparison evidence
-        if: ${{ steps.export.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.export.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: auth0-production-export-evidence
@@ -148,7 +148,7 @@ jobs:
           retention-days: 7
 
       - name: Safety assertion
-        if: ${{ steps.export.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.export.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
