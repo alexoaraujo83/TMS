@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchApiHealth, type ApiHealth } from "../../lib/api";
 
-const nav=[["dashboard","Dashboard","⌂"],["transportes","Transportes","▣"],["veiculos","Veículos","◇"],["motoristas","Motoristas","◌"],["clientes","Clientes","◎"],["rotas","Rotas","↗"],["documentos","Documentos","◫"],["financeiro","Financeiro","R$"],["relatorios","Relatórios","▥"],["auditoria","Auditoria","◈"],["configuracoes","Configurações","⚙"]];
+const nav=[["dashboard","Dashboard","⌂"],["transportes","Transportes","▣"],["veiculos","Veículos","◇"],["motoristas","Motoristas","◌"],["clientes","Clientes","◎"],["rotas","Rotas","↗"],["documentos","Documentos","◫"],["financeiro","Financeiro","R$"],["relatorios","Relatórios","▥"],["auditoria","Auditoria","◈"],["evidencias","Evidências","✓"],["configuracoes","Configurações","⚙"]];
 
 type Freight={id:string;status:string;originCity:string;originState:string;destinationCity:string;destinationState:string};
 type Session={authenticated:boolean;user?:{name?:string;email?:string}|null};
