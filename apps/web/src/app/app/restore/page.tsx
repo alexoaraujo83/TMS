@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+
+type Backup = { object: string; runUrl: string; createdAt: string };
 
 type Result = {
   ok?: boolean;
@@ -17,16 +19,39 @@ export default function RestoreVerifyPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [backupConfirmation, setBackupConfirmation] = useState("");
   const [backupResult, setBackupResult] = useState<Result | null>(null);
+  const [backups, setBackups] = useState<Backup[]>([]);
+  const [selectedBackup, setSelectedBackup] = useState("");
+  const [loadingBackups, setLoadingBackups] = useState(true);
+  const [backupCatalogError, setBackupCatalogError] = useState("");
+
+  async function loadBackups() {
+    setLoadingBackups(true);
+    setBackupCatalogError("");
+    try {
+      const response = await fetch("/api/tms/backups", { cache: "no-store" });
+      const text = await response.text();
+      const body = (text ? JSON.parse(text) : {}) as { backups?: Backup[]; error?: string };
+      if (!response.ok) throw new Error(body.error || "Falha ao carregar os backups.");
+      setBackups(body.backups ?? []);
+      setSelectedBackup((current) => current && (body.backups ?? []).some((item) => item.object === current) ? current : (body.backups?.[0]?.object ?? ""));
+    } catch (error) {
+      setBackupCatalogError(error instanceof Error ? error.message : "Falha ao carregar os backups.");
+    } finally {
+      setLoadingBackups(false);
+    }
+  }
+
+  useEffect(() => { void loadBackups(); }, []);
 
   async function execute() {
-    if (confirmation !== "RESTORE-VERIFY") return;
+    if (confirmation !== "RESTORE-VERIFY" || !selectedBackup) return;
     setRunning("restore");
     setResult(null);
     try {
       const response = await fetch("/api/tms/restore-verify", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ confirmation }),
+        body: JSON.stringify({ confirmation, backupObject: selectedBackup }),
       });
       const text = await response.text();
       const body = (text ? JSON.parse(text) : {}) as Result;
@@ -194,7 +219,7 @@ export default function RestoreVerifyPage() {
             <button
               className="button button-primary"
               onClick={execute}
-              disabled={running !== null || confirmation !== "RESTORE-VERIFY"}
+              disabled={running !== null || confirmation !== "RESTORE-VERIFY" || !selectedBackup}
             >
               {running === "restore" ? "Solicitando execução…" : "Executar restore-verify.sh"}
             </button>
