@@ -28,7 +28,8 @@ export default function RestoreVerifyPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ confirmation }),
       });
-      const body = (await response.json()) as Result;
+      const text = await response.text();
+      const body = (text ? JSON.parse(text) : {}) as Result;
       setResult(response.ok ? body : { error: body.error || body.message || "Falha ao solicitar o restore." });
     } catch (error) {
       setResult({ error: error instanceof Error ? error.message : "Falha de comunicação." });
@@ -47,7 +48,8 @@ export default function RestoreVerifyPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ confirmation: backupConfirmation }),
       });
-      const body = (await response.json()) as Result;
+      const text = await response.text();
+      const body = (text ? JSON.parse(text) : {}) as Result;
       setBackupResult(response.ok ? body : { error: body.error || body.message || "Falha ao solicitar o backup." });
     } catch (error) {
       setBackupResult({ error: error instanceof Error ? error.message : "Falha de comunicação." });
