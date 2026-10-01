@@ -22,15 +22,39 @@ cipher="$tmp_dir/backup.dump.enc"
 plain="$tmp_dir/backup.dump"
 toc="$tmp_dir/restore.list"
 filtered_toc="$tmp_dir/restore.filtered.list"
+manifest="$tmp_dir/manifest.json"
 
 aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://${S3_BUCKET}/${BACKUP_OBJECT}" "$cipher" --only-show-errors
+manifest_object="${BACKUP_OBJECT%/*}/manifest.json"
+aws --endpoint-url "$S3_ENDPOINT" s3 cp "s3://${S3_BUCKET}/${manifest_object}" "$manifest" --only-show-errors
+python3 - "$manifest" "$BACKUP_OBJECT" <<'PY'
+import json, sys
+m=json.load(open(sys.argv[1], encoding="utf-8"))
+if m.get("object") != sys.argv[2]: raise SystemExit("manifest object does not match selected backup")
+for k in ("sha256","bytes","postgres_version","public_table_count","migration_count"):
+    if k not in m: raise SystemExit("manifest missing field: "+k)
+if len(m["sha256"]) != 64: raise SystemExit("manifest sha256 is invalid")
+PY
 
 expected="$(aws --endpoint-url "$S3_ENDPOINT" s3api get-object --bucket "$S3_BUCKET" --key "${BACKUP_OBJECT%.dump.enc}.sha256" "$tmp_dir/remote.sha256" >/dev/null && awk '{print $1}' "$tmp_dir/remote.sha256")"
 actual="$(sha256sum "$cipher" | awk '{print $1}')"
+manifest_sha="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sha256"])' "$manifest")"
+manifest_bytes="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["bytes"])' "$manifest")"
+manifest_pg="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["postgres_version"])' "$manifest")"
+manifest_tables="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["public_table_count"])' "$manifest")"
+manifest_migrations="$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); print("" if m["migration_count"] is None else m["migration_count"])' "$manifest")"
+
 [[ "$actual" == "$expected" ]] || { echo "checksum mismatch" >&2; exit 1; }
+[[ "$actual" == "$manifest_sha" ]] || { echo "manifest checksum mismatch" >&2; exit 1; }
+remote_size="$(stat -c '%s' "$cipher")"
+[[ "$remote_size" == "$manifest_bytes" ]] || { echo "manifest size mismatch: expected=$manifest_bytes actual=$remote_size" >&2; exit 1; }
 
+echo "restore_manifest=verified object=$BACKUP_OBJECT"
 echo "restore_checksum=verified sha256=$actual"
-
+echo "restore_bytes=verified bytes=$remote_size"
+echo "restore_expected_postgres=$manifest_pg"
+echo "restore_expected_public_tables=$manifest_tables"
+echo "restore_expected_migrations=${manifest_migrations:-none}"
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
   -in "$cipher" -out "$plain" \
   -pass env:BACKUP_ENCRYPTION_KEY
