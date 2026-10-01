@@ -13,6 +13,7 @@ export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID"
 export AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
 export AWS_DEFAULT_REGION="$S3_REGION"
 export PGSSLMODE="${PGSSLMODE:-verify-full}"
+export PGSSLROOTCERT="${PGSSLROOTCERT:-system}"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT

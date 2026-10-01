@@ -19,6 +19,7 @@ export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID"
 export AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
 export AWS_DEFAULT_REGION="$S3_REGION"
 export PGSSLMODE="${PGSSLMODE:-verify-full}"
+export PGSSLROOTCERT="${PGSSLROOTCERT:-system}"
 
 run_id="$(date -u +%Y%m%dT%H%M%SZ)"
 tmp_dir="$(mktemp -d)"
