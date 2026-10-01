@@ -27,6 +27,7 @@ type Result = {
 };
 
 type RestoreStep = { name: string; status: string; conclusion: string | null };
+type RestoreHistory = { runId: number; runUrl: string; createdAt: string; updatedAt: string; status: "queued" | "running" | "verified" | "failed" };
 type RestoreStatus = {
   status?: "pending" | "queued" | "running" | "verified" | "failed";
   runId?: number;
@@ -37,6 +38,7 @@ type RestoreStatus = {
   message?: string;
   error?: string;
   steps?: RestoreStep[];
+  history?: RestoreHistory[];
 };
 
 function formatBytes(bytes: number | null) {
@@ -190,7 +192,8 @@ export default function RestoreVerifyPage() {
   }
 
   const restoreSteps = restoreStatus?.steps ?? [];
-  const lastVerifiedRestore = restoreStatus?.status === "verified" ? restoreStatus : null;
+  const restoreHistory = restoreStatus?.history ?? [];
+  const lastVerifiedRestore = restoreHistory.find((item) => item.status === "verified") ?? null;
 
   return (
     <main className="evidence-page">
@@ -322,6 +325,16 @@ export default function RestoreVerifyPage() {
           </ol>}
           {restoreStatus?.status === "verified" && <div className="evidence-banner"><div><strong>PASS — restore verificado</strong><span>O workflow reportou conclusão bem-sucedida; use o run vinculado como evidência operacional.</span></div><span className="evidence-badge">PASS</span></div>}
           {restoreStatus?.status === "failed" && <div className="ops-alert">FAIL — o workflow não concluiu a verificação.</div>}
+        </div>
+      </section>}
+
+      {restoreHistory.length > 0 && <section className="ops-card" style={{ maxWidth: 980 }}>
+        <div className="card-head"><div><span className="eyebrow">HISTÓRICO</span><h2>Restore drills recentes</h2></div><span className="status-pill open">{restoreHistory.length} registros</span></div>
+        <div style={{ overflowX: "auto", marginTop: 18 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr><th style={{ textAlign: "left", padding: 10 }}>Data</th><th style={{ textAlign: "left", padding: 10 }}>Run</th><th style={{ textAlign: "left", padding: 10 }}>Status</th><th style={{ textAlign: "left", padding: 10 }}>Evidência</th></tr></thead>
+            <tbody>{restoreHistory.map((item) => <tr key={item.runId}><td style={{ padding: 10 }}>{new Date(item.createdAt).toLocaleString("pt-BR")}</td><td style={{ padding: 10 }}>#{item.runId}</td><td style={{ padding: 10 }}><strong>{statusLabel(item.status)}</strong></td><td style={{ padding: 10 }}><a href={item.runUrl} target="_blank" rel="noreferrer">Abrir workflow</a></td></tr>)}</tbody>
+          </table>
         </div>
       </section>}
 
