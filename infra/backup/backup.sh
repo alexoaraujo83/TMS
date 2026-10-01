@@ -138,6 +138,46 @@ done < <(aws --endpoint-url "$S3_ENDPOINT" s3api list-objects-v2 \
 
 end_epoch="$(date +%s)"
 duration="$((end_epoch - start_epoch))"
+
+source_run_id="${GITHUB_RUN_ID:-}"
+source_run_url=""
+if [[ -n "${GITHUB_SERVER_URL:-}" && -n "${GITHUB_REPOSITORY:-}" && -n "$source_run_id" ]]; then
+  source_run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${source_run_id}"
+fi
+
+psql "$NEON_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  --set=backup_id="$run_id" \
+  --set=object_path="$object" \
+  --set=created_at="$run_id" \
+  --set=bytes="$size" \
+  --set=sha256="$checksum" \
+  --set=postgres_version="$postgres_version" \
+  --set=public_table_count="$public_table_count" \
+  --set=migration_table="${migration_table}" \
+  --set=migration_count="${migration_count:-}" \
+  --set=duration_seconds="$duration" \
+  --set=source_run_id="$source_run_id" \
+  --set=source_run_url="$source_run_url" <<'SQL'
+insert into public.backup_manifests (
+  backup_id, object_path, created_at, bytes, sha256, postgres_version,
+  public_table_count, migration_table, migration_count, duration_seconds,
+  integrity_status, retention_status, source_run_id, source_run_url
+) values (
+  :'backup_id', :'object_path',
+  to_timestamp(extract(epoch from to_timestamp(:'created_at', 'YYYYMMDD"T"HH24MISS"Z"'))),
+  :'bytes'::bigint, :'sha256', :'postgres_version', :'public_table_count'::integer,
+  nullif(:'migration_table', ''), nullif(:'migration_count', '')::integer,
+  :'duration_seconds'::integer, 'verified', 'verified',
+  nullif(:'source_run_id', '')::bigint, nullif(:'source_run_url', '')
+)
+on conflict (object_path) do update set
+  bytes = excluded.bytes, sha256 = excluded.sha256,
+  postgres_version = excluded.postgres_version, public_table_count = excluded.public_table_count,
+  migration_table = excluded.migration_table, migration_count = excluded.migration_count,
+  duration_seconds = excluded.duration_seconds, integrity_status = excluded.integrity_status,
+  retention_status = excluded.retention_status, source_run_id = excluded.source_run_id,
+  source_run_url = excluded.source_run_url, recorded_at = now();
+SQL
 echo "backup_id=${run_id}"
 echo "object=${object}"
 echo "bytes=${size}"
@@ -147,6 +187,7 @@ echo "postgres_version=${postgres_version}"
 echo "public_table_count=${public_table_count}"
 echo "migration_table=${migration_table:-none}"
 echo "migration_count=${migration_count:-none}"
+echo "manifest_status=recorded"
 echo "retention_deleted_objects=${deleted_objects}"
 echo "retention_deleted_runs=${deleted_runs}"
 echo "backup_status=verified"
