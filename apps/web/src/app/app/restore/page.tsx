@@ -32,8 +32,11 @@ export default function RestoreVerifyPage() {
       const text = await response.text();
       const body = (text ? JSON.parse(text) : {}) as { backups?: Backup[]; error?: string };
       if (!response.ok) throw new Error(body.error || "Falha ao carregar os backups.");
-      setBackups(body.backups ?? []);
-      setSelectedBackup((current) => current && (body.backups ?? []).some((item) => item.object === current) ? current : (body.backups?.[0]?.object ?? ""));
+      const catalog = body.backups ?? [];
+      setBackups(catalog);
+      setSelectedBackup((current) =>
+        current && catalog.some((item) => item.object === current) ? current : (catalog[0]?.object ?? ""),
+      );
     } catch (error) {
       setBackupCatalogError(error instanceof Error ? error.message : "Falha ao carregar os backups.");
     } finally {
@@ -168,6 +171,59 @@ export default function RestoreVerifyPage() {
             <div className="evidence-banner">
               <div><strong>{backupResult.status ?? "Solicitado"}</strong><span>{backupResult.message}</span></div>
             </div>
+          )}
+        </div>
+      </section>
+
+      <section className="ops-card" style={{ maxWidth: 860 }}>
+        <div className="card-head">
+          <div>
+            <span className="eyebrow">CATÁLOGO VERIFICADO</span>
+            <h2>Selecionar backup</h2>
+          </div>
+          <button className="button button-ghost" onClick={() => void loadBackups()} disabled={loadingBackups}>
+            {loadingBackups ? "Atualizando…" : "Atualizar lista"}
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
+          {loadingBackups && <p>Carregando backups verificados…</p>}
+          {backupCatalogError && <div className="ops-alert">{backupCatalogError}</div>}
+          {!loadingBackups && !backupCatalogError && backups.length === 0 && (
+            <div className="evidence-banner">
+              <div>
+                <strong>Nenhum backup disponível</strong>
+                <span>O catálogo considera somente execuções bem-sucedidas do workflow Backup Now.</span>
+              </div>
+            </div>
+          )}
+          {!loadingBackups && !backupCatalogError && backups.length > 0 && (
+            <>
+              <label style={{ display: "grid", gap: 8 }}>
+                <strong>Arquivo de backup</strong>
+                <select
+                  value={selectedBackup}
+                  onChange={(event) => setSelectedBackup(event.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    border: "1px solid var(--border, #d8dde5)",
+                    borderRadius: 10,
+                    font: "inherit",
+                    background: "var(--surface, #fff)",
+                  }}
+                >
+                  {backups.map((backup) => (
+                    <option key={backup.object} value={backup.object}>
+                      {new Date(backup.createdAt).toLocaleString("pt-BR")} — {backup.object}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p style={{ margin: 0 }}>
+                {backups.length} backup{backups.length === 1 ? "" : "s"} verificado{backups.length === 1 ? "" : "s"} disponível{backups.length === 1 ? "" : "eis"}.
+              </p>
+            </>
           )}
         </div>
       </section>
