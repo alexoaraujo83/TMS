@@ -31,7 +31,7 @@ python3 - "$manifest" "$BACKUP_OBJECT" <<'PY'
 import json, sys
 m=json.load(open(sys.argv[1], encoding="utf-8"))
 if m.get("object") != sys.argv[2]: raise SystemExit("manifest object does not match selected backup")
-for k in ("sha256","bytes","postgres_version","public_table_count","migration_count"):
+for k in ("sha256","bytes","postgres_version","public_table_count","migration_table","migration_count"):
     if k not in m: raise SystemExit("manifest missing field: "+k)
 if len(m["sha256"]) != 64: raise SystemExit("manifest sha256 is invalid")
 PY
@@ -42,6 +42,7 @@ manifest_sha="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))[
 manifest_bytes="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["bytes"])' "$manifest")"
 manifest_pg="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["postgres_version"])' "$manifest")"
 manifest_tables="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["public_table_count"])' "$manifest")"
+manifest_migration_table="$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); print(m["migration_table"] or "")' "$manifest")"
 manifest_migrations="$(python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); print("" if m["migration_count"] is None else m["migration_count"])' "$manifest")"
 
 [[ "$actual" == "$expected" ]] || { echo "checksum mismatch" >&2; exit 1; }
@@ -54,6 +55,7 @@ echo "restore_checksum=verified sha256=$actual"
 echo "restore_bytes=verified bytes=$remote_size"
 echo "restore_expected_postgres=$manifest_pg"
 echo "restore_expected_public_tables=$manifest_tables"
+echo "restore_expected_migration_table=${manifest_migration_table:-none}"
 echo "restore_expected_migrations=${manifest_migrations:-none}"
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 \
   -in "$cipher" -out "$plain" \
@@ -91,7 +93,7 @@ table_count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select coun
 echo "restore_public_table_count=verified count=$table_count"
 
 if [[ -n "$manifest_migrations" ]]; then
-  count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from public.schema_migrations" 2>/dev/null || true)"
+  count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from public.\"${manifest_migration_table}\"" 2>/dev/null || true)"
   [[ "$count" == "$manifest_migrations" ]] || { echo "migration count mismatch: expected=$manifest_migrations actual=$count" >&2; exit 1; }
   echo "restore_migration_count=verified count=$count"
 fi
