@@ -17,12 +17,7 @@ type Run = {
   conclusion: string | null;
   display_title: string;
 };
-type Job = {
-  id: number;
-  name: string;
-  status: string;
-  conclusion: string | null;
-};
+type Job = { id: number; name: string; status: string; conclusion: string | null };
 type Step = { name: string; status: string; conclusion: string | null };
 
 async function github(path: string, token: string) {
@@ -68,12 +63,27 @@ export async function GET(request: Request) {
       token,
     );
     const runs = (await response.json()).workflow_runs as Run[];
+    const history = runs.slice(0, 8).map((candidate) => ({
+      runId: candidate.id,
+      runUrl: candidate.html_url,
+      createdAt: candidate.created_at,
+      updatedAt: candidate.updated_at,
+      status: publicStatus(candidate),
+      conclusion: candidate.conclusion,
+    }));
+
     const run = runs.find((candidate) => {
       const created = Date.parse(candidate.created_at);
       return Number.isNaN(sinceMs) || created >= sinceMs;
     });
 
-    if (!run) return NextResponse.json({ status: "pending", message: "Aguardando o workflow de restore iniciar." });
+    if (!run) {
+      return NextResponse.json({
+        status: "pending",
+        message: "Aguardando o workflow de restore iniciar.",
+        history,
+      });
+    }
 
     const jobsResponse = await github(`/repos/${OWNER}/${REPO}/actions/runs/${run.id}/jobs?per_page=10`, token);
     const jobs = (await jobsResponse.json()).jobs as Job[];
@@ -98,6 +108,7 @@ export async function GET(request: Request) {
         status: step.status,
         conclusion: step.conclusion,
       })),
+      history,
     });
   } catch {
     return NextResponse.json({ error: "Não foi possível consultar o status do restore." }, { status: 502 });
