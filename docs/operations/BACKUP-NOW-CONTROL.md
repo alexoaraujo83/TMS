@@ -32,3 +32,11 @@ Create/protect the `backup-production` environment and configure:
 - `BACKUP_RETENTION_DAYS`
 
 No secret value belongs in the repository.
+
+## Restore backup selection
+
+- The Restore / DR page loads the catalog from successful Backup Now workflow runs.
+- The catalog exposes only the generated encrypted dump object path; S3 credentials and encryption keys remain server-side.
+- The selected object is sent as the backup_object workflow input.
+- The restore workflow accepts only objects matching the generated TMS backup namespace and filename format.
+- The previous static BACKUP_OBJECT GitHub Environment secret is no longer required for restore selection.

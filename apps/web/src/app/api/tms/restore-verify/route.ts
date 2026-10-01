@@ -29,9 +29,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Restore verification is not authorized for this session." }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { confirmation?: string };
+  const body = (await request.json().catch(() => ({}))) as { confirmation?: string; backupObject?: string };
   if (body.confirmation !== "RESTORE-VERIFY") {
     return NextResponse.json({ error: "Confirmation required" }, { status: 400 });
+  }
+
+  const backupObject = body.backupObject?.trim() ?? "";
+  if (!/^tms\/postgres\/\d{8}T\d{6}Z\/tms-\d{8}T\d{6}Z\.dump\.enc$/.test(backupObject)) {
+    return NextResponse.json({ error: "Selecione um backup válido do catálogo de backups verificados." }, { status: 400 });
   }
 
   const token = process.env.GITHUB_RESTORE_DISPATCH_TOKEN?.trim();
@@ -52,7 +57,7 @@ export async function POST(request: Request) {
         "content-type": "application/json",
         "x-github-api-version": "2022-11-28",
       },
-      body: JSON.stringify({ ref: BRANCH }),
+      body: JSON.stringify({ ref: BRANCH, inputs: { backup_object: backupObject } }),
       cache: "no-store",
     },
   );
