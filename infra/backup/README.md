@@ -17,7 +17,7 @@ Set these as Railway service secrets. Never commit values to GitHub:
 - `S3_ACCESS_KEY_ID` — dedicated least-privilege application key.
 - `S3_SECRET_ACCESS_KEY` — secret component of the application key.
 - `BACKUP_ENCRYPTION_KEY` — dedicated backup encryption passphrase/key.
-- Optional `PGSSLMODE` — defaults to `require`.
+- Optional `PGSSLMODE` — defaults to `verify-full`.
 
 ## Schedule
 
