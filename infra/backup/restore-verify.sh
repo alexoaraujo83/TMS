@@ -80,16 +80,20 @@ pg_restore \
 
 echo "restore_pg_restore=verified"
 
-psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select current_database(), current_schema();"
-table_count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from information_schema.tables where table_schema not in ('pg_catalog','information_schema');")"
-echo "restore_public_table_count=$table_count"
+target_pg="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select current_setting('server_version')")"
+source_pg_major="$(printf '%s' "$manifest_pg" | cut -d. -f1)"
+target_pg_major="$(printf '%s' "$target_pg" | cut -d. -f1)"
+[[ "$target_pg_major" == "$source_pg_major" ]] || { echo "postgres major version mismatch: expected=$source_pg_major actual=$target_pg" >&2; exit 1; }
+echo "restore_postgres_version=verified source=$manifest_pg target=$target_pg"
 
-# Optional migration marker validation: set EXPECTED_MIGRATION_COUNT only after
-# the production migration inventory has been confirmed for the target restore.
-if [[ -n "${EXPECTED_MIGRATION_COUNT:-}" ]]; then
+table_count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from information_schema.tables where table_schema = 'public';")"
+[[ "$table_count" == "$manifest_tables" ]] || { echo "public table count mismatch: expected=$manifest_tables actual=$table_count" >&2; exit 1; }
+echo "restore_public_table_count=verified count=$table_count"
+
+if [[ -n "$manifest_migrations" ]]; then
   count="$(psql "$RESTORE_DATABASE_URL" -v ON_ERROR_STOP=1 -Atc "select count(*) from public.schema_migrations" 2>/dev/null || true)"
-  [[ "$count" == "$EXPECTED_MIGRATION_COUNT" ]] || { echo "migration count mismatch: expected=${EXPECTED_MIGRATION_COUNT} actual=${count}" >&2; exit 1; }
-  echo "restore_migration_count=$count"
+  [[ "$count" == "$manifest_migrations" ]] || { echo "migration count mismatch: expected=$manifest_migrations actual=$count" >&2; exit 1; }
+  echo "restore_migration_count=verified count=$count"
 fi
 
 echo "restore_status=verified"
