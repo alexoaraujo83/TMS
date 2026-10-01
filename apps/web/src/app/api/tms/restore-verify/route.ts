@@ -9,9 +9,24 @@ const REPO = "TMS";
 const BRANCH = "main";
 
 export async function POST(request: Request) {
+  const appBaseUrl = process.env.APP_BASE_URL?.replace(/\/+$/, "");
+  const origin = request.headers.get("origin");
+  if (origin && appBaseUrl && origin !== appBaseUrl) {
+    return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
+  }
+
   const session = await auth0.getSession();
   if (!session) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  const allowedSubjects = (process.env.RESTORE_VERIFY_ALLOWED_SUBJECTS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const subject = session.user?.sub;
+  if (!subject || allowedSubjects.length === 0 || !allowedSubjects.includes(subject)) {
+    return NextResponse.json({ error: "Restore verification is not authorized for this session." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as { confirmation?: string };
