@@ -28,8 +28,8 @@ jobs:
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
-          export PATH="/usr/lib/postgresql/17/bin:${PATH}"
-          pg_restore --version
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/17/bin/pg_restore --version
 
       - name: Execute isolated restore verification
         env:
@@ -52,5 +52,7 @@ jobs:
             echo "Refusing restore target that looks like production/local."
             exit 1
           fi
+          echo "pg_restore=$(command -v pg_restore)"
+          pg_restore --version
           chmod 0755 infra/backup/restore-verify.sh
           infra/backup/restore-verify.sh
