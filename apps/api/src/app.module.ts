@@ -7,6 +7,7 @@ import { ComplianceModule } from "./modules/compliance/compliance.module.js";
 import { FinanceModule } from "./modules/finance/finance.module.js";
 import { FreightModule } from "./modules/freight/freight.module.js";
 import { OperationsModule } from "./modules/operations/operations.module.js";
+import { BackupModule } from "./modules/backup/backup.module.js";
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { OperationsModule } from "./modules/operations/operations.module.js";
     OperationsModule,
     ComplianceModule,
     FinanceModule,
+    BackupModule,
   ],
   controllers: [HealthController],
 })
