@@ -53,19 +53,11 @@ jobs:
           set -euo pipefail
           test -n "${RESTORE_DATABASE_URL}"
           test -n "${BACKUP_OBJECT}"
-          if ! printf '%s' "${BACKUP_OBJECT}" | grep -Eq '^tms/postgres/[0-9]{8}T[0-9]{6}Z/tms-[0-9]{8}T[0-9]{6}Z\.dump\.enc          if printf '%s' "${RESTORE_DATABASE_URL}" | grep -Eq '(^|[/?])((localhost|127\\.0\\.0\\.1)|prod|production)'; then
-            echo "Refusing restore target that looks like production/local."
-            exit 1
-          fi
-          echo "pg_restore=$(command -v pg_restore)"
-          pg_restore --version
-          chmod 0755 infra/backup/restore-verify.sh
-          infra/backup/restore-verify.sh
-; then
+          if ! printf '%s' "${BACKUP_OBJECT}" | grep -Eq '^tms/postgres/[0-9]{8}T[0-9]{6}Z/tms-[0-9]{8}T[0-9]{6}Z\.dump\.enc$'; then
             echo "Refusing backup object outside the controlled TMS backup namespace." >&2
             exit 1
           fi
-          if printf '%s' "${RESTORE_DATABASE_URL}" | grep -Eq '(^|[/?])((localhost|127\\.0\\.0\\.1)|prod|production)'; then
+          if printf '%s' "${RESTORE_DATABASE_URL}" | grep -Eq '(^|[/?])((localhost|127\.0\.0\.1)|prod|production)'; then
             echo "Refusing restore target that looks like production/local."
             exit 1
           fi
