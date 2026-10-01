@@ -37,7 +37,26 @@ export default function RestoreVerifyPage() {
     }
   }
 
-  async function executeBackup() {\n    if (backupConfirmation !== "BACKUP-NOW") return;\n    setRunning("backup");\n    setBackupResult(null);\n    try {\n      const response = await fetch("/api/tms/backup", {\n        method: "POST",\n        headers: { "content-type": "application/json" },\n        body: JSON.stringify({ confirmation: backupConfirmation }),\n      });\n      const body = (await response.json()) as Result;\n      setBackupResult(response.ok ? body : { error: body.error || body.message || "Falha ao solicitar o backup." });\n    } catch (error) {\n      setBackupResult({ error: error instanceof Error ? error.message : "Falha de comunicação." });\n    } finally {\n      setRunning(null);\n    }\n  }\n\n  return (
+  async function executeBackup() {
+    if (backupConfirmation !== "BACKUP-NOW") return;
+    setRunning("backup");
+    setBackupResult(null);
+    try {
+      const response = await fetch("/api/tms/backup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirmation: backupConfirmation }),
+      });
+      const body = (await response.json()) as Result;
+      setBackupResult(response.ok ? body : { error: body.error || body.message || "Falha ao solicitar o backup." });
+    } catch (error) {
+      setBackupResult({ error: error instanceof Error ? error.message : "Falha de comunicação." });
+    } finally {
+      setRunning(null);
+    }
+  }
+
+  return (
     <main className="evidence-page">
       <div className="evidence-head">
         <div>
