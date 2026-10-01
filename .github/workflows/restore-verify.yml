@@ -46,7 +46,6 @@ jobs:
           BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
           BACKUP_OBJECT: ${{ inputs.backup_object }}
           RESTORE_DATABASE_URL: ${{ secrets.RESTORE_DATABASE_URL }}
-          EXPECTED_MIGRATION_COUNT: ${{ secrets.EXPECTED_MIGRATION_COUNT }}
           PGSSLMODE: verify-full
           PGSSLROOTCERT: system
         run: |
