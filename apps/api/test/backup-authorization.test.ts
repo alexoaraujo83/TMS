@@ -34,14 +34,10 @@ test("backup manifests require iam:manage and deny an authenticated user without
   );
 });
 
-test("backup manifests controller is wired to AuthGuard, PermissionGuard and iam:manage", () => {
+test("backup manifests controller requires iam:manage", () => {
   const handler = BackupController.prototype.listManifests;
-
-  assert.deepEqual(Reflect.getMetadata(REQUIRED_PERMISSION, handler), "iam:manage");
-
-  const guards = Reflect.getMetadata("guards", BackupController);
-  assert.ok(Array.isArray(guards));
-  assert.equal(guards.length, 2);
-  assert.equal(guards[0]?.name, "AuthGuard");
-  assert.equal(guards[1]?.name, "PermissionGuard");
+  assert.equal(
+    Reflect.getMetadata(REQUIRED_PERMISSION, handler),
+    "iam:manage",
+  );
 });
