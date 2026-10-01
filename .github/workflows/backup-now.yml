@@ -1,0 +1,58 @@
+name: Backup Now
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-now
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Production backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: backup-production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL 17 client and OpenSSL
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common ca-certificates curl openssl
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+          export PATH="/usr/lib/postgresql/17/bin:${PATH}"
+          pg_dump --version
+          psql --version
+
+      - name: Execute production backup
+        env:
+          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          BACKUP_RETENTION_DAYS: ${{ secrets.BACKUP_RETENTION_DAYS }}
+          PGSSLMODE: verify-full
+          PGSSLROOTCERT: system
+        run: |
+          set -euo pipefail
+          test -n "${NEON_DATABASE_URL}"
+          test -n "${S3_ENDPOINT}"
+          test -n "${S3_BUCKET}"
+          test -n "${S3_ACCESS_KEY_ID}"
+          test -n "${S3_SECRET_ACCESS_KEY}"
+          test -n "${S3_REGION}"
+          test -n "${BACKUP_ENCRYPTION_KEY}"
+          chmod 0755 infra/backup/backup.sh
+          export PATH="/usr/lib/postgresql/17/bin:${PATH}"
+          infra/backup/backup.sh
