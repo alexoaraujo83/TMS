@@ -16,8 +16,13 @@ Required GitHub Environment secrets:
 - `RESTORE_DATABASE_URL`
 - `EXPECTED_MIGRATION_COUNT`
 
-The Vercel production environment additionally requires `GITHUB_RESTORE_DISPATCH_TOKEN` with the minimum GitHub permission needed to dispatch this workflow.
+The Vercel production environment additionally requires:
 
-`RESTORE_DATABASE_URL` must point to an isolated Neon recovery branch/database. Production must never be used as the restore target.
+- `GITHUB_RESTORE_DISPATCH_TOKEN`: minimum GitHub permission needed to dispatch this workflow.
+- `RESTORE_VERIFY_ALLOWED_SUBJECTS`: comma-separated Auth0 subject IDs allowed to request a restore drill.
 
-The page is intentionally fail-closed: without the dispatch token it returns HTTP 503 and does not attempt any restore.
+`RESTORE_DATABASE_URL` must point to an isolated Neon recovery branch/database. Production must never be used as the restore target. The workflow does not accept a target database from user input.
+
+The page is intentionally fail-closed: missing authorization configuration or dispatch credentials prevents execution.
+
+After the dispatch, the workflow runs `infra/backup/restore-verify.sh` with `PGSSLMODE=verify-full` and `PGSSLROOTCERT=system`, then exposes the workflow run as the audit trail.
