@@ -109,3 +109,53 @@ A capability is not considered complete until:
 - observability is sufficient to diagnose failures;
 - documentation is updated;
 - CI passes.
+
+
+## Current runtime diagrams — 2026-10-02
+
+### System context
+
+```mermaid
+flowchart LR
+  User[User] --> Web[Next.js Web]
+  Web --> API[NestJS API]
+  API --> Auth0[Auth0]
+  API --> DB[(Neon PostgreSQL)]
+  API --> Outbox[Outbox / Durable Jobs]
+  Outbox --> Worker[Async Worker]
+  Worker --> Ext[External integrations]
+  Backup[Backup Worker] --> DB
+  Backup --> ObjectStore[(S3-compatible storage)]
+  Actions[GitHub Actions] --> Restore[Restore Verification]
+  ObjectStore --> Restore
+  Restore --> Isolated[(Isolated Neon target)]
+```
+
+### Request flow
+
+```mermaid
+flowchart TD
+  A[Authentication] --> B[TenantContext]
+  B --> C[Authorization]
+  C --> D[Use Case]
+  D --> E[PostgreSQL Transaction]
+  E --> F[Audit + Outbox]
+  F --> G[Response]
+```
+
+### DR flow
+
+```mermaid
+flowchart TD
+  DB[(PostgreSQL)] --> BW[Backup Worker]
+  BW --> ENC[Encrypted dump + SHA-256 + manifest]
+  ENC --> S3[(Object storage)]
+  BW --> CAT[(backup_manifests)]
+  CAT --> UI[Restore / DR console]
+  UI --> WF[Restore Verification]
+  S3 --> WF
+  WF --> ISO[(Isolated Neon target)]
+  ISO --> EV[Evidence]
+```
+
+These diagrams describe the audited architecture. They do not, by themselves, prove that every external deployment is currently live; runtime proof must be attached to the release/evidence record.
