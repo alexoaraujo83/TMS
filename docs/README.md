@@ -8,6 +8,8 @@
 
 ## Current implementation
 
+- `PROJECT-AUDIT-2026-10-02.md` — auditoria geral, evidências observadas, diagramas, gaps e checklist mestre de desenvolvimento.
+
 - `PROJECT-DOCUMENTATION.md` — code-grounded project inventory and implemented-vs-target matrix.
 - `DATABASE.md` — schema, entities, fields, relationships, constraints, indexes and migrations.
 - `INTEGRATIONS-OPERATIONS.md` — runtime topology, environment contract, integration status, deploy, rollback and incidents.
