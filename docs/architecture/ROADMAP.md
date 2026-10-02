@@ -169,3 +169,19 @@
 - keep backup/recovery readiness **NOT PROVEN** until isolated recovery, recurring policy, RPO and RTO targets are established
 
 No stage is considered production-ready merely because its UI exists. Completion requires end-to-end traceability and passing quality/security gates.
+
+
+## Current audit reconciliation — 2026-10-02
+
+| Area | Status | Evidence / next gate |
+|---|---|---|
+| Stage 0 Foundation | IMPLEMENTED | monorepo, CI, config, Web/API/Worker |
+| Stage 1 Security/Tenancy | IMPLEMENTED FOUNDATION | Auth0, IAM, tenant context, RLS; DB-04/E4 runtime evidence remains a gate |
+| Stages 2–7 | IMPLEMENTED FOUNDATIONS in several domains | expand domain use cases and end-to-end coverage before calling complete |
+| Stage 8 Reliability | IMPLEMENTED FOUNDATION | durable jobs/outbox/webhooks need continued hardening and external contract evidence |
+| Stage 9 Analytics/AI | PLANNED | start after stable domain/event contracts |
+| Stage 10.10/10.11 DR | PARTIALLY PROVEN | isolated restore mechanism proven; recurring policy, ownership, retention, RPO/RTO not proven |
+| Restore UI automation | IN PROGRESS | PR #121 is open/draft; do not describe its changes as merged |
+| Documentation governance | CURRENT | audit and schema docs reconciled on 2026-10-02 |
+
+Production readiness remains evidence-driven: implementation, CI, preview deployment and production runtime proof are separate gates.
