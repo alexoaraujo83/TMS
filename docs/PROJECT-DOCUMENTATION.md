@@ -4,6 +4,8 @@
 **Repository:** `alexoaraujo83/TMS`  
 **Purpose:** document what is actually implemented, distinguish it from the target architecture, and make the project transferable between teams.
 
+> **Audited current state — 2026-10-02:** the production database is at migration `0039_backup_manifests.sql` with 39 applied migrations and 22 public tables. The historical statements below that mention 0031/0035 or 21 tables are superseded by this current-state addendum and by `docs/PROJECT-AUDIT-2026-10-02.md`.
+
 ## 1. Executive summary
 
 TMS is a new, independent Transportation Management System/SaaS. `alexoaraujo83/nexora-tms` is reference material only. The TMS repository explicitly forbids a runtime dependency, shared database, copied application boundary, or fork relationship with Nexora.
@@ -94,7 +96,7 @@ Database hardening also prevents cross-tenant carrier/driver/vehicle relationshi
 
 ## 6. Implemented business data
 
-The current main schema has 21 public tables and 31 migrations, with `0031_finance_relationship_invariants.sql` as the latest migration. A separate recovery drill documented elsewhere intentionally validated an earlier 28-migration restore state; that historical evidence must not be used to describe the current main schema.
+The current audited main schema has 22 public tables and 39 migrations, with `0039_backup_manifests.sql` as the latest migration. A separate recovery drill documented elsewhere intentionally validated an earlier 28-migration restore state; that historical evidence must not be used to describe the current main schema.
 
 Freight supports dedicated, shared, complement and urgent types; route, cargo, quantity, weight, volume, linear meters, commercial/driver prices, BRL currency, collection/delivery windows and matching requirements.
 
@@ -136,7 +138,7 @@ Nexora has a mature engineering baseline including the same Node/pnpm/Turborepo 
 | ------------------------------ | -------------- |
 | Monorepo/toolchain             | Implemented |
 | Web/API/Worker deployables     | Implemented foundation; worker has outbox processing |
-| PostgreSQL migrations          | Implemented through migration `0031_finance_relationship_invariants.sql` |
+| PostgreSQL migrations          | Implemented through migration `0039_backup_manifests.sql` |
 | Multi-tenancy                  | Implemented foundation |
 | IAM/permissions                | Implemented foundation |
 | Master data                    | Implemented foundation: carrier/driver/vehicle |
@@ -150,7 +152,7 @@ Nexora has a mature engineering baseline including the same Node/pnpm/Turborepo 
 | Durable jobs                   | Migration/persistence foundation implemented; broader runtime orchestration remains under validation |
 | External business integrations | Not established as implemented production connectors |
 | Analytics/AI                   | Architectural target |
-| Backup/restore                 | Restore mechanism proven; recurring DR policy not proven |
+| Backup/restore                 | Catalog/manifest/restore console integrated; isolated restore mechanism proven; recurring DR policy not proven |
 | Production hardening           | Roadmap / gates still open |
 
 ## 14. Versioned architecture diagrams
@@ -168,3 +170,8 @@ Any change to topology, bounded contexts, persistence or external integration mu
 ## 13. Documentation rule
 
 Whenever implementation changes, update the corresponding documentation in the same change. Never describe a planned module as production functionality. Architectural changes require an ADR.
+
+
+## 15. Audited current-state evidence
+
+See `docs/PROJECT-AUDIT-2026-10-02.md` for the 2026-10-02 repository/Neon/PR audit. The audit distinguishes implementation from environment evidence and records the open PR #121 as `OPEN / DRAFT / not merged`.
