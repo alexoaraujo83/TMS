@@ -119,117 +119,9 @@ TMS
 
 # E2 — Integration and production-state audit
 
-Status: **IN PROGRESS**
+Status: **IN PROGRESS — NOT CLOSED**
 
 Objective: verify the real integration chain independently for all specialist areas before advancing to E3.
-
-## E2 gates
-
-### Backend/API
-- production deployment
-- health/readiness
-- API contract
-- authentication
-- authorization
-- tenant context
-- database connectivity
-- audit/observability
-
-### Frontend/Web
-- production deployment
-- Auth0 login/session
-- API integration
-- protected routes
-- production runtime
-
-### Database
-- migration head
-- required tables
-- privileges
-- RLS
-- forced RLS
-- tenant context
-- production connectivity
-
-### Auth0/Identity
-- production application
-- callback/logout configuration
-- post-login action
-- tenant claim
-- JWT audience/issuer
-- API validation
-
-### Worker/Outbox
-- production service
-- queue/outbox
-- durable jobs
-- retry/idempotency
-- successful processing
-- failure handling
-
-### Infra/Deploy
-- Vercel
-- Railway
-- Neon
-- deployment/runtime alignment
-- environment separation
-
-### Security/Multi-tenancy
-- authenticated tenant A
-- denied/isolated tenant B
-- membership enforcement
-- RLS enforcement
-- privilege boundaries
-
-### CI/CD
-- source revision
-- workflow status
-- build
-- test
-- deployment linkage
-
-### Tests
-- integration
-- E2E
-- regression
-- security
-- production smoke
-
-### Observability
-- structured logs
-- correlation/request identifiers
-- tenant identifiers
-- errors
-- audit events
-
-### Backup/DR
-- backup worker
-- real cron evidence
-- backup object
-- manifest persistence
-- restore
-- RPO/RTO evidence
-
-## E2 evidence ledger
-
-| ID | Area | Evidence | Result | Status |
-|---|---|---|---|---|
-| E2-001 | Repository | Current main/repository structure | Pending verification in this checkpoint | OPEN |
-| E2-002 | Frontend | Production deployment | Pending current verification | OPEN |
-| E2-003 | Backend | Production deployment | Pending current verification | OPEN |
-| E2-004 | Database | Production schema/runtime | Pending current verification | OPEN |
-| E2-005 | Auth0 | Runtime identity chain | Pending current verification | OPEN |
-| E2-006 | Worker | Runtime processing | Pending current verification | OPEN |
-| E2-007 | Security | Cross-tenant behavioral test | Pending current verification | OPEN |
-| E2-008 | CI/CD | Workflow/deployment linkage | Pending current verification | OPEN |
-| E2-009 | Observability | Runtime evidence | Pending current verification | OPEN |
-| E2-010 | Backup/DR | Real scheduled backup + manifest persistence | Pending next real cycle / current evidence review | OPEN |
-
----
-
-# E2 — Integration and production-state audit
-
-Status: **IN PROGRESS — NOT CLOSED**
 
 ## E2 evidence recorded
 
@@ -237,7 +129,7 @@ Status: **IN PROGRESS — NOT CLOSED**
 - Repository is public and active.
 - Default branch: `main`.
 - The audit ledger itself is maintained on `audit/new-tms-master-2026-10-02`.
-- GitHub Actions workflows currently include CI, database migrations, Auth0 production workflows, backup, and restore verification.
+- GitHub Actions workflows include CI, database migrations, Auth0 production workflows, backup, and restore verification.
 - Result: **VERIFIED / E2 remains open for runtime linkage checks**.
 
 ### E2-002 — Frontend/Web
@@ -253,22 +145,17 @@ Status: **IN PROGRESS — NOT CLOSED**
 
 ### E2-004 — Database
 Read-only production inspection against Neon project `shiny-hall-34679912` / database `neondb` returned:
-
 - PostgreSQL 17.11.
 - 22 public tables.
 - `schema_migrations` latest migration: `0039_backup_manifests.sql`.
 - Migration 0039 applied at `2026-10-01T05:34:43.475Z`.
-- `backup_manifests` table exists.
-- `backup_manifests` currently contains **0 rows**.
+- `backup_manifests` table exists and currently contains **0 rows** on the current main branch read.
 - `tms_app` has `rolbypassrls=false`.
 - `authenticator` has `rolbypassrls=false`.
 - `neondb_owner` has `rolbypassrls=true` and is therefore not suitable as the behavioral RLS proof role.
 - Tenant-scoped application tables have RLS and FORCE ROW LEVEL SECURITY enabled.
 - Policies use `current_setting('app.tenant_id', true)` for tenant isolation.
-
-Important exception:
-- `backup_manifests`, `permissions`, and `schema_migrations` do not have RLS. This is not automatically a defect because these tables have different security semantics, but their access model must be validated separately.
-
+- Main branch metadata identifies the active read/write compute as `ep-red-mountain-ac177cgo` in `aws-sa-east-1`, with both direct and pooled host forms available.
 Result: **DATABASE INTEGRATION VERIFIED; behavioral RLS test and manifest persistence evidence remain open**.
 
 ### E2-005 — Auth0 / Identity
@@ -279,12 +166,14 @@ Result: **DATABASE INTEGRATION VERIFIED; behavioral RLS test and manifest persis
 
 ### E2-006 — Worker / Outbox
 - Railway production environment contains independent `tms-worker` and `tms-backup-worker` services.
-- Current Railway status: both latest deployments are **SUCCESS**.
-- `tms-worker` latest deployment: `0a58ab07-66b9-43ce-a2f5-0e637024e3a1`, created 2026-10-02 17:45:56Z, from main commit `0445a5ca2df20231bce4355081eaa4323750ba18`.
-- Fresh runtime logs from `tms-worker` show repeated structured `durable_job.telemetry` events in production with the production tenant context and pending-job telemetry.
-- `tms-backup-worker` latest deployment: `2f5292f6-e2df-489c-b782-1b32e1ddf934`, SUCCESS, with cron `0 2 * * *`.
-- The 2026-10-02 scheduled backup log records backup `20261002T020330Z`, verified object/checksum/retention, PostgreSQL 17.11, 22 public tables, migration count 39, `INSERT 0 1`, `manifest_status=recorded`, and manifest persistence verification at execution time.
-- Result: **WORKER RUNTIME VERIFIED; backup manifest durability still requires post-run database observation because the current direct DB read does not currently show the row.**
+- Both services are configured in the same production environment.
+- `tms-backup-worker` source is `alexoaraujo83/TMS`, branch `main`, Dockerfile `infra/backup/Dockerfile`, start command `/app/backup.sh`, cron `0 2 * * *`, restart policy `NEVER`.
+- `tms-backup-worker` has a production `NEON_DATABASE_URL` variable, but the connected Railway API exposes variable names only; its secret value cannot be independently inspected through the current connector session. Therefore the exact runtime host used by Railway cannot be proven from the variable API without exposing a secret.
+- Latest backup deployment `2f5292f6-e2df-489c-b782-1b32e1ddf934` is **SUCCESS**.
+- The real 2026-10-02 scheduled execution at `02:03:31Z` logged backup `20261002T020330Z`, successful backup/retention verification, `INSERT 0 1`, and `manifest_status=recorded`.
+- Repository source confirms that after the INSERT the script executes a fresh `psql "$NEON_DATABASE_URL"` count query for the same `backup_id` and exits non-zero if the count is not exactly `1`. fileciteturn104file5L84-L96
+- Repository search found no `DELETE FROM public.backup_manifests` application path in the audited commit; the only matching source result is the backup INSERT plus its persistence check. fileciteturn105file0L1-L8
+- Result: **WORKER RUNTIME VERIFIED; manifest visibility discrepancy remains unresolved**.
 
 ### E2-007 — Security / Multi-tenancy
 Schema evidence confirms tenant isolation policies and FORCE RLS on application tables.
@@ -312,26 +201,29 @@ It ran against commit `cac32ced8d3b92699afe4d695b715f1cf22bc473`.
 Result: **RESTORE VERIFICATION PASS**; this is not the same as global production completion.
 
 ### E2-009 — Observability
-- Observability package and structured audit/runtime instrumentation are part of the repository architecture.
-- Fresh production log correlation evidence has not yet been collected in this checkpoint.
-Result: **OPEN FOR RUNTIME EVIDENCE**.
+- Fresh Railway runtime logs for the real scheduled backup are available, including backup id, checksum, object, byte count, PostgreSQL version, table count, migration count, INSERT result and manifest status.
+- Neon SQL telemetry is not available for this project/region (`telemetry_not_enabled`), so the database cannot provide a historical SQL trace to independently prove or disprove a later DELETE.
+- Broader API/Web/Auth0 runtime correlation remains pending.
+- Result: **PARTIALLY VERIFIED**.
 
 ### E2-010 — Backup / DR
 - Backup workflow exists and is manual-dispatch only; it must not be invoked merely to manufacture evidence.
-- The real scheduled cron `0 2 * * *` executed on 2026-10-02 and the worker log records successful backup creation, remote verification, retention verification, and `INSERT 0 1` into `backup_manifests`.
-- The same execution logged `manifest_persisted_count=1` / `manifest_status=recorded` at backup time.
-- However, a fresh direct Neon read at 2026-10-02 20:44Z returned `backup_manifests` count **0** and no latest manifest.
-- This is a material evidence discrepancy: execution-time persistence was reported by the backup worker, but durable post-run visibility cannot currently be independently reproduced from the production database connection used by the audit.
-- No artificial manifest insertion is permitted, and no manual backup will be triggered to resolve this discrepancy.
-Result: **OPEN — POST-RUN MANIFEST DURABILITY DISCREPANCY REQUIRES INVESTIGATION.**
+- The real scheduled cron `0 2 * * *` executed on 2026-10-02.
+- Railway logged `INSERT 0 1` and `manifest_status=recorded` for `backup_id=20261002T020330Z`.
+- The backup script itself performs an immediate post-insert count verification against `backup_manifests` using `NEON_DATABASE_URL`. fileciteturn104file5L84-L96
+- A later independent read of the production main branch returned `backup_manifests = 0`.
+- The current Railway connector cannot expose the secret value of `NEON_DATABASE_URL`, so the exact runtime connection target cannot yet be compared directly with the audit connection without handling a secret.
+- No manual backup, artificial INSERT, restore, or data mutation will be used to manufacture evidence.
+Result: **OPEN — CONNECTION-PATH / POST-RUN VISIBILITY DISCREPANCY REQUIRES RECONCILIATION**.
 
 ## E2 current blockers
 
 1. Fresh Auth0 → JWT → API → TenantContext runtime proof.
 2. Behavioral cross-tenant/RLS negative test using application role.
-3. Fresh production observability evidence.
-4. Post-run durability of the 2026-10-02 `backup_manifests` record must be reconciled.
-5. RPO/RTO operational evidence still needs final consolidation.
+3. Broader production observability/API-Web runtime correlation.
+4. Reconcile the exact database target used by Railway `NEON_DATABASE_URL` with the production Neon main branch used by the audit, without exposing the secret.
+5. Reconcile why the real cron reports immediate manifest persistence while the later independent main-branch read reports zero rows.
+6. RPO/RTO operational evidence still needs final consolidation.
 
 ## E2 decision
 
