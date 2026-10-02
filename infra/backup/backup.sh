@@ -45,6 +45,9 @@ if [[ -n "$migration_table" ]]; then
   migration_count="$(psql "$NEON_DATABASE_URL" -Atqc "select count(*) from public.\"${migration_table}\"")"
 fi
 
+db_fingerprint="$(psql "$NEON_DATABASE_URL" -Atqc "select current_database() || '|' || current_user || '|' || coalesce(inet_server_addr()::text, 'local') || '|' || inet_server_port() || '|' || current_setting('server_version')")"
+echo "db_fingerprint=${db_fingerprint}"
+
 openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
   -in "$plain" -out "$cipher" \
   -pass env:BACKUP_ENCRYPTION_KEY
@@ -178,6 +181,14 @@ on conflict (object_path) do update set
   retention_status = excluded.retention_status, source_run_id = excluded.source_run_id,
   source_run_url = excluded.source_run_url, recorded_at = now();
 SQL
+
+manifest_persisted_count="$(psql "$NEON_DATABASE_URL" -Atqc "select count(*) from public.backup_manifests where backup_id = '$run_id'")"
+if [[ "$manifest_persisted_count" != "1" ]]; then
+  echo "manifest persistence verification failed: backup_id=${run_id} count=${manifest_persisted_count}" >&2
+  exit 1
+fi
+echo "manifest_persisted=true"
+echo "manifest_persisted_count=${manifest_persisted_count}"
 echo "backup_id=${run_id}"
 echo "object=${object}"
 echo "bytes=${size}"
