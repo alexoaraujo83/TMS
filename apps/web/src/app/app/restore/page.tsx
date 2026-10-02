@@ -81,6 +81,7 @@ export default function RestoreVerifyPage() {
   const [selectedBackup, setSelectedBackup] = useState("");
   const [loadingBackups, setLoadingBackups] = useState(true);
   const [backupCatalogError, setBackupCatalogError] = useState("");
+  const [catalogUpdatedAt, setCatalogUpdatedAt] = useState("");
   const [filter, setFilter] = useState("");
   const [restoreStatus, setRestoreStatus] = useState<RestoreStatus | null>(null);
   const [restoreRequestedAt, setRestoreRequestedAt] = useState("");
@@ -91,21 +92,33 @@ export default function RestoreVerifyPage() {
     try {
       const response = await fetch("/api/tms/backups", { cache: "no-store" });
       const text = await response.text();
-      const body = (text ? JSON.parse(text) : {}) as { backups?: Backup[]; error?: string };
+      let body: { backups?: Backup[]; error?: string } = {};
+      try {
+        body = text ? (JSON.parse(text) as { backups?: Backup[]; error?: string }) : {};
+      } catch {
+        throw new Error("O catálogo retornou uma resposta inválida.");
+      }
       if (!response.ok) throw new Error(body.error || "Falha ao carregar os backups.");
-      const catalog = body.backups ?? [];
+      const catalog = Array.isArray(body.backups) ? body.backups : [];
       setBackups(catalog);
+      setCatalogUpdatedAt(new Date().toISOString());
       setSelectedBackup((current) =>
         current && catalog.some((item) => item.object === current) ? current : (catalog[0]?.object ?? ""),
       );
+      return catalog;
     } catch (error) {
       setBackupCatalogError(error instanceof Error ? error.message : "Falha ao carregar os backups.");
+      return [];
     } finally {
       setLoadingBackups(false);
     }
   }
 
-  useEffect(() => { void loadBackups(); }, []);
+  useEffect(() => {
+    void loadBackups();
+    const timer = window.setInterval(() => void loadBackups(), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const visibleBackups = useMemo(() => {
     const query = filter.trim().toLowerCase();
@@ -172,6 +185,7 @@ export default function RestoreVerifyPage() {
 
   async function executeBackup() {
     if (backupConfirmation !== "BACKUP-NOW") return;
+    const requestedAt = new Date().toISOString();
     setRunning("backup");
     setBackupResult(null);
     try {
@@ -183,7 +197,16 @@ export default function RestoreVerifyPage() {
       const text = await response.text();
       const body = (text ? JSON.parse(text) : {}) as Result;
       setBackupResult(response.ok ? body : { error: body.error || body.message || "Falha ao solicitar o backup." });
-      if (response.ok) window.setTimeout(() => void loadBackups(), 8000);
+      if (response.ok) {
+        let attempts = 0;
+        const refreshUntilCataloged = async () => {
+          attempts += 1;
+          const catalog = await loadBackups();
+          const hasNewBackup = catalog.some((item) => Date.parse(item.createdAt) >= Date.parse(requestedAt));
+          if (!hasNewBackup && attempts < 12) window.setTimeout(refreshUntilCataloged, 5000);
+        };
+        window.setTimeout(refreshUntilCataloged, 5000);
+      }
     } catch (error) {
       setBackupResult({ error: error instanceof Error ? error.message : "Falha de comunicação." });
     } finally {
@@ -253,7 +276,10 @@ export default function RestoreVerifyPage() {
       <section className="ops-card" style={{ maxWidth: 980 }}>
         <div className="card-head">
           <div><span className="eyebrow">CATÁLOGO VERIFICADO</span><h2>Backups disponíveis</h2></div>
-          <button className="button button-ghost" onClick={() => void loadBackups()} disabled={loadingBackups}>{loadingBackups ? "Atualizando…" : "Atualizar lista"}</button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <small>{catalogUpdatedAt ? `Atualizado ${new Date(catalogUpdatedAt).toLocaleTimeString("pt-BR")}` : "Aguardando atualização"}</small>
+            <button className="button button-ghost" onClick={() => void loadBackups()} disabled={loadingBackups}>{loadingBackups ? "Atualizando…" : "Atualizar lista"}</button>
+          </div>
         </div>
         <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
           {loadingBackups && <p>Carregando backups verificados…</p>}
@@ -261,14 +287,15 @@ export default function RestoreVerifyPage() {
           {!loadingBackups && !backupCatalogError && backups.length === 0 && <div className="evidence-banner"><div><strong>Nenhum backup disponível</strong><span>O catálogo considera somente execuções bem-sucedidas do workflow Backup Now.</span></div></div>}
           {!loadingBackups && !backupCatalogError && backups.length > 0 && <>
             <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filtrar por arquivo, SHA-256, PostgreSQL ou data…" aria-label="Filtrar backups" style={{ width: "100%", padding: "12px 14px", border: "1px solid var(--border, #d8dde5)", borderRadius: 10, font: "inherit", background: "var(--surface, #fff)" }} />
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            {visibleBackups.length === 0 && <div className="evidence-banner"><div><strong>Nenhum backup corresponde ao filtro</strong><span>Limpe o filtro para visualizar os arquivos verificados.</span></div></div>}
+            {visibleBackups.length > 0 && <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", minWidth: 860, borderCollapse: "collapse" }}>
                 <thead><tr><th style={{ textAlign: "left", padding: 10 }}>Data</th><th style={{ textAlign: "left", padding: 10 }}>Backup</th><th style={{ textAlign: "left", padding: 10 }}>Integridade</th><th style={{ textAlign: "left", padding: 10 }}>Origem</th><th style={{ textAlign: "left", padding: 10 }}>Tamanho</th><th style={{ textAlign: "left", padding: 10 }}>Ação</th></tr></thead>
                 <tbody>
                   {visibleBackups.map((backup) => (
-                    <tr key={backup.object}>
+                    <tr key={backup.object} style={{ background: selectedBackup === backup.object ? "var(--surface-muted, #f5f7fa)" : undefined }}>
                       <td style={{ padding: 10, verticalAlign: "top" }}>{new Date(backup.createdAt).toLocaleString("pt-BR")}<br /><small>{ageLabel(backup.createdAt)}</small></td>
-                      <td style={{ padding: 10, verticalAlign: "top" }}><code>{backup.object}</code><br /><small>SHA {shortHash(backup.sha256)}</small></td>
+                      <td style={{ padding: 10, verticalAlign: "top", minWidth: 360 }}><code style={{ display: "block", whiteSpace: "normal", overflowWrap: "anywhere" }}>{backup.object}</code><small>SHA {shortHash(backup.sha256)}</small></td>
                       <td style={{ padding: 10, verticalAlign: "top" }}><strong>✓ VERIFIED</strong><br /><small>run #{backup.runId}</small></td>
                       <td style={{ padding: 10, verticalAlign: "top" }}>{backup.origin}</td>
                       <td style={{ padding: 10, verticalAlign: "top" }}>{formatBytes(backup.bytes)}<br /><small>PG {backup.postgresVersion ?? "—"}</small></td>
@@ -277,7 +304,7 @@ export default function RestoreVerifyPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>}
             <p style={{ margin: 0 }}>{visibleBackups.length} de {backups.length} backups verificados. O catálogo é derivado de execuções bem-sucedidas do Backup Now.</p>
           </>}
         </div>
@@ -287,9 +314,9 @@ export default function RestoreVerifyPage() {
         <div className="card-head"><div><span className="eyebrow">PRÉ-VISUALIZAÇÃO</span><h2>Backup selecionado</h2></div><span className="status-pill open">{selected ? "Pronto" : "Selecione"}</span></div>
         <div style={{ display: "grid", gap: 10, marginTop: 18 }}>
           {selected ? <>
-            <p><strong>Arquivo:</strong> <code>{selected.object}</code></p>
+            <p><strong>Arquivo:</strong> <code style={{ overflowWrap: "anywhere" }}>{selected.object}</code></p>
             <p><strong>Data:</strong> {new Date(selected.createdAt).toLocaleString("pt-BR")} · <strong>idade:</strong> {ageLabel(selected.createdAt)}</p>
-            <p><strong>SHA-256:</strong> <code>{selected.sha256 ?? "não disponível"}</code></p>
+            <p><strong>SHA-256:</strong> <code style={{ overflowWrap: "anywhere" }}>{selected.sha256 ?? "não disponível"}</code></p>
             <p><strong>Tamanho:</strong> {formatBytes(selected.bytes)} · <strong>PostgreSQL:</strong> {selected.postgresVersion ?? "—"} · <strong>Migrações:</strong> {selected.migrationCount ?? "—"}</p>
             <p><strong>Integridade:</strong> VERIFIED · <a href={selected.runUrl} target="_blank" rel="noreferrer">evidência do workflow #{selected.runId}</a></p>
           </> : <p>Nenhum backup selecionado.</p>}
