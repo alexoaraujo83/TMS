@@ -278,9 +278,13 @@ Result: **DATABASE INTEGRATION VERIFIED; behavioral RLS test and manifest persis
 - Result: **OPEN**.
 
 ### E2-006 — Worker / Outbox
-- Railway production project contains independent `tms-worker` and `tms-backup-worker` services.
-- Prior runtime evidence established worker/outbox processing, but E2 requires linkage to the current production revision and fresh operational evidence.
-- Result: **OPEN FOR CURRENT-RUNTIME REVALIDATION**.
+- Railway production environment contains independent `tms-worker` and `tms-backup-worker` services.
+- Current Railway status: both latest deployments are **SUCCESS**.
+- `tms-worker` latest deployment: `0a58ab07-66b9-43ce-a2f5-0e637024e3a1`, created 2026-10-02 17:45:56Z, from main commit `0445a5ca2df20231bce4355081eaa4323750ba18`.
+- Fresh runtime logs from `tms-worker` show repeated structured `durable_job.telemetry` events in production with the production tenant context and pending-job telemetry.
+- `tms-backup-worker` latest deployment: `2f5292f6-e2df-489c-b782-1b32e1ddf934`, SUCCESS, with cron `0 2 * * *`.
+- The 2026-10-02 scheduled backup log records backup `20261002T020330Z`, verified object/checksum/retention, PostgreSQL 17.11, 22 public tables, migration count 39, `INSERT 0 1`, `manifest_status=recorded`, and manifest persistence verification at execution time.
+- Result: **WORKER RUNTIME VERIFIED; backup manifest durability still requires post-run database observation because the current direct DB read does not currently show the row.**
 
 ### E2-007 — Security / Multi-tenancy
 Schema evidence confirms tenant isolation policies and FORCE RLS on application tables.
@@ -314,20 +318,20 @@ Result: **OPEN FOR RUNTIME EVIDENCE**.
 
 ### E2-010 — Backup / DR
 - Backup workflow exists and is manual-dispatch only; it must not be invoked merely to manufacture evidence.
-- Restore Verification is operational and has a successful run.
-- Production `backup_manifests` currently has **0 rows**.
-- Therefore the manifest persistence gate remains intentionally open pending the next real scheduled backup cycle.
-- No artificial manifest insertion is permitted.
-Result: **OPEN / WAITING FOR REAL CRON EVIDENCE**.
+- The real scheduled cron `0 2 * * *` executed on 2026-10-02 and the worker log records successful backup creation, remote verification, retention verification, and `INSERT 0 1` into `backup_manifests`.
+- The same execution logged `manifest_persisted_count=1` / `manifest_status=recorded` at backup time.
+- However, a fresh direct Neon read at 2026-10-02 20:44Z returned `backup_manifests` count **0** and no latest manifest.
+- This is a material evidence discrepancy: execution-time persistence was reported by the backup worker, but durable post-run visibility cannot currently be independently reproduced from the production database connection used by the audit.
+- No artificial manifest insertion is permitted, and no manual backup will be triggered to resolve this discrepancy.
+Result: **OPEN — POST-RUN MANIFEST DURABILITY DISCREPANCY REQUIRES INVESTIGATION.**
 
 ## E2 current blockers
 
 1. Fresh Auth0 → JWT → API → TenantContext runtime proof.
 2. Behavioral cross-tenant/RLS negative test using application role.
-3. Current Worker runtime revalidation.
-4. Fresh production observability evidence.
-5. Real scheduled backup producing a persisted `backup_manifests` row.
-6. RPO/RTO operational evidence still needs final consolidation.
+3. Fresh production observability evidence.
+4. Post-run durability of the 2026-10-02 `backup_manifests` record must be reconciled.
+5. RPO/RTO operational evidence still needs final consolidation.
 
 ## E2 decision
 
