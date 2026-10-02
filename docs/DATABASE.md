@@ -8,7 +8,7 @@ The canonical database is independent from the reference Nexora project. No Nexo
 
 ## 2. Current schema state
 
-The repository currently contains **35 ordered migrations**, from `0001_foundation.sql` through `0035_diagnostics_permission_and_admin_replay.sql`. CI proves that the complete migration chain applies to a fresh PostgreSQL 17 database before the quality chain proceeds.
+The repository currently contains **39 ordered migrations**, from `0001_foundation.sql` through `0039_backup_manifests.sql`. CI proves that the complete migration chain applies to a fresh PostgreSQL 17 database before the quality chain proceeds.
 
 The migration sequence is:
 
@@ -49,6 +49,10 @@ The migration sequence is:
 | 0033 | Durable Job idempotency |
 | 0034 | Dedicated freight replay permission |
 | 0035 | Operational diagnostics permission and admin replay grant |
+| 0036 | Auth0 identity bootstrap |
+| 0037 | Auth0 identity orphan relink |
+| 0038 | Auth0 SECURITY DEFINER CI ownership/grants |
+| 0039 | Structured verified backup manifest catalog |
 
 ## 3. Core entity catalogue
 
@@ -63,6 +67,7 @@ The migration sequence is:
 | Finance | `financial_entries` | tenant composite FKs, amount/currency checks, external-reference uniqueness, immutability trigger, RLS |
 | Reliability | `outbox_events`, `durable_jobs` | tenant isolation, indexes for claim/lease processing, RLS |
 | Audit | `audit_events` | tenant-scoped immutable operational/security history, RLS |
+| Reliability / DR catalog | `backup_manifests` | verified backup metadata; not tenant-scoped; protected through API authorization |
 | Migration metadata | `schema_migrations` | migration bookkeeping; not application business data |
 
 ## 4. Freight lifecycle
@@ -177,3 +182,12 @@ The external PostgreSQL backup worker is the current backup mechanism. The inten
 `PostgreSQL/Neon -> scheduled backup worker -> compressed/encrypted dump -> S3-compatible storage -> checksum/manifest verification -> retention -> isolated restore drill`.
 
 An isolated restore-proof branch has now been reconciled from 0028 to the current 0031 schema and validated for the 0030/0031 relationship invariants. This proves schema-level DR reconciliation. Independent restoration from the current encrypted backup artifact and runtime backup execution remain operational gates.
+
+
+## 16. Audited current state — 2026-10-02
+
+Direct Neon inspection reports PostgreSQL 17.11, 39 applied migrations and 22 public tables. `public.backup_manifests` contains the structured DR catalog introduced by migration 0039. The runtime role `tms_app` is `NOSUPERUSER` and `NOBYPASSRLS`. The default `main` branch is ready; the named `development` and `staging` Neon branches are currently archived and therefore must not be documented as active runtime environments without fresh evidence.
+
+`backup_manifests` deliberately has no RLS because it is a platform-level DR catalog rather than tenant business data. Its safety boundary is the authenticated/authorized API and the absence of direct browser/database exposure. The authorization regression is covered by PR #119 and the operational UI consumes only the authorized API surface.
+
+Historical restore evidence based on 28 migrations remains historical evidence and must not be used as the current schema state. The current restore proof should reference the selected manifest and the current migration head.
