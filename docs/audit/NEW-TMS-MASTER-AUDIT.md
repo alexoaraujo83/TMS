@@ -170,12 +170,13 @@ Result: **DATABASE INTEGRATION VERIFIED; behavioral RLS test and manifest persis
 - Railway production configuration exposes a dedicated `NEON_DATABASE_URL` variable for `tms-backup-worker`.
 - User-provided masked runtime value confirms that the configured host is `ep-red-mountain-ac177cgo-pooler.sa-east-1.aws.neon.tech`, database `neondb`, using `neondb_owner`, `sslmode=verify-full`, `channel_binding=require`. The password was not recorded in this ledger.
 - This host/branch target matches the audited Neon production main branch endpoint. Therefore the earlier hypothesis that the worker was simply writing to a different Neon branch is **not supported by current evidence**.
-- Latest backup deployment `2f5292f6-e2df-489c-b782-1b32e1ddf934` is **SUCCESS**.
-- The real 2026-10-02 scheduled execution at `02:03:31Z` logged backup `20261002T020330Z`, successful backup/retention verification, `INSERT 0 1`, and `manifest_status=recorded`.
-- The deployed source at commit `0445a5ca...` contains an explicit post-insert `psql "$NEON_DATABASE_URL"` count check that exits non-zero unless the count for the backup id is exactly `1`. fileciteturn117file5L84-L96
-- Important new observation: the captured Railway log stream for the 2026-10-02 run contains `INSERT 0 1`, but does **not** contain the source's expected `manifest_persisted=true` or `manifest_persisted_count=1` lines. It also does not contain the source's `db_fingerprint` line. Therefore the Railway log stream is not sufficient to independently prove that the post-insert verification line was emitted, even though the job later reported `backup_status=verified`.
-- Repository-wide search for `backup_manifests` found the migration, API catalog read, backup INSERT/persistence check, and documentation; no application `DELETE FROM public.backup_manifests` path was found in the audited commit. fileciteturn117file0L1-L17 fileciteturn117file4L68-L80 fileciteturn117file5L84-L96
-- Result: **WORKER RUNTIME VERIFIED; manifest persistence remains UNPROVEN after correcting the earlier overstatement of execution-time verification.**
+- Latest deployment `2f5292f6-e2df-489c-b782-1b32e1ddf934` is **SUCCESS**, created at `2026-10-02T17:02:39Z`, from commit `0445a5ca...` (PR #122).
+- **Critical timeline correction:** the real scheduled backup logged at `2026-10-02T02:03:31Z` occurred **before** that 17:02 deployment. The deployment active before the cron was commit `2982600520dc2ff4046c33f2f713062893ea6f76` (PR #121-era production revision), not `0445a5ca...`.
+- The `backup.sh` at commit `298260...` already contains the `INSERT INTO public.backup_manifests` and logs `manifest_status=recorded`, but it does **not** contain the later `db_fingerprint` or `manifest_persisted_count` verification code introduced by PR #122. fileciteturn125file0L1-L7
+- Therefore the absence of `db_fingerprint`, `manifest_persisted=true`, and `manifest_persisted_count=1` in the 02:03 cron log is now **explained by deployment chronology**, not by a Railway log-ingestion defect.
+- The 02:03 cron nevertheless logged `INSERT 0 1`, `backup_id=20261002T020330Z`, `backup_status=verified`, and `manifest_status=recorded`.
+- The current source at `0445a5ca...` contains the newer post-insert persistence check. fileciteturn121file0L1-L7
+- Result: **WORKER RUNTIME VERIFIED; 2026-10-02 manifest INSERT is evidenced, but durable post-run visibility remains unproven.**
 
 ### E2-007 — Security / Multi-tenancy
 Schema evidence confirms tenant isolation policies and FORCE RLS on application tables.
@@ -204,7 +205,7 @@ Result: **RESTORE VERIFICATION PASS**; this is not the same as global production
 
 ### E2-009 — Observability
 - Fresh Railway runtime logs for the real scheduled backup are available, including backup id, checksum, object, byte count, PostgreSQL version, table count, migration count, INSERT result and manifest status.
-- The same log stream does not expose the `db_fingerprint` or `manifest_persisted_count` lines emitted by the audited source code, so log completeness is itself a current evidence limitation.
+- The earlier apparent absence of `db_fingerprint` and `manifest_persisted_count` is now explained by the fact that the cron executed before PR #122 was deployed; those lines did not exist in the active `backup.sh` at that time.
 - Neon SQL telemetry is not available for this project/region (`telemetry_not_enabled`), so the database cannot provide a historical SQL trace to independently prove or disprove a later DELETE.
 - Broader API/Web/Auth0 runtime correlation remains pending.
 - Result: **PARTIALLY VERIFIED**.
@@ -212,11 +213,12 @@ Result: **RESTORE VERIFICATION PASS**; this is not the same as global production
 ### E2-010 — Backup / DR
 - Backup workflow exists and is manual-dispatch only; it must not be invoked merely to manufacture evidence.
 - The real scheduled cron `0 2 * * *` executed on 2026-10-02.
-- Railway logged `INSERT 0 1` and `manifest_status=recorded` for `backup_id=20261002T020330Z`.
-- The audited source performs a post-insert count verification against `backup_manifests` using `NEON_DATABASE_URL`. fileciteturn117file5L84-L96
+- The production revision active at that time was commit `2982600520dc2ff4046c33f2f713062893ea6f76`, whose `backup.sh` contains the manifest INSERT but not the later post-insert count verification. fileciteturn125file0L1-L7
+- Railway logged `INSERT 0 1`, `backup_id=20261002T020330Z`, `manifest_status=recorded`, backup verification and retention verification.
 - A later independent read of the production main branch returned `backup_manifests = 0`.
-- The supplied Railway connection target matches the production main branch endpoint and uses `neondb_owner`, so **wrong-branch routing is no longer the leading explanation**.
-- The remaining evidence gap is whether the post-insert verification actually returned `1` during the cron run and, if it did, what later event could account for the current zero-row state. The current Railway log stream omits the verification lines, while Neon SQL telemetry is unavailable.
+- The supplied Railway `NEON_DATABASE_URL` target matches the production main branch endpoint and uses `neondb_owner`, so wrong-branch routing is no longer the leading explanation.
+- Neon project operations show no branch reset/restore operation on the production main branch after the relevant period; the visible main-branch operations are historical endpoint/config operations. This reduces, but does not eliminate, the possibility of database timeline replacement as the explanation.
+- Neon SQL telemetry is unavailable in this region, so a historical `DELETE` cannot currently be proven or disproven from database telemetry.
 - No manual backup, artificial INSERT, restore, or data mutation will be used to manufacture evidence.
 Result: **OPEN — MANIFEST DURABILITY/PERSISTENCE DISCREPANCY REQUIRES NON-DESTRUCTIVE RECONCILIATION**.
 
@@ -225,8 +227,8 @@ Result: **OPEN — MANIFEST DURABILITY/PERSISTENCE DISCREPANCY REQUIRES NON-DEST
 1. Fresh Auth0 → JWT → API → TenantContext runtime proof.
 2. Behavioral cross-tenant/RLS negative test using application role.
 3. Broader production observability/API-Web runtime correlation.
-4. Reconcile the missing Railway `db_fingerprint` / `manifest_persisted_count` log lines with the deployed source.
-5. Determine whether the 2026-10-02 manifest was ever durably visible after the insert, without modifying data.
+4. Reconcile the 2026-10-02 `INSERT 0 1` evidence with the current zero-row `backup_manifests` state.
+5. Establish post-insert durability using a future real scheduled cycle running the already-deployed PR #122 verification code; no manual backup will be used.
 6. RPO/RTO operational evidence still needs final consolidation.
 
 ## E2 decision
