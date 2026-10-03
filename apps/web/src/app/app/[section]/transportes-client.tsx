@@ -31,7 +31,8 @@ export default function TransportesPage(){
  const [freights,setFreights]=useState<Freight[]>([]);
  const [selected,setSelected]=useState<Set<string>>(new Set());
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState<string|null>(null),[deleting,setDeleting]=useState<string|null>(null),[bulkDeleting,setBulkDeleting]=useState(false);
- const [editing,setEditing]=useState<string|null>(null),[form,setForm]=useState<FormState|null>(null),[creating,setCreating]=useState(false),[createSaving,setCreateSaving]=useState(false),[error,setError]=useState("");\n const [historyId,setHistoryId]=useState<string|null>(null),[history,setHistory]=useState<Record<string,StatusEvent[]>>({}),[historyLoading,setHistoryLoading]=useState<string|null>(null),[replaying,setReplaying]=useState<string|null>(null);
+ const [editing,setEditing]=useState<string|null>(null),[form,setForm]=useState<FormState|null>(null),[creating,setCreating]=useState(false),[createSaving,setCreateSaving]=useState(false),[error,setError]=useState("");
+ const [historyId,setHistoryId]=useState<string|null>(null),[history,setHistory]=useState<Record<string,StatusEvent[]>>({}),[historyLoading,setHistoryLoading]=useState<string|null>(null),[replaying,setReplaying]=useState<string|null>(null);
  async function load(){setLoading(true);setError("");try{const r=await fetch("/api/tms/freights",{cache:"no-store"});const body=await r.json().catch(()=>[]);if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível carregar os transportes.");setFreights(Array.isArray(body)?body:[]);setSelected(new Set());}catch(e){setError(e instanceof Error?e.message:"Não foi possível carregar os transportes.");}finally{setLoading(false);}}
  useEffect(()=>{void load();},[]);
  function startEdit(f:Freight){setEditing(f.id);setCreating(false);setForm(formFrom(f));setError("");}
