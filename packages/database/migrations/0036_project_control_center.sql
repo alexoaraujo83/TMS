@@ -70,7 +70,7 @@ create table if not exists project_control_evidence (
     on delete cascade,
   foreign key (tenant_id, stage_id)
     references project_control_stages(tenant_id, id)
-    on delete set null,
+    on delete cascade,
   unique (tenant_id, evidence_code)
 );
 
