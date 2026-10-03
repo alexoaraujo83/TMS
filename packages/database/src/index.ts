@@ -84,3 +84,12 @@ export {
 } from "./auth0-identity-bootstrap.js";
 export { AuditRepository } from "./audit-repository.js";
 export { queryOne, assertUuid } from "./query.js";
+
+export {
+  ProjectControlRepository,
+  type ProjectControlDashboard,
+  type ProjectControlModule,
+  type ProjectControlStage,
+  type ProjectControlEvidence,
+  type ProjectControlBlocker,
+} from "./project-control-repository.js";
