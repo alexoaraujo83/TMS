@@ -309,7 +309,10 @@ export class FreightController {
 
   @Get(":id/status-events")
   @RequirePermission("freight:read")
-  statusEvents(@CurrentUser() context: RequestContext, @Param("id", new ParseUUIDPipe()) id: string) {
+  statusEvents(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+  ) {
     return this.service.listStatusEvents(context, id);
   }
 
