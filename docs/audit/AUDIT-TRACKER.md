@@ -116,16 +116,17 @@ No fluxo normal, a chave de idempotência é determinística pelo ID do evento d
 
 Isso não é necessariamente um defeito; é uma decisão semântica que precisa ser explícita e testada.
 
-### 4.3 Há endpoints de diagnóstico que merecem revisão antes do fechamento
+### 4.3 Diagnósticos de runtime foram separados da permissão funcional
 
-O controller de Freight contém endpoints de diagnóstico de contexto, banco, RLS e claims. Eles estão protegidos por `freight:read`, mas alguns retornam dados de contexto operacional e fazem probes de isolamento.
+O controller de Freight contém endpoints de diagnóstico de contexto, banco, RLS e claims. No HEAD atual, eles usam `ops:diagnostics`, não `freight:read`; a migration 0035 cria a permissão e o bootstrap administrativo a concede ao admin, enquanto o operador não a recebe por padrão.
 
-Antes do DoD final, decidir se esses endpoints:
-- ficam disponíveis somente para operadores/admin;
-- ficam condicionados a feature flag/ambiente não produtivo; ou
-- permanecem em produção com contrato explícito e testes de exposição.
+O finding histórico de exposição sob `freight:read` fica encerrado estruturalmente. Permanece a prova negativa/positiva de runtime do `PermissionGuard` como API-06.
 
-### 4.4 CI e runtime devem continuar separados
+### 4.4 Superfície API sem BFF correspondente
+
+A API NestJS também expõe quatro superfícies que não possuem Route Handler `/api/tms/*` identificado no Web atual: `GET /freights/:id`, `GET /freights/:id/matches`, `POST /freights/:id/assignment` e `GET /freights/runtime-db-context`. A busca de uso no Web não encontrou consumo dessas rotas. Isso é uma diferença de superfície, não uma falha de autorização: todas permanecem sob `AuthGuard` + `PermissionGuard`. Antes de criar BFFs, deve-se decidir se são contratos Web necessários ou endpoints backend-only.
+
+### 4.5 CI e runtime devem continuar separados
 
 Há evidência de qualidade/integração em CI para o fluxo do worker, mas isso não substitui:
 - migration head do Neon;
@@ -276,8 +277,8 @@ A camada de persistência principal foi percorrida: transações tenant-scoped, 
 
 - **API-09 — Cobertura estrutural de autorização:** os cinco módulos de negócio auditados (Freight, Operations/Trip, Trip Execution, Compliance e Finance) aplicam AuthGuard + PermissionGuard no controller e cada endpoint possui @RequirePermission. **Estado: E2-E3 COMPROVADO.** Permanece necessária a matriz negativa em runtime (sem token, tenant divergente, membership inativa, permissão ausente).
 - **API-10 — TenantGuard é código órfão na superfície HTTP:** o guard valida x-tenant-id contra o contexto autenticado, mas os controllers auditados não o utilizam; a mesma proteção já está implementada no AuthGuard. **Estado: CANDIDATO A ORFÃO / P2.** Não será removido durante a auditoria.
-- **API-11 — Diagnósticos de runtime expostos dentro da superfície autenticada:** runtime-context, runtime-db-context, runtime-rls-isolation e runtime-auth-claims estão sob freight:read. Eles retornam tenant/user/roles/permissões e detalhes de banco/OIDC, e um deles executa uma sonda RLS contra um tenant sintético. **Estado: CONTROLE DE EXPOSIÇÃO / P1.** A decisão deve ser separar esses endpoints da permissão funcional de leitura de freight, restringi-los a operação/admin e definir se devem existir em produção.
-- **API-12 — Replay continua com privilégio amplo:** POST /freights/:id/status-events/:eventId/replay usa freight:update, embora seja uma ação operacional distinta. **Estado: P1**, já coberto por API-02/SEC-03; auditoria confirma que a implementação não criou uma permissão dedicada.
+- **API-11 — Diagnósticos de runtime:** **corrigido estruturalmente**. `runtime-context`, `runtime-db-context`, `runtime-rls-isolation` e `runtime-auth-claims` usam `ops:diagnostics`; a permissão é separada de `freight:read` e não é concedida ao operador por padrão. **Estado: ESTRUTURALMENTE CORRIGIDO / E4 DE AUTORIZAÇÃO PENDENTE**.
+- **API-12 — Replay continua com privilégio amplo:** **corrigido**. `POST /freights/:id/status-events/:eventId/replay` exige `freight:replay`; migrations 0034/0035 criam e concedem explicitamente a permissão ao administrador. **Estado: ESTRUTURALMENTE CORRIGIDO / E4 DE AUTORIZAÇÃO PENDENTE**.
 - **API-13 — Contrato de listagem de Freight não suporta query string no controller:** GET /freights recebe somente RequestContext e ignora parâmetros HTTP. **Estado: P1/P2 conforme contrato pretendido.** Se paginação, filtros ou ordenação fizerem parte do contrato, há perda silenciosa de parâmetros; se não fizerem, deve existir evidência/documentação explícita dessa decisão.
 - **API-14 — DTOs e validação de entrada estão amplamente presentes:** os módulos auditados usam class-validator, UUIDs para identificadores e enums/allowlists para estados e tipos; o bootstrap global usa whitelist + forbidNonWhitelisted. **Estado: E2-E3 COMPROVADO.** Ainda falta testar limites/erros por endpoint em E4 e verificar consistência dos DTOs de query (freightId em Finance é DTO validado; freightId em Compliance é string cru no controller).
 - **API-15 — Mapeamento de erros de domínio para HTTP é explícito, mas heterogêneo:** Operations/Compliance/Freight traduzem erros conhecidos para 404/409/400; Finance/Trip Execution deixam mais da semântica para o filtro global. **Estado: P2 de consistência de contrato**, sem evidência atual de vazamento de stack trace.
@@ -2479,3 +2480,28 @@ A execução real do export contra Production ainda é necessária. O resultado 
 2. Reconciliar a prova real de sessão `tms_app` que já foi validada anteriormente, registrando somente os resultados observados.
 3. Não executar nova migration, não alterar RLS e não forçar redeploy do Web para resolver esta etapa.
 4. Após a reconciliação de DB-04, revisar AUTH-01 separadamente e manter o E2E Auth0 como gate independente.
+
+
+## 17. Reconciliação 2026-10-03 — matriz Web BFF × API NestJS
+
+A auditoria da superfície `/api/tms/*` foi cruzada novamente contra o `FreightController` no HEAD `a3ae55bc432403e607be69ddcc49274b675b1d2b`.
+
+### API NestJS existente sem BFF identificado
+
+| Método | Endpoint API | Permissão | Situação Web |
+|---|---|---|---|
+| GET | /freights/:id | freight:read | Backend-only identificado; nenhum consumo /api/tms encontrado |
+| GET | /freights/:id/matches | matching:read | Backend-only identificado; nenhum consumo /api/tms encontrado |
+| POST | /freights/:id/assignment | matching:assign | Backend-only identificado; nenhum consumo /api/tms encontrado |
+| GET | /freights/runtime-db-context | ops:diagnostics | Backend-only identificado; Web usa runtime-context para o probe RLS |
+
+### Classificação
+
+- **Não é gap de autorização:** todas as superfícies API estão protegidas por `AuthGuard` + `PermissionGuard` e permissões específicas.
+- **É gap de integração/superfície:** os quatro endpoints acima não estão expostos pelo BFF atual.
+- **Decisão pendente:** não criar BFF automaticamente. Primeiro confirmar se o produto Web precisa de detalhe de freight, matching/assignment ou diagnóstico DB-context. Se precisar, criar Route Handlers e testes; se não, registrar explicitamente como backend-only.
+- **API-01 permanece P1:** a matriz completa de autorização/runtime ainda precisa de testes negativos/positivos, inclusive para essas quatro rotas.
+
+### Resultado desta etapa
+
+A fronteira `/api/tms/* → API NestJS` está estruturalmente mapeada. O próximo fechamento é a matriz de autorização runtime e, em paralelo, AUTH-01 (token real → Web → API → tenant/RLS).
