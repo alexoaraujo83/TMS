@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - ".github/workflows/auth0-production-readonly.yml"
+      - "infra/auth0/actions/post-login.js"
+      - "infra/auth0/tenant.yaml"
   workflow_dispatch:
 
 permissions:
@@ -44,11 +46,8 @@ jobs:
           AUTH0_CLI_SHA256: "5f95695b07ddca90a6cb87392fa0d94c0b945b0f3653f51aa58997c436ba139c"
         run: |
           set -euo pipefail
-          # Pin the CLI release and verify the official release checksum.
           archive="${RUNNER_TEMP}/auth0-cli.tar.gz"
-          curl --fail --silent --show-error --location \
-            "https://github.com/auth0/auth0-cli/releases/download/v${AUTH0_CLI_VERSION}/auth0-cli_${AUTH0_CLI_VERSION}_Linux_x86_64.tar.gz" \
-            --output "${archive}"
+          curl --fail --silent --show-error --location             "https://github.com/auth0/auth0-cli/releases/download/v${AUTH0_CLI_VERSION}/auth0-cli_${AUTH0_CLI_VERSION}_Linux_x86_64.tar.gz"             --output "${archive}"
           echo "${AUTH0_CLI_SHA256}  ${archive}" | sha256sum --check
           mkdir -p "${RUNNER_TEMP}/auth0-bin"
           tar -xzf "${archive}" -C "${RUNNER_TEMP}/auth0-bin"
@@ -116,8 +115,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Do not emit free-form Auth0 descriptions: they may contain PII or
-          # provider-specific details. Keep only fields needed for reconciliation.
           auth0 logs list --filter "type:f" --number 20 |
             jq -c '[.[] | {
               date,
