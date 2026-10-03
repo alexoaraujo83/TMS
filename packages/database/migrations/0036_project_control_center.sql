@@ -27,7 +27,8 @@ create table if not exists project_control_modules (
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (tenant_id, module_key)
+  unique (tenant_id, module_key),
+  unique (tenant_id, id)
 );
 
 create table if not exists project_control_stages (
@@ -45,6 +46,7 @@ create table if not exists project_control_stages (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (tenant_id, module_id, stage_key),
+  unique (tenant_id, id),
   foreign key (tenant_id, module_id)
     references project_control_modules(tenant_id, id)
     on delete cascade
