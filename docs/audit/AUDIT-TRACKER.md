@@ -50,7 +50,7 @@ A regra de evidência é:
 | API-05 | Documentação do replay | Documentação geral de freight não reflete claramente a nova operação de replay | DRIFT DOCUMENTAL | Atualizar API/ops e controles operacionais | Docs, permissão e operação coincidem | P1 |
 | API-06 | Endpoints de diagnóstico em produção | Quatro endpoints usam `ops:diagnostics`; migration 0035 cria a permissão e concede explicitamente ao admin; operator bootstrap não recebe a permissão | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Executar 403 para operador e 200 para admin, mantendo tenant-scoped | Usuário funcional comum recebe 403; operador sem `ops:diagnostics` recebe 403; admin autorizado recebe 200 | P1 |
 | WORK-01 | Deploy do worker | SHA atual foi SKIPPED; worker anterior permanece como versão efetiva | PARCIAL | Confirmar regras de watch e registrar SHA efetivo | Versão do worker é conhecida, intencional e observável | P1 |
-| WORK-02 | Contrato de negócio do worker | Agora existe caminho fonte-controlado: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; há teste de integração CI | E2/E3 COMPROVADO / E4 ABERTO | Reconciliar contrato com Neon/Railway de produção e processar evento real | Evento real percorre todo o fluxo em runtime de produção | P1 |
+| WORK-02 | Contrato de negócio do worker | Caminho fonte-controlado confirmado em produção: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; evento real e replay já percorreram o worker em Railway | **E4 OPERACIONAL — PASS** | Preservar a cadeia observada e manter regressão; não repetir replay sem necessidade | Evento real publicado, durable job concluído, handler/audit/telemetry correlacionados por `event_id` e job; replay posterior registra `idempotent_replay=true` sem novo audit de processamento | P1 |
 | WORK-03 | Prontidão operacional | Worker valida `tms_app` e tenants ativos, mas ainda pode ficar idle quando `OUTBOX_TENANT_IDS` está vazio; métricas de ciclo/último sucesso ainda são insuficientes | ABERTO | Expor readiness/telemetria para processo, DB, role, tenants, outbox, durable jobs e último ciclo | É possível distinguir healthy-idle de unhealthy | P1 |
 | WORK-04 | Idempotência Durable Jobs | TMS usa chave determinística do evento no fluxo normal; handler tem proteção de replay; deduplicação atômica no destino externo continua dependência externa | PARCIAL / CORRETO | Preservar chave e obter prova do destino quando integrações externas forem ativadas | Destino comprova deduplicação atômica pela mesma chave | P1 |
 | BAK-01 | Execução de backup | Deploy do backup worker foi SUCCESS; isso não prova objeto, checksum, retenção ou execução recorrente | ABERTO | Capturar/realizar uma execução real e verificar artefato, checksum, manifesto e retenção | Artefato real + verificação independente | P1 |
@@ -68,6 +68,26 @@ A regra de evidência é:
 | CI-02 | Gates de promoção | Web/API/Worker podem ser promovidos separadamente | ABERTO | Definir gates explícitos por componente e release | Componente desatualizado/falho não é confundido com release completa | P1 |
 | SEC-03 | Replay sensível | Replay é mutação de produção que cria durable job e auditoria | PRECISA HARDENING | Permissão dedicada, motivo estruturado, rate/approval quando aplicável e auditoria | Replay controlado + testes negativos + trilha de auditoria | P1 |
 | FINAL-01 | DoD final | P0/P1 ainda têm evidência operacional aberta | BLOQUEADO | Fechar P0, depois P1, executar regressão e reconciliar documentação | Gates finais verdes ou aceitos formalmente com evidência | P0 |
+
+## 4.0 FASE 2 — 2026-10-03 — WORK-02: prova E4 do worker em produção
+
+### Evidência operacional
+
+- Neon Production confirmou eventos reais `freight.status_changed` com `outbox_events.status=published` e `published_at` preenchido.
+- Para o evento `225c85dc-4cfb-4216-9055-a011c192b64c`, o durable job normal `f591c170-e571-4d84-a341-7d379f3af247` terminou `completed`, tentativa 1, e existe `freight.status_changed.processed` correspondente.
+- Railway Production registrou `outbox.durable_job.enqueued`, `outbox.processed` (`claimed=1`, `published=1`, `failed=0`), `freight.status_changed.handled` e `durable_job.processed` (`completed=1`, `failed=0`) para o mesmo evento.
+- O replay já executado para o mesmo `event_id` foi processado pelo job `fb4f61a5-64e9-4250-a5af-1db701bbe20f` com `idempotent_replay=true`; o job terminou `completed`, tentativa 1. A auditoria de processamento permaneceu única, demonstrando idempotência no handler.
+- Neon confirmou ainda os eventos normais `6e370e20-c5dd-4216-9c3e-738c4abf909d` e `e7963509-6698-488f-a9a7-e770b0f64a4c`, ambos publicados, concluídos em tentativa 1 e com auditoria de processamento correspondente.
+
+### Classificação
+
+**WORK-02 / BLK-WORKER-01: E4 OPERACIONAL — PASS.**
+
+A prova deixa de depender apenas de código/CI: a cadeia foi observada no runtime de produção, com correlação entre outbox, durable job, handler, audit e telemetry. O replay confirma adicionalmente a proteção idempotente do handler.
+
+### Limite da evidência
+
+A semântica de solicitação de replay continua separada: o endpoint gera uma nova chave por solicitação, portanto duas solicitações podem criar dois jobs de replay. Isso não invalida a idempotência do processamento pelo `event_id`; a decisão de tornar a própria solicitação de replay deduplicada permanece em **API-03**.
 
 ## 4. Correções importantes feitas nesta auditoria cruzada
 
