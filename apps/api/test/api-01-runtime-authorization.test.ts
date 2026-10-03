@@ -97,6 +97,17 @@ function permissionGuardFor(permission: string) {
   } as never);
 }
 
+function authorizationContext(
+  request: Record<string, unknown>,
+  handler: unknown,
+) {
+  return {
+    getHandler: () => handler,
+    getClass: () => FreightController,
+    switchToHttp: () => ({ getRequest: () => request }),
+  } as never;
+}
+
 const routePermissions: Record<string, string> = {
   create: "freight:create",
   list: "freight:read",
@@ -126,9 +137,7 @@ test("API-01 runtime matrix: every FreightController permission allows its autho
     );
 
     const guard = permissionGuardFor(permission);
-    const result = guard.canActivate({
-      switchToHttp: () => ({ getRequest: () => request }),
-    } as never);
+    const result = guard.canActivate(authorizationContext(request, handler));
 
     assert.equal(result, true, `authorized permission rejected for ${method}`);
   }
@@ -145,9 +154,9 @@ test("API-01 runtime matrix: missing route permission is denied", async () => {
 
     assert.throws(
       () =>
-        permissionGuardFor(requiredPermission).canActivate({
-          switchToHttp: () => ({ getRequest: () => request }),
-        } as never),
+        permissionGuardFor(requiredPermission).canActivate(
+          authorizationContext(request, handler),
+        ),
       (error: unknown) =>
         error instanceof Error && error.message === "Insufficient permission",
       `unexpected authorization for ${method}`,
@@ -162,9 +171,9 @@ test("API-01 runtime matrix: wildcard permission remains explicitly authorized",
     assert.equal(Reflect.getMetadata(REQUIRED_PERMISSION, handler), requiredPermission);
 
     assert.equal(
-      permissionGuardFor(requiredPermission).canActivate({
-        switchToHttp: () => ({ getRequest: () => request }),
-      } as never),
+      permissionGuardFor(requiredPermission).canActivate(
+        authorizationContext(request, handler),
+      ),
       true,
     );
   }
