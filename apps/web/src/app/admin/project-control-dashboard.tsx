@@ -60,6 +60,7 @@ type Dashboard = {
     openBlockers: number;
   };
   modules: Module[];
+  stages: { id: string; moduleId: string; stageKey: string; name: string; phase: string; status: string; weight: number; evidenceRequired: boolean }[];
   recentEvidence: Evidence[];
   blockers: Blocker[];
 };
@@ -193,8 +194,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
               </div>
               <div className="control-phase-strip">
                 {["discover","analyze","classify","correct","test","evidence","next"].map((phase) => {
-                  const stages = data.modules.flatMap(() => []);
-                  const count = stages.length;
+                  const count = data.stages.filter((stage) => stage.phase === phase).length;
                   return <span key={phase}><b>{phase}</b><small>{count ? count : "—"}</small></span>;
                 })}
               </div>
