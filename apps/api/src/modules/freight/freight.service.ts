@@ -131,6 +131,15 @@ export class FreightService {
   }
 
 
+  async listStatusEvents(context: RequestContext, freightId: string): Promise<readonly Record<string, unknown>[]> {
+    return withTenantContext(this.pool, context.tenantId, async (client) => {
+      const result = await client.query(
+        "select e.id, e.aggregate_id as freight_id, e.event_type, e.payload->>'from_status' as from_status, e.payload->>'to_status' as to_status, e.created_at, e.published_at, exists (select 1 from audit_events a where a.tenant_id=e.tenant_id and a.action='freight.status_changed.processed' and a.metadata->>'event_id'=e.id::text) as processed, (select count(*)::int from audit_events a where a.tenant_id=e.tenant_id and a.action='durable_job.replay_requested' and a.metadata->>'event_id'=e.id::text) as replay_requested, (select count(*)::int from audit_events a where a.tenant_id=e.tenant_id and a.action='freight.status_changed.processed' and a.metadata->>'event_id'=e.id::text and a.metadata->>'idempotent_replay'='true') as replay_processed from outbox_events e where e.tenant_id=$1 and e.aggregate_type='freight' and e.aggregate_id=$2 and e.event_type='freight.status_changed' order by e.created_at desc limit 50",
+        [context.tenantId, freightId],
+      );
+      return result.rows;
+    });
+  }
   async update(
     context: RequestContext,
     freightId: string,
