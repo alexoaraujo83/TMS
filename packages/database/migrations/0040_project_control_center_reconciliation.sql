@@ -167,7 +167,7 @@ create trigger project_control_blockers_updated_at
 before update on project_control_blockers
 for each row execute function project_control_set_updated_at();
 
--- Seed the current TMS tenant(s) with the first control-center baseline.
+-- Seed only missing baseline records. Existing live control-center state is preserved.
 insert into project_control_modules
   (tenant_id, module_key, name, description, status, sort_order)
 select
@@ -191,11 +191,7 @@ cross join (
     ('backup','Backup / DR','Backup, restore and disaster-recovery controls','in_progress',90),
     ('cicd','CI/CD','Build, tests, deployment and environment reconciliation','in_progress',100)
 ) as v(module_key,name,description,status,sort_order)
-on conflict (tenant_id, module_key) do update
-set name = excluded.name,
-    description = excluded.description,
-    status = excluded.status,
-    sort_order = excluded.sort_order;
+on conflict (tenant_id, module_key) do nothing;
 
 insert into project_control_stages
   (tenant_id, module_id, stage_key, name, phase, status, weight, evidence_required)
@@ -226,12 +222,7 @@ cross join (
     (6,'evidence','Evidence','evidence'),
     (7,'next','Next','next')
 ) as p(sort_order,stage_key,name,phase)
-on conflict (tenant_id, module_id, stage_key) do update
-set name = excluded.name,
-    phase = excluded.phase,
-    status = excluded.status,
-    weight = excluded.weight,
-    evidence_required = excluded.evidence_required;
+on conflict (tenant_id, module_id, stage_key) do nothing;
 
 insert into project_control_evidence
   (tenant_id, module_id, evidence_code, title, kind, status, source, reference, captured_at, metadata)
@@ -268,9 +259,4 @@ select
   'Executar evento real freight.status_changed e registrar event_id/idempotency_key do outbox ao handler, audit e telemetry.'
 from project_control_modules m
 where m.module_key = 'worker'
-on conflict (tenant_id, blocker_code) do update
-set title = excluded.title,
-    severity = excluded.severity,
-    status = excluded.status,
-    description = excluded.description,
-    next_action = excluded.next_action;
+on conflict (tenant_id, blocker_code) do nothing;
