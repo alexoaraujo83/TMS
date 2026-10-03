@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth0 } from "../../../../../lib/auth0";
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}));
+  const body = await request.clone().json().catch(() => ({}));
   const freightId = typeof body.freightId === "string" ? body.freightId.trim() : "";
   const eventId = typeof body.eventId === "string" ? body.eventId.trim() : "";
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim().replace(/\/+$/, "");
