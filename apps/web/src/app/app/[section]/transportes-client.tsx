@@ -9,6 +9,7 @@ type Freight={
  quantity:number; weightKg:string|number; customerPriceCents:string|number|null;
  driverPriceCents:string|number|null;
 };
+type StatusEvent={id:string;freight_id:string;event_type:string;from_status:string|null;to_status:string|null;created_at:string;published_at:string|null;processed:boolean;replay_requested:number;replay_processed:number;};
 type FormState={
  freightType:string; status:string; originCity:string; originState:string; destinationCity:string;
  destinationState:string; cargoDescription:string; quantity:string; weightKg:string;
@@ -30,7 +31,7 @@ export default function TransportesPage(){
  const [freights,setFreights]=useState<Freight[]>([]);
  const [selected,setSelected]=useState<Set<string>>(new Set());
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState<string|null>(null),[deleting,setDeleting]=useState<string|null>(null),[bulkDeleting,setBulkDeleting]=useState(false);
- const [editing,setEditing]=useState<string|null>(null),[form,setForm]=useState<FormState|null>(null),[creating,setCreating]=useState(false),[createSaving,setCreateSaving]=useState(false),[error,setError]=useState("");
+ const [editing,setEditing]=useState<string|null>(null),[form,setForm]=useState<FormState|null>(null),[creating,setCreating]=useState(false),[createSaving,setCreateSaving]=useState(false),[error,setError]=useState("");\n const [historyId,setHistoryId]=useState<string|null>(null),[history,setHistory]=useState<Record<string,StatusEvent[]>>({}),[historyLoading,setHistoryLoading]=useState<string|null>(null),[replaying,setReplaying]=useState<string|null>(null);
  async function load(){setLoading(true);setError("");try{const r=await fetch("/api/tms/freights",{cache:"no-store"});const body=await r.json().catch(()=>[]);if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível carregar os transportes.");setFreights(Array.isArray(body)?body:[]);setSelected(new Set());}catch(e){setError(e instanceof Error?e.message:"Não foi possível carregar os transportes.");}finally{setLoading(false);}}
  useEffect(()=>{void load();},[]);
  function startEdit(f:Freight){setEditing(f.id);setCreating(false);setForm(formFrom(f));setError("");}
@@ -51,6 +52,20 @@ export default function TransportesPage(){
    const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível incluir o frete.");
    setFreights(v=>[body,...v]);cancelEdit();
   }catch(e){setError(e instanceof Error?e.message:"Não foi possível incluir o frete.");}finally{setCreateSaving(false);}
+ }
+ async function loadHistory(id:string){
+  if(historyId===id){setHistoryId(null);return;}
+  setHistoryId(id);setHistoryLoading(id);setError("");
+  try{const r=await fetch(`/api/tms/freights/status-events?id=${encodeURIComponent(id)}`,{cache:"no-store"});const body=await r.json().catch(()=>[]);if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível carregar o histórico.");setHistory(v=>({...v,[id]:Array.isArray(body)?body:[]}));}
+  catch(e){setError(e instanceof Error?e.message:"Não foi possível carregar o histórico.");}
+  finally{setHistoryLoading(null);}
+ }
+ async function replayEvent(freightId:string,eventId:string){
+  if(!window.confirm("Reexecutar este evento de status? A operação criará um durable job e será registrada na auditoria."))return;
+  setReplaying(eventId);setError("");
+  try{const r=await fetch("/api/tms/freights/replay",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({freightId,eventId})});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body?.detail||body?.error||"Não foi possível solicitar o replay.");await loadHistory(freightId);setHistoryId(freightId);}
+  catch(e){setError(e instanceof Error?e.message:"Não foi possível solicitar o replay.");}
+  finally{setReplaying(null);}
  }
  async function updateStatus(id:string,status:string){
   setSaving(id);setError("");
@@ -119,7 +134,8 @@ export default function TransportesPage(){
       <div className="freight-actions"><button className="button button-secondary" onClick={cancelEdit} disabled={saving===f.id}>Cancelar</button><button className="button button-secondary" onClick={()=>void updateStatus(f.id,form.status)} disabled={saving===f.id||form.status===f.status}>{saving===f.id?"Salvando…":"Alterar status"}</button><button className="button button-primary" onClick={()=>void save(f.id)} disabled={saving===f.id}>{saving===f.id?"Salvando…":"Salvar alterações"}</button></div>
     </div>:<>
       <div className="freight-main"><label className="freight-checkbox"><input type="checkbox" checked={selected.has(f.id)} onChange={()=>toggleSelected(f.id)} disabled={loading||createSaving||!!saving||!!deleting||bulkDeleting}/></label><span className="transport-id">{f.id.slice(0,8).toUpperCase()}</span><div><strong>{f.originCity} <i>{f.originState}</i> <span className="route-arrow">→</span> {f.destinationCity} <i>{f.destinationState}</i></strong><small>{f.freightType} · {labels[f.status]||f.status}</small></div></div>
-      <div className="freight-actions"><span className={`status-pill ${f.status}`}>{labels[f.status]||f.status}</span><button className="button button-secondary" onClick={()=>startEdit(f)} disabled={!!deleting||!!saving}>Alterar</button><button className="button button-danger" onClick={()=>void remove(f.id)} disabled={deleting===f.id||!!saving}>{deleting===f.id?"Excluindo…":"Excluir"}</button></div>
+      <div className="freight-actions"><span className={`status-pill ${f.status}`}>{labels[f.status]||f.status}</span><button className="button button-secondary" onClick={()=>void loadHistory(f.id)} disabled={!!deleting||!!saving}>{historyLoading===f.id?"Carregando…":historyId===f.id?"Fechar histórico":"Histórico"}</button><button className="button button-secondary" onClick={()=>startEdit(f)} disabled={!!deleting||!!saving}>Alterar</button><button className="button button-danger" onClick={()=>void remove(f.id)} disabled={deleting===f.id||!!saving}>{deleting===f.id?"Excluindo…":"Excluir"}</button></div>
+      {historyId===f.id&&<div className="freight-history"><div className="history-head"><strong>Histórico de status</strong><small>{(history[f.id]??[]).length} evento(s)</small></div>{history[f.id]===undefined?<div className="control-empty">Carregando histórico…</div>:history[f.id].length===0?<div className="control-empty">Nenhum evento de status encontrado.</div>:history[f.id].map(event=><div className="freight-history-row" key={event.id}><div><strong>{labels[event.from_status||""]||event.from_status||"—"} → {labels[event.to_status||""]||event.to_status||"—"}</strong><small>{new Date(event.created_at).toLocaleString("pt-BR")} · {event.processed?"processado":"pendente"} · ID {event.id.slice(0,8).toUpperCase()}</small></div><div className="history-actions"><span className={`status-pill ${event.processed?"open":"draft"}`}>{event.replay_requested>0?`Replay: ${event.replay_requested}`:"Normal"}</span>{event.replay_requested>0&&<small>{event.replay_processed} replay(s) processado(s)</small>}<button className="button button-secondary" onClick={()=>void replayEvent(f.id,event.id)} disabled={replaying===event.id}>{replaying===event.id?"Solicitando…":"Replay"}</button></div></div>)}</div>}
     </>}
    </article>)}</div>}
   </section>
