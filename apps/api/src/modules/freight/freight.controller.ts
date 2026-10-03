@@ -307,6 +307,15 @@ export class FreightController {
     return this.service.get(context, id);
   }
 
+  @Get(":id/status-events")
+  @RequirePermission("freight:read")
+  statusEvents(
+    @CurrentUser() context: RequestContext,
+    @Param("id", new ParseUUIDPipe()) id: string,
+  ) {
+    return this.service.listStatusEvents(context, id);
+  }
+
   @Get(":id/matches")
   @RequirePermission("matching:read")
   matches(

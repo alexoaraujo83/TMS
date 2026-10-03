@@ -69,6 +69,67 @@ export class FreightService {
     return this.repository.list(context.tenantId);
   }
 
+  async listStatusEvents(context: RequestContext, freightId: string): Promise<readonly {
+    id: string;
+    freightId: string;
+    eventType: string;
+    fromStatus: string | null;
+    toStatus: string | null;
+    createdAt: string;
+    publishedAt: string | null;
+    processed: boolean;
+    replayRequested: number;
+    replayProcessed: number;
+  }[]> {
+    return withTenantContext(this.pool, context.tenantId, async (client) => {
+      const result = await client.query<{
+        id: string;
+        freightId: string;
+        eventType: string;
+        fromStatus: string | null;
+        toStatus: string | null;
+        createdAt: string;
+        publishedAt: string | null;
+        processed: boolean;
+        replayRequested: number;
+        replayProcessed: number;
+      }>(
+        `select
+           e.id,
+           e.aggregate_id as "freightId",
+           e.event_type as "eventType",
+           e.payload->>'from_status' as "fromStatus",
+           e.payload->>'to_status' as "toStatus",
+           e.created_at as "createdAt",
+           e.published_at as "publishedAt",
+           exists (
+             select 1 from audit_events a
+             where a.tenant_id = e.tenant_id
+               and a.action = 'freight.status_changed.processed'
+               and a.metadata->>'event_id' = e.id::text
+           ) as processed,
+           (select count(*)::int from audit_events a
+             where a.tenant_id = e.tenant_id
+               and a.action = 'durable_job.replay_requested'
+               and a.metadata->>'event_id' = e.id::text) as "replayRequested",
+           (select count(*)::int from audit_events a
+             where a.tenant_id = e.tenant_id
+               and a.action = 'freight.status_changed.processed'
+               and a.metadata->>'event_id' = e.id::text
+               and a.metadata->>'idempotent_replay' = 'true') as "replayProcessed"
+         from outbox_events e
+         where e.tenant_id = $1
+           and e.aggregate_type = 'freight'
+           and e.aggregate_id = $2
+           and e.event_type = 'freight.status_changed'
+         order by e.created_at desc
+         limit 50`,
+        [context.tenantId, freightId],
+      );
+      return result.rows;
+    });
+  }
+
 
   async update(
     context: RequestContext,
