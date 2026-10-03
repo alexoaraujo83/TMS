@@ -36,6 +36,10 @@ const expectedTables = [
   "trips",
   "users",
   "vehicles",
+  "project_control_modules",
+  "project_control_stages",
+  "project_control_evidence",
+  "project_control_blockers",
 ] as const;
 
 const rlsTables = expectedTables.filter(
@@ -60,6 +64,10 @@ const requiredColumns: Record<string, string[]> = {
   carriers: ["id", "tenant_id"],
   drivers: ["id", "tenant_id", "carrier_id"],
   vehicles: ["id", "tenant_id", "driver_id"],
+  project_control_modules: ["id", "tenant_id", "module_key", "name", "status", "sort_order"],
+  project_control_stages: ["id", "tenant_id", "module_id", "stage_key", "phase", "status", "weight"],
+  project_control_evidence: ["id", "tenant_id", "module_id", "stage_id", "evidence_code", "title", "kind", "status", "metadata"],
+  project_control_blockers: ["id", "tenant_id", "module_id", "stage_id", "blocker_code", "title", "severity", "status", "description", "next_action"],
   freights: ["id", "tenant_id"],
   freight_assignments: ["id", "tenant_id", "freight_id"],
   trips: ["id", "tenant_id", "freight_id", "assignment_id", "status"],
