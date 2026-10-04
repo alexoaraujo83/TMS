@@ -80,7 +80,9 @@ The freight controller currently exposes:
 | GET    | `/api/v1/freights/:id`            | `freight:read`    | Get freight           |
 | GET    | `/api/v1/freights/:id/matches`    | `matching:read`   | Rank candidates       |
 | POST   | `/api/v1/freights/:id/assignment` | `matching:assign` | Assign driver/vehicle |
-| PATCH  | `/api/v1/freights/:id/status`     | `freight:update`  | Change freight status |
+| PATCH  | `/freights/:id/status`             | `freight:update`  | Change freight status |
+| GET    | `/freights/:id/status-events`      | `freight:read`    | List status-event history |
+| POST   | `/freights/:id/status-events/:eventId/replay` | `freight:replay` | Enqueue manual replay |
 
 Every freight endpoint is protected by authentication and permission guards. UUID route parameters are validated by NestJS pipes.
 
@@ -112,7 +114,7 @@ Trip Operations and Compliance/GR are implemented foundations with tenant-scoped
 
 The worker is no longer only a bootstrap placeholder. The repository contains an outbox processor and persistence path with tenant context, pending-event claiming, `FOR UPDATE SKIP LOCKED`, lease tokens, publish/failure transitions and exponential retry delay capped at five minutes. Outbox events are persisted transactionally and protected by tenant RLS.
 
-Webhook delivery is implemented as an event side effect with request timeout, redirect rejection, HMAC SHA-256 signing and event-based idempotency metadata. These mechanisms are implemented and tested, but production-grade receiver-side deduplication and a full replay workflow must not be inferred unless independently exercised and evidenced.
+Webhook delivery is implemented as an event side effect with request timeout, redirect rejection, HMAC SHA-256 signing and event-based idempotency metadata. Freight status events also expose a tenant-scoped history and a controlled manual replay operation. The replay endpoint is documented in `docs/operations/FREIGHT-REPLAY.md`; it requires `freight:replay`, records `durable_job.replay_requested`, creates a fresh replay key per explicit request, and relies on handler idempotency by `event_id`. Production execution evidence must still be distinguished from code/CI evidence.
 
 ## 9. External integrations
 
