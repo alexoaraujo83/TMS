@@ -41,7 +41,7 @@ A regra de evidência é:
 | DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
 | DB-03 | Papel de banco em runtime | API e worker possuem guard de runtime; produção agora registra o worker como `tms_app` no startup, com operação do outbox/durable jobs no mesmo deployment | COMPROVADO | Preservar evidência e manter separação entre runtime e credenciais administrativas | Worker em produção confirma papel aprovado e least privilege | P1 |
 | DB-04 | RLS comportamental | RLS/FORCE RLS e `NOBYPASSRLS` estão implementados; a identidade do runtime `tms_app` em produção está comprovada. A prova comportamental E4 permanece separada e não é inferida do log de startup | PARCIAL / E4 COMPORTAMENTAL PENDENTE | Reconciliar o artefato da sessão real `tms_app` já validada e registrar as seis asserções comportamentais sem repetir mutações desnecessárias | Evidência da sessão real com own-tenant, cross-tenant read/insert/update e ausência de mutação persistente | P0 |
-| AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; API valida token, subject e membership | ABERTO | Emitir novo token real e rastrear Auth0 → Web → API → DB | Token real com claim de tenant é aceito e operação tenant-scoped funciona; tenant incorreto é negado | P0 |
+| AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; evidência real de produção confirmou issuer, audience, subject, tenant_id e aceitação pelo caminho autenticado; API exige o claim e membership | **E4 OPERACIONAL — PASS** | Preservar regressão do fluxo Auth0 → Web → API → TenantContext → DB/RLS | Emitir novo token real e rastrear Auth0 → Web → API → DB | Token real com claim de tenant é aceito e operação tenant-scoped funciona; tenant incorreto é negado | P0 |
 | AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
 | API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e permissões específicas por operação | PARCIAL | Criar matriz rota × permissão × validação × tenant e executar smoke tests | Todas as rotas de negócio possuem evidência de proteção e isolamento | P1 |
 | API-02 | Permissão de replay | Endpoint usa `freight:replay`; migrations 0034/0035 criam e concedem explicitamente a permissão ao admin | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Executar matriz negativa/positiva em runtime | Usuário sem `freight:replay` recebe 403; papel autorizado executa replay | P1 |
@@ -2505,3 +2505,31 @@ A auditoria da superfície `/api/tms/*` foi cruzada novamente contra o `FreightC
 ### Resultado desta etapa
 
 A fronteira `/api/tms/* → API NestJS` está estruturalmente mapeada. O próximo fechamento é a matriz de autorização runtime e, em paralelo, AUTH-01 (token real → Web → API → tenant/RLS).
+
+## 79. FASE 2 — 2026-10-04 — AUTH-01: evidência real de produção do tenant claim
+
+### Evidência operacional
+
+- Foi obtida evidência fresca em produção por sessão autenticada do TMS: `authenticated=true`.
+- O issuer observado foi `https://tms-platform.us.auth0.com/`.
+- O audience observado inclui `urn:tms:api:production` e o endpoint `userinfo` do Auth0.
+- O subject observado foi `auth0|6aad217effa00aa441cb0b3f`, com `expiresAt` presente.
+- O `tenantId` observado em runtime foi `19d9a5a4-2d50-4b78-a910-1fdea96fd12e`.
+- O perfil autenticado confirmou o mesmo subject, estabelecendo continuidade de identidade entre a sessão de runtime e o perfil Web.
+- A Action versionada `infra/auth0/actions/post-login.js` emite o claim namespaced `https://tms-platform.io/claims/tenant_id` no Access Token e no ID Token quando `event.user.app_metadata.tenant_id` está presente.
+- O `AuthGuard` atual valida issuer/audience, exige `tenantId`, valida membership e constrói o contexto tenant-scoped da requisição.
+- A prova DB-04 já encerrada separadamente demonstra em produção que o papel `tms_app` não possui superuser/bypass RLS e que leitura/mutações cross-tenant são bloqueadas pelo PostgreSQL.
+
+### Limite da evidência
+
+Esta evidência não grava nem incorpora token bruto ou segredo no repositório/tracker. O resultado comprova o contrato de runtime e a aceitação pelo caminho autenticado; não é necessário inferir detalhes criptográficos do JWT que não foram observados diretamente.
+
+### Classificação
+
+**AUTH-01: E4 OPERACIONAL — PASS.**
+
+O gate deixa de depender apenas da Action/AuthGuard em código: há evidência fresca de produção para identidade, issuer, audience e tenant_id, complementada pela prova operacional de isolamento DB-04.
+
+### Próxima ação
+
+Preservar a regressão Auth0 → Web → API → TenantContext → PostgreSQL/RLS. Não alterar Auth0 Production como parte deste fechamento.
