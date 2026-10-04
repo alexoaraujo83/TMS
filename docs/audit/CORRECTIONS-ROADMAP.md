@@ -713,7 +713,15 @@ Alterações:
 
 ### API-03
 
-Não alterar ainda a chave `replay:<eventId>:<randomUUID>`. Primeiro decidir se replay manual repetido é intencionalmente repetível ou deve ser deduplicado. A mudança de permissão não resolve essa decisão semântica.
+**Decisão registrada em 2026-10-04: replay manual deliberadamente repetível, com processamento idempotente por `event_id`.**
+
+A implementação mantém `replay:<eventId>:<randomUUID>` porque cada POST explícito representa uma nova intenção operacional. Isso permite solicitar novamente o processamento de um evento quando necessário. O worker, por sua vez, permanece idempotente pelo `event_id`: um replay de evento já processado registra `idempotent_replay=true` e não cria uma segunda auditoria `freight.status_changed.processed`.
+
+Assim, **solicitação de replay não é deduplicada; efeito de negócio do evento é idempotente**.
+
+Controles: `freight:replay`, tenant scope, `durable_job.replay_requested`, confirmação explícita na UI e trilha auditável.
+
+**Estado:** decisão de contrato FECHADA. A próxima ação é alinhar a documentação operacional/API em **API-05**.
 
 
 ## 2026-09-25 — Correção P1: isolamento dos endpoints de diagnóstico
