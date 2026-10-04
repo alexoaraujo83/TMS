@@ -905,3 +905,12 @@ A auditoria cruzada confirmou que o repositório não implementa um receiver HTT
 - ao ativar uma integração, registrar receiver, ownership e contrato antes de configurar produção.
 
 **Nenhuma variável de produção foi alterada nesta etapa.**
+
+
+## API-05 — documentação do replay
+
+**Estado:** FECHADO — documentação reconciliada em 2026-10-04.
+
+A rota, permissão `freight:replay`, auditoria `durable_job.replay_requested`, semântica de solicitação repetível e idempotência por `event_id` estão documentadas em `docs/PROJECT-DOCUMENTATION.md`, `docs/INTEGRATIONS-OPERATIONS.md` e `docs/operations/FREIGHT-REPLAY.md`.
+
+**Próximo:** API-06 — evidência E4 de autorização dos endpoints de diagnóstico em produção.
