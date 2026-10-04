@@ -45,7 +45,7 @@ A regra de evidência é:
 | AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
 | API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e a matriz runtime cobre todas as rotas protegidas, permissões positivas/negativas, wildcard, bearer ausente, tenant mismatch e membership inativa | **CI/RUNTIME MATRIX — PASS** | Preservar a matriz e repetir após mudanças de autorização | Todas as rotas inventariadas permanecem protegidas e a matriz passa no CI | P1 |
 | API-02 | Permissão de replay | Endpoint usa `freight:replay`; teste de autorização cobre a permissão dedicada e replay real em produção foi processado pelo worker com auditoria/telemetria | **E4 OPERACIONAL — PASS** | Preservar permissão dedicada, auditoria e regressão | Usuário autorizado executa replay; acesso sem permissão é negado; execução deixa trilha auditável | P1 |
-| API-03 | Semântica de replay | Cada replay gera `replay:<eventId>:<randomUUID>`; chamadas repetidas criam jobs distintos | DECISÃO NECESSÁRIA | Definir se replay manual é deliberadamente repetível ou deve ser idempotente | Semântica documentada + teste de chamadas repetidas | P1 |
+| API-03 | Semântica de replay | Replay manual é deliberadamente repetível: cada POST representa nova intenção operacional e gera `replay:<eventId>:<randomUUID>`; o processamento do mesmo `event_id` permanece idempotente no handler | **DECISÃO REGISTRADA — REPETÍVEL / HANDLER IDEMPOTENTE** | Preservar chave aleatória por solicitação; manter `freight:replay`, auditoria `durable_job.replay_requested` e confirmação antes da operação | Contrato documentado + teste de repetição + evidência E4 de `idempotent_replay=true` sem duplicar audit de processamento | P1 |
 | API-04 | Testes do replay | Suíte dedicada `apps/api/test/freight-replay.service.test.ts` cobre enqueue + audit transacional, aggregate divergente, payload inconsistente e repetição distinta; autorização é coberta por testes do controller e matriz API-01 | **CI — PASS** | Preservar a suíte e ampliar somente se o contrato de replay mudar | Suite direcionada passa e permanece integrada ao CI | P1 |
 | API-05 | Documentação do replay | Documentação geral de freight não reflete claramente a nova operação de replay | DRIFT DOCUMENTAL | Atualizar API/ops e controles operacionais | Docs, permissão e operação coincidem | P1 |
 | API-06 | Endpoints de diagnóstico em produção | Quatro endpoints usam `ops:diagnostics`; migration 0035 cria a permissão e concede explicitamente ao admin; operator bootstrap não recebe a permissão | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Executar 403 para operador e 200 para admin, mantendo tenant-scoped | Usuário funcional comum recebe 403; operador sem `ops:diagnostics` recebe 403; admin autorizado recebe 200 | P1 |
@@ -2505,6 +2505,38 @@ A auditoria da superfície `/api/tms/*` foi cruzada novamente contra o `FreightC
 ### Resultado desta etapa
 
 A fronteira `/api/tms/* → API NestJS` está estruturalmente mapeada. O próximo fechamento é a matriz de autorização runtime e, em paralelo, AUTH-01 (token real → Web → API → tenant/RLS).
+
+## 80. FASE 2 — 2026-10-04 — API-03: decisão operacional da semântica de replay
+
+### Decisão
+
+**API-03 = DECISÃO REGISTRADA — replay manual deliberadamente repetível, com processamento idempotente por `event_id`.**
+
+O contrato atual mantém duas propriedades separadas:
+
+- cada solicitação manual de replay é uma nova intenção operacional e recebe `replay:<eventId>:<randomUUID>`;
+- o worker trata o mesmo `event_id` de forma idempotente, evitando duplicar `freight.status_changed.processed` e registrando `idempotent_replay=true` quando o evento já foi processado.
+
+Portanto, duas solicitações manuais para o mesmo evento **podem criar dois durable jobs**, mas isso não implica dois efeitos de negócio processados. A deduplicação do pedido HTTP não será introduzida neste ciclo sem um requisito operacional diferente.
+
+### Controles obrigatórios preservados
+
+1. Permissão dedicada `freight:replay`.
+2. Operação tenant-scoped.
+3. Auditoria transacional `durable_job.replay_requested`.
+4. Confirmação explícita na UI antes do replay.
+5. Proteção idempotente no handler por `event_id`.
+6. Evidência de produção já observada com `idempotent_replay=true` e job concluído em tentativa 1.
+
+### Limite
+
+A repetibilidade é uma capacidade administrativa controlada, não um mecanismo para disparo automático. Rate limiting/approval adicional permanece uma decisão de hardening em SEC-03 caso o risco operacional exija.
+
+### Classificação
+
+**API-03: FECHADO COMO DECISÃO DE CONTRATO.**
+
+Não há mudança funcional nesta etapa; a implementação existente já corresponde à decisão. O próximo item relacionado é **API-05 — documentação do replay**, que deve refletir exatamente esta semântica.
 
 ## 79. FASE 2 — 2026-10-04 — AUTH-01: evidência real de produção do tenant claim
 
