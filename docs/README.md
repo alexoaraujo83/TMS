@@ -12,7 +12,8 @@
 
 - `PROJECT-DOCUMENTATION.md` — code-grounded project inventory and implemented-vs-target matrix.
 - `DATABASE.md` — schema, entities, fields, relationships, constraints, indexes and migrations.
-- `INTEGRATIONS-OPERATIONS.md` — runtime topology, environment contract, integration status, deploy, rollback and incidents.
+- `INTEGRATIONS-OPERATIONS.md` — runtime topology, environment contract, integration status, deploy, rollback, events and incidents.
+- `operations/FREIGHT-REPLAY.md` — production contract and runbook for tenant-scoped Freight status-event replay.
 
 ## Handoff
 
