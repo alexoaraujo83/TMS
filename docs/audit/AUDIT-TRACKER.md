@@ -47,7 +47,7 @@ A regra de evidência é:
 | API-02 | Permissão de replay | Endpoint usa `freight:replay`; teste de autorização cobre a permissão dedicada e replay real em produção foi processado pelo worker com auditoria/telemetria | **E4 OPERACIONAL — PASS** | Preservar permissão dedicada, auditoria e regressão | Usuário autorizado executa replay; acesso sem permissão é negado; execução deixa trilha auditável | P1 |
 | API-03 | Semântica de replay | Replay manual é deliberadamente repetível: cada POST representa nova intenção operacional e gera `replay:<eventId>:<randomUUID>`; o processamento do mesmo `event_id` permanece idempotente no handler | **DECISÃO REGISTRADA — REPETÍVEL / HANDLER IDEMPOTENTE** | Preservar chave aleatória por solicitação; manter `freight:replay`, auditoria `durable_job.replay_requested` e confirmação antes da operação | Contrato documentado + teste de repetição + evidência E4 de `idempotent_replay=true` sem duplicar audit de processamento | P1 |
 | API-04 | Testes do replay | Suíte dedicada `apps/api/test/freight-replay.service.test.ts` cobre enqueue + audit transacional, aggregate divergente, payload inconsistente e repetição distinta; autorização é coberta por testes do controller e matriz API-01 | **CI — PASS** | Preservar a suíte e ampliar somente se o contrato de replay mudar | Suite direcionada passa e permanece integrada ao CI | P1 |
-| API-05 | Documentação do replay | Documentação geral de freight não reflete claramente a nova operação de replay | DRIFT DOCUMENTAL | Atualizar API/ops e controles operacionais | Docs, permissão e operação coincidem | P1 |
+| API-05 | Documentação do replay | API/ops agora documentam rota, `freight:replay`, auditoria, semântica repetível e idempotência do handler | **DOCUMENTAÇÃO RECONCILIADA — PASS** | Preservar atualização no mesmo change set de mudanças de replay | Docs, permissão, código e operação coincidem | P1 |
 | API-06 | Endpoints de diagnóstico em produção | Quatro endpoints usam `ops:diagnostics`; migration 0035 cria a permissão e concede explicitamente ao admin; operator bootstrap não recebe a permissão | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Executar 403 para operador e 200 para admin, mantendo tenant-scoped | Usuário funcional comum recebe 403; operador sem `ops:diagnostics` recebe 403; admin autorizado recebe 200 | P1 |
 | WORK-01 | Deploy do worker | SHA atual foi SKIPPED; worker anterior permanece como versão efetiva | PARCIAL | Confirmar regras de watch e registrar SHA efetivo | Versão do worker é conhecida, intencional e observável | P1 |
 | WORK-02 | Contrato de negócio do worker | Caminho fonte-controlado confirmado em produção: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; evento real e replay já percorreram o worker em Railway | **E4 OPERACIONAL — PASS** | Preservar a cadeia observada e manter regressão; não repetir replay sem necessidade | Evento real publicado, durable job concluído, handler/audit/telemetry correlacionados por `event_id` e job; replay posterior registra `idempotent_replay=true` sem novo audit de processamento | P1 |
@@ -2565,3 +2565,29 @@ O gate deixa de depender apenas da Action/AuthGuard em código: há evidência f
 ### Próxima ação
 
 Preservar a regressão Auth0 → Web → API → TenantContext → PostgreSQL/RLS. Não alterar Auth0 Production como parte deste fechamento.
+
+
+## 81. FASE 2 — 2026-10-04 — API-05: documentação do replay reconciliada
+
+### Resultado
+
+A documentação do replay foi alinhada ao contrato efetivamente implementado no código e já observado em produção:
+
+- `docs/PROJECT-DOCUMENTATION.md` agora lista `GET /freights/:id/status-events` e `POST /freights/:id/status-events/:eventId/replay`, com `freight:replay`.
+- `docs/INTEGRATIONS-OPERATIONS.md` descreve o replay como mutação operacional interna e separa repetição da solicitação de idempotência do handler.
+- `docs/operations/FREIGHT-REPLAY.md` registra autorização, validações tenant-scoped, comportamento transacional, auditoria, procedimento operacional e padrão de evidência E4.
+- `docs/README.md` indexa o novo runbook.
+
+### Contrato documentado
+
+O replay manual é deliberadamente repetível: cada POST cria uma nova intenção e uma chave `replay:<eventId>:<randomUUID>`. O handler usa `event_id` como fronteira de idempotência e, quando o evento já foi processado, registra `idempotent_replay=true` sem duplicar `freight.status_changed.processed`.
+
+### Classificação
+
+**API-05 — DOCUMENTAÇÃO RECONCILIADA — PASS.**
+
+Nenhuma mudança funcional, migration, credencial ou mutação de produção foi executada nesta etapa.
+
+### Próximo gate
+
+API-06: prova E4 de autorização dos endpoints de diagnóstico em produção, com 403 para usuário sem `ops:diagnostics` e 200 para usuário autorizado, sem alterar o tenant efetivo.

@@ -82,7 +82,7 @@ Base path: `/api/v1`.
 
 Health: `GET /health`.
 
-Freight endpoints are documented in `docs/PROJECT-DOCUMENTATION.md`. Errors are normalized by the API error/HTTP exception infrastructure; clients should use HTTP status plus the stable application error payload rather than parsing human-readable text.
+Freight endpoints are documented in `docs/PROJECT-DOCUMENTATION.md`. The manual status-event replay contract is documented in `docs/operations/FREIGHT-REPLAY.md`. Errors are normalized by the API error/HTTP exception infrastructure; clients should use HTTP status plus the stable application error payload rather than parsing human-readable text.
 
 ## 6. External services
 
@@ -114,7 +114,7 @@ The operational model is:
 
 `committed transaction -> outbox/durable job -> worker claim -> idempotent handler -> external side effect -> completion/failure -> audit`
 
-This does **not** imply that every future external integration is implemented. Receiver-side deduplication, complete replay tooling and business-specific handlers must be independently exercised and evidenced before being described as production-ready.
+This does **not** imply that every future external integration is implemented. The TMS freight replay operation is an implemented, tenant-scoped internal control; it is not an external receiver replay mechanism. Its request semantics are deliberately repeatable, while handler processing remains idempotent by `event_id`. Production readiness claims must still be backed by runtime evidence.
 
 ## 8. Backup and retention
 
@@ -174,3 +174,9 @@ All operational flows should carry a correlation/request ID. Audit events suppor
 - Perform periodic backup/restore drills.
 - Perform a controlled retention test before declaring retention production-proven.
 - Remove unused environment variables and integrations rather than leaving undocumented operational dependencies.
+
+## 7.1 Freight status-event replay
+
+Manual replay is an explicit operational mutation for a previously persisted `freight.status_changed` event. It is authorized by `freight:replay`, validates Freight/event/payload identity inside the authenticated tenant, creates a durable job and records `durable_job.replay_requested` transactionally.
+
+The contract is deliberately repeatable: each explicit POST gets `replay:<eventId>:<randomUUID>`. This means two explicit requests can create separate durable jobs. The worker handler is the idempotency boundary: when the same `event_id` was already processed, it records `idempotent_replay=true` and does not create a second `freight.status_changed.processed` audit. See `docs/operations/FREIGHT-REPLAY.md` for the operational procedure and E4 evidence standard.
