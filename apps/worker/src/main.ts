@@ -51,9 +51,16 @@ if (!databaseUrl) {
       }
 
       if (tenantIds.length === 0) {
-        logger.log("WARN", "worker.idle", {}, { reason: "OUTBOX_TENANT_IDS is not configured" });
+        logger.log("WARN", "worker.idle", {}, { reason: "OUTBOX_TENANT_IDS is not configured", readiness: "healthy-idle" });
         return;
       }
+
+      logger.log("INFO", "worker.ready", {}, {
+        readiness: "ready",
+        database_runtime_role: "tms_app",
+        configured_tenants: tenantIds.length,
+        durable_jobs_enabled: durableJobsEnabled,
+      });
 
       const outboxStore = new PgOutboxStore(pool);
       const webhookPublisher = new WebhookPublisher(webhookUrls, {
@@ -116,9 +123,15 @@ if (!databaseUrl) {
         const execution = (async () => {
           const runStartedAt = Date.now();
           try {
+            let totalClaimed = 0;
+            let totalPublished = 0;
+            let totalFailed = 0;
             for (const tenantId of tenantIds) {
               if (shuttingDown) break;
               const outboxResult = await outboxProcessor.process(tenantId, batchSize);
+              totalClaimed += outboxResult.claimed;
+              totalPublished += outboxResult.published;
+              totalFailed += outboxResult.failed;
               if (outboxResult.claimed > 0) {
                 logger.log("INFO", "outbox.processed", { tenantId }, {
                   duration_ms: Date.now() - runStartedAt,
@@ -127,6 +140,8 @@ if (!databaseUrl) {
               }
               if (durableJobsEnabled && !shuttingDown) {
                 const durableJobResult = await durableJobProcessor.process(tenantId, batchSize);
+                totalClaimed += durableJobResult.claimed;
+                totalFailed += durableJobResult.failed;
                 if (durableJobResult.claimed > 0) {
                   logger.log("INFO", "durable_job.processed", { tenantId }, {
                     duration_ms: Date.now() - runStartedAt,
@@ -135,6 +150,14 @@ if (!databaseUrl) {
                 }
               }
             }
+            logger.log("INFO", "worker.cycle.completed", {}, {
+              duration_ms: Date.now() - runStartedAt,
+              configured_tenants: tenantIds.length,
+              claimed: totalClaimed,
+              published: totalPublished,
+              failed: totalFailed,
+              readiness: totalFailed === 0 ? "healthy" : "degraded",
+            });
           } catch (error) {
             logger.log("ERROR", "worker.error", {}, {
               error: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
