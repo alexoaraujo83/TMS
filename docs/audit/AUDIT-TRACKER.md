@@ -48,7 +48,7 @@ A regra de evidência é:
 | API-03 | Semântica de replay | Replay manual é deliberadamente repetível: cada POST representa nova intenção operacional e gera `replay:<eventId>:<randomUUID>`; o processamento do mesmo `event_id` permanece idempotente no handler | **DECISÃO REGISTRADA — REPETÍVEL / HANDLER IDEMPOTENTE** | Preservar chave aleatória por solicitação; manter `freight:replay`, auditoria `durable_job.replay_requested` e confirmação antes da operação | Contrato documentado + teste de repetição + evidência E4 de `idempotent_replay=true` sem duplicar audit de processamento | P1 |
 | API-04 | Testes do replay | Suíte dedicada `apps/api/test/freight-replay.service.test.ts` cobre enqueue + audit transacional, aggregate divergente, payload inconsistente e repetição distinta; autorização é coberta por testes do controller e matriz API-01 | **CI — PASS** | Preservar a suíte e ampliar somente se o contrato de replay mudar | Suite direcionada passa e permanece integrada ao CI | P1 |
 | API-05 | Documentação do replay | API/ops agora documentam rota, `freight:replay`, auditoria, semântica repetível e idempotência do handler | **DOCUMENTAÇÃO RECONCILIADA — PASS** | Preservar atualização no mesmo change set de mudanças de replay | Docs, permissão, código e operação coincidem | P1 |
-| API-06 | Endpoints de diagnóstico em produção | Cinco endpoints usam `ops:diagnostics`; migration 0035 cria a permissão e concede explicitamente ao admin; o bootstrap/teste de IAM confirma que o operador não recebe a permissão | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Obter em produção 403 para usuário funcional e operador, e 200 para admin autorizado, mantendo tenant-scoped | Usuário funcional comum recebe 403; operador sem `ops:diagnostics` recebe 403; admin autorizado recebe 200 | P1 |
+| API-06 | Endpoints de diagnóstico em produção | Cinco endpoints usam `ops:diagnostics`; migration 0035 cria a permissão e concede explicitamente ao admin; o bootstrap/teste de IAM confirma que o operador não recebe a permissão; produção comprovou operador 403 e admin 200 tenant-scoped | **E4 OPERACIONAL — PASS** | Preservar a matriz negativa/positiva e repetir após mudanças de autorização | Operador sem `ops:diagnostics` recebe 403 `Insufficient permission`; admin autorizado recebe 200 com `authenticated=true` e `tenantId` correto | P1 |
 | WORK-01 | Deploy do worker | Deployment Railway `54d90a24-e9a1-4241-ad65-226c2f20a78d` do commit `0375a4cefce728253c900986b0254df138aa732b` concluiu SUCCESS em produção; snapshot `31b1dd2d-9e5d-4a17-8f91-0bd692844cb6` | COMPROVADO | Preservar SHA efetivo e separar deploy de prova funcional | Worker em produção executa o commit promovido e o runtime é observável | P1 |
 | WORK-02 | Contrato de negócio do worker | Caminho fonte-controlado confirmado em produção: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; evento real e replay já percorreram o worker em Railway | **E4 OPERACIONAL — PASS** | Preservar a cadeia observada e manter regressão; não repetir replay sem necessidade | Evento real publicado, durable job concluído, handler/audit/telemetry correlacionados por `event_id` e job; replay posterior registra `idempotent_replay=true` sem novo audit de processamento | P1 |
 | WORK-03 | Prontidão operacional | Railway Production confirmou `worker.ready` após validação de `tms_app`/tenants e múltiplos `worker.cycle.completed` com `readiness=healthy`, `failed=0`; deployment `54d90a24...` SUCCESS | **E4 OPERACIONAL — PASS** | Preservar os eventos como evidência de readiness/ciclo; repetir somente após mudanças funcionais relevantes | Runtime real demonstra prontidão, ciclos contínuos e ausência de falhas no período observado | P1 |
@@ -1272,3 +1272,22 @@ Esta prova confirma a execução e a integridade declarada/verificada pelo próp
 **DR-01 — PARCIAL / E4 ATUAL PENDENTE.**
 
 A evidência histórica prova o mecanismo, mas o DoD atual exige restauração do artefato corrente e medição de RPO/RTO. O gate permanece aberto até essa prova ser executada.
+
+
+## 89. FASE 2 — 2026-10-05 — API-06: prova E4 operacional dos diagnósticos
+
+### Evidência runtime
+
+- Sessão com perfil operador chamou o endpoint de diagnóstico em produção e recebeu **403**, com `code=REQUEST_ERROR` e `message=Insufficient permission`; requestId `c1922316-1f0c-497d-a7f2-58c5cc729759`.
+- Sessão administrativa chamou o mesmo caminho de diagnóstico e recebeu **200**, com `authenticated=true` e `tenantId=19d9a5a4-2d50-4b78-a910-1fdea96fd12e`.
+- A evidência confirma o comportamento do `PermissionGuard` no runtime: o operador não herda `ops:diagnostics`, enquanto o admin autorizado acessa a superfície de diagnóstico tenant-scoped.
+
+### Classificação
+
+**API-06 — E4 OPERACIONAL — PASS.**
+
+O finding deixa de depender apenas da migration, código e testes: o par negativo/positivo foi observado em produção. O controle permanece sujeito à regressão normal caso permissões, roles ou endpoints sejam alterados.
+
+### Limite
+
+Esta prova fecha somente API-06. Ela não fecha DR-01, ENV-01/ENV-02, CI-02 ou FINAL-01.
