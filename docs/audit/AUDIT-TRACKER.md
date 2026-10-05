@@ -54,7 +54,7 @@ A regra de evidência é:
 | WORK-03 | Prontidão operacional | Railway Production confirmou `worker.ready` após validação de `tms_app`/tenants e múltiplos `worker.cycle.completed` com `readiness=healthy`, `failed=0`; deployment `54d90a24...` SUCCESS | **E4 OPERACIONAL — PASS** | Preservar os eventos como evidência de readiness/ciclo; repetir somente após mudanças funcionais relevantes | Runtime real demonstra prontidão, ciclos contínuos e ausência de falhas no período observado | P1 |
 | WORK-04 | Idempotência Durable Jobs | TMS usa chave determinística do evento no fluxo normal; handler tem proteção de replay; deduplicação atômica no destino externo continua dependência externa | PARCIAL / CORRETO | Preservar chave e obter prova do destino quando integrações externas forem ativadas | Destino comprova deduplicação atômica pela mesma chave | P1 |
 | BAK-01 | Execução de backup | Execução real em Railway Production em 2026-10-05T02:00:11Z produziu tms/postgres/20261005T020011Z/tms-20261005T020011Z.dump.enc, 193632 bytes, SHA-256 b5606d25af13f4636a4d6a0fb80e8256ddf3fa4962ac69b72e69ff8ad4287da2; manifesto persistido e backup_status=verified, retention_status=verified, retention_days=14, migration_count=41 | E4 OPERACIONAL — PASS | Preservar a evidência do objeto/checksum e repetir apenas conforme ciclo de backup ou mudança do mecanismo | Artefato real + checksum + manifesto + retenção comprovados no runtime | P1 |
-| DR-01 | Restore independente | Branch isolada foi reconciliada até 0031; isso não prova restore do backup criptografado atual | ABERTO | Restaurar backup atual em infraestrutura isolada e medir execução | Restore real com RPO/RTO registrados | P1 |
+| DR-01 | Restore independente | Existe prova histórica de restore isolado Neon com finalize=false e validação read-only, mas ela cobre um recovery point antigo (28 migrations / 21 tables) e não o backup criptografado atual de 2026-10-05 | **PARCIAL / E4 ATUAL PENDENTE** | Executar restore do artefato atual em infraestrutura isolada, validar schema/dados e registrar RPO/RTO | Restore real do backup atual, validação read-only e RPO/RTO observados | P1 |
 | ENV-01 | Paridade de ambientes | Evidência histórica mostra development/staging atrás de produção e sem `schema_migrations` canônico | BLOQUEADO | Definir ownership/uso e então migrar ou aposentar de modo não destrutivo | Matriz aprovada + evidência de schema/version | P1 |
 | ENV-02 | Contrato de variáveis | Há consumidores conhecidos, mas ainda existem variáveis diretas e históricas sem reconciliação completa | PARCIAL | Classificar cada variável como obrigatória, opcional, legada, documental ou indireta | Contrato completo por ambiente, sem segredos | P1 |
 | SEC-01 | Isolamento tenant | AuthZ + membership + contexto transacional + RLS formam defesa em profundidade | FORTE / E3 ESTRUTURAL | Preservar arquitetura e fechar prova comportamental | DB-04 + AUTH-01 comprovados em runtime | P0 |
@@ -1256,3 +1256,19 @@ A prova agora é operacional: existe uma execução real, um artefato identifica
 ### Limite da evidência
 
 Esta prova confirma a execução e a integridade declarada/verificada pelo próprio job de backup. Ela não substitui o DR-01, que exige restauração real do artefato criptografado em infraestrutura isolada e medição de RPO/RTO.
+
+
+## 88. FASE 2 — 2026-10-05 — DR-01: reconciliação da evidência de restore
+
+### Evidência disponível
+
+- O repositório contém o runbook `docs/operations/BACKUP-RESTORE-DRILL.md` com prova histórica de restore Neon isolado usando `finalize: false`, branch não primária/não default e validação read-only.
+- A prova histórica confirmou PostgreSQL 17.11, 21 tabelas públicas, 28 migrations e 10/10 tabelas críticas. Ela é válida como evidência do mecanismo de restore, mas não representa o schema atual.
+- O backup atual de 2026-10-05 é um dump criptografado de 193632 bytes, com checksum registrado e manifesto persistido; ainda não há prova de que esse artefato atual foi restaurado em infraestrutura isolada.
+- O ambiente Railway atual não expõe uma ferramenta Neon/recovery branch pelo conjunto de ferramentas conectado nesta sessão. Portanto, não será executado restore especulativo nem qualquer operação que possa tocar produção.
+
+### Classificação
+
+**DR-01 — PARCIAL / E4 ATUAL PENDENTE.**
+
+A evidência histórica prova o mecanismo, mas o DoD atual exige restauração do artefato corrente e medição de RPO/RTO. O gate permanece aberto até essa prova ser executada.
