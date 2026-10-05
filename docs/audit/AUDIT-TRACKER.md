@@ -36,7 +36,7 @@ A regra de evidência é:
 
 | ID | Área | Concreto hoje | Estado | O que fazer | Evidência de encerramento | Prioridade |
 |---|---|---|---|---|---|---|
-| REL-01 | Manifesto de release | API está no HEAD; Web/Worker podem permanecer em SHA anterior porque foram pulados como não afetados | ABERTO | Criar manifesto versionado com SHA do repositório, SHA efetivo de Web/API/Worker, head de migração e referências de configuração | Um único registro reconcilia todos os componentes de produção | P0 |
+| REL-01 | Manifesto de release | Manifesto versionado `docs/releases/RELEASE-MANIFEST-2026-10-05.md` reconcilia Git `main`, SHA efetivo de Web/API/Worker/backup-worker, migration head live e referências de configuração; Web/API estão em `e7e35824...` e o Worker efetivo permanece em `6348d292...` porque o deploy posterior foi SKIPPED | **FECHADO / RECONCILIADO** | Preservar o manifesto e atualizar a cada promoção multi-componente | Um único registro versionado reconcilia todos os componentes de produção e distingue Git HEAD de SHA efetivo | P0 |
 | DB-01 | Head de migração Neon | Evidência live reconciliada: `schema_migrations` com 41 registros; `0036_auth0_identity_bootstrap` único; legado `0036_project_control_center` ausente; `0040_project_control_center_reconciliation` e `0041_schema_migrations_version_integrity` presentes; PK de `schema_migrations` presente; versões duplicadas = 0 | **E4 OPERACIONAL — PASS** | Preservar consulta read-only e checksums de referência; não executar migration corretiva. | Banco live comprova head/integridade da história e ausência de colisão de versões | P0 |
 | DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
 | DB-03 | Papel de banco em runtime | API e worker possuem guard de runtime; produção agora registra o worker como `tms_app` no startup, com operação do outbox/durable jobs no mesmo deployment | COMPROVADO | Preservar evidência e manter separação entre runtime e credenciais administrativas | Worker em produção confirma papel aprovado e least privilege | P1 |
@@ -2609,6 +2609,28 @@ Ainda não foi observada em logs/runtime uma chamada negativa real com `403` par
 **Classificação: API-06 — CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE.**
 
 Nenhuma permissão foi alterada em produção e nenhum token/segredo foi registrado nesta etapa.
+
+
+## 84. FASE 2 — 2026-10-05 — REL-01: manifesto de release versionado
+
+### Evidência
+
+- PR #137 criou `docs/releases/RELEASE-MANIFEST-2026-10-05.md` com o estado efetivo por componente.
+- Vercel Web e API permanecem em produção no SHA `e7e35824eae7fdb6fd3d68898f861f37fcac922b`.
+- Railway `tms-worker` permanece efetivamente no SHA `6348d2926f0b0cac120ff9350bb77bc0fce0903d`, pois o deployment posterior foi SKIPPED; o manifesto não trata SKIPPED como promoção.
+- Railway backup worker possui deployment SUCCESS no SHA de produção corrente registrado no ciclo.
+- O manifesto registra também a evidência live de migrações Neon: 41 registros, 0036 normalizado, 0040/0041 presentes, PK presente e versões duplicadas = 0.
+- PR #137 foi validado com Vercel Web/API em SUCCESS e mesclado no `main` com commit `e9ea5aa2c5a27b816fd6dcdde56b408d3aad50c0`.
+
+### Classificação
+
+**REL-01 — FECHADO / RECONCILIADO.**
+
+O controle de release agora distingue explicitamente Git HEAD, SHA efetivo por componente e estado de migração. A diferença de SHA entre componentes permanece uma condição controlada e documentada, não uma inferência de defeito.
+
+### Limite
+
+REL-01 não fecha WORK-01, WORK-03, BAK-01, DR-01, ENV-01/02 ou FINAL-01. Esses gates continuam independentes.
 
 
 ## 83. FASE 2 — 2026-10-05 — Reconciliação do estado de produção após API-06
