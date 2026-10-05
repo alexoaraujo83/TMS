@@ -1,11 +1,11 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-09-28 00:00 -03:00
+> **Última atualização:** 2026-10-05 00:00 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
-> **HEAD de main verificado antes desta atualização:** `7cdf6b769624f9fed24446dc6ebe47ede4b1a827`
-> **Último HEAD funcional de aplicação explicitamente auditado:** `d304b2cdfacc6d78282648b1d5bd1243811a7b78`  
+> **HEAD de main verificado nesta atualização:** `e7e35824eae7fdb6fd3d68898f861f37fcac922b`
+> **HEAD de produção Web/API observado nesta atualização:** `e7e35824eae7fdb6fd3d68898f861f37fcac922b`  
 > **HEAD de controle/documentação anterior:** `c4fcb3ba598a0218142c11911b52d7a032eb24a4`  
 > **Regra:** este arquivo registra somente evidência concreta já observada, estado atual, próxima ação recomendada e evidência exigida para encerramento. Itens não verificados permanecem ABERTOS/BLOQUEADOS.
 
@@ -25,9 +25,9 @@ A regra de evidência é:
 
 | Componente | Evidência concreta | Estado efetivo | Próxima ação |
 |---|---|---|---|
-| GitHub / main | HEAD da aplicação auditada é `fb0025aea93aed9ad134a3266f2e7274fb9bcda5` | CANÔNICO | Usar este SHA como referência da aplicação neste ciclo. |
-| Vercel API | tms-core-api, deployment dpl_CExsdt8aHv7DRhZvQwdJoou1AbSp, READY, production, SHA 20ff155544c99e587100fa17aedeeeb6eda5a284; aplicação funcional auditada permanece fb0025... | CONTROLE/DOCUMENTAÇÃO ATUAL / CÓDIGO DE APP INALTERADO | Separar SHA de controle/documentação do HEAD funcional da aplicação no manifesto. |
-| Vercel Web | tms-web, deployment dpl_9zSdC58f8hhwg1ejaURTyGRLznbK, READY, production, SHA 20ff155544c99e587100fa17aedeeeb6eda5a284; código funcional auditado permanece fb0025... | CONTROLE/DOCUMENTAÇÃO ATUAL / CÓDIGO DE APP INALTERADO | Registrar SHA efetivo e diferenciar deploy de controle de mudança funcional. |
+| GitHub / main | HEAD de `main` observado: `e7e35824eae7fdb6fd3d68898f861f37fcac922b` | CANÔNICO | Manter este SHA como referência do ciclo corrente. |
+| Vercel API | `tms-core-api`, deployment `dpl_BTJuv3FqAR6snskJXb7QvGxMCyMz`, READY/production, commit `e7e35824eae7fdb6fd3d68898f861f37fcac922b` | ATUAL / READY | Preservar evidência de deployment e separar runtime de documentação. |
+| Vercel Web | `tms-web`, deployment `dpl_4jTG3GMNjQYPMTrPWfLM87hduK2h`, READY/production, commit `e7e35824eae7fdb6fd3d68898f861f37fcac922b` | ATUAL / READY | Preservar evidência de deployment. |
 | Railway worker | Deployment do SHA atual `74c88ebf-7046-4d01-836b-c72847e08255` foi SKIPPED; último worker principal conhecido como SUCCESS é `9d938334-b80c-4064-bd40-683620f950a2`, SHA `6348d2926f0b0cac120ff9350bb77bc0fce0903d` | SHA EFETIVO ANTERIOR | Verificar regras de watch/build e registrar o SHA efetivo. Não forçar deploy apenas para igualar SHAs. |
 | Railway backup worker | Deployment `21278249-58dc-4121-85de-d866a71a1003` está SUCCESS no SHA atual | ATUAL / EXECUÇÃO DE BACKUP NÃO PROVADA | Obter evidência de artefato real, checksum e retenção. |
 | CI | Run `36081162875` / #1139 no SHA `2eb43e87bb8005cbfb6d65c7808e34dde725cca4` concluiu `success`; job `107903222930` passou architecture check, migration, RLS/IAM/worker integration, format, lint, typecheck, test e build | COMPROVADO NO HEAD ATUAL DE CONTROLE | Manter CI separado da prova operacional de produção e repetir após mudanças funcionais relevantes |
@@ -37,10 +37,10 @@ A regra de evidência é:
 | ID | Área | Concreto hoje | Estado | O que fazer | Evidência de encerramento | Prioridade |
 |---|---|---|---|---|---|---|
 | REL-01 | Manifesto de release | API está no HEAD; Web/Worker podem permanecer em SHA anterior porque foram pulados como não afetados | ABERTO | Criar manifesto versionado com SHA do repositório, SHA efetivo de Web/API/Worker, head de migração e referências de configuração | Um único registro reconcilia todos os componentes de produção | P0 |
-| DB-01 | Head de migração Neon | Repositório contém até `0035_diagnostics_permission_and_admin_replay.sql`; evidência independente de produção/main continua pendente para o head atual | BLOQUEADO | Executar verificação read-only autoritativa do `schema_migrations` e dos checksums 0032/0033 | Banco live comprova head e checksums esperados | P0 |
+| DB-01 | Head de migração Neon | Evidência live reconciliada: `schema_migrations` com 41 registros; `0036_auth0_identity_bootstrap` único; legado `0036_project_control_center` ausente; `0040_project_control_center_reconciliation` e `0041_schema_migrations_version_integrity` presentes; PK de `schema_migrations` presente; versões duplicadas = 0 | **E4 OPERACIONAL — PASS** | Preservar consulta read-only e checksums de referência; não executar migration corretiva. | Banco live comprova head/integridade da história e ausência de colisão de versões | P0 |
 | DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
 | DB-03 | Papel de banco em runtime | API e worker possuem guard de runtime; produção agora registra o worker como `tms_app` no startup, com operação do outbox/durable jobs no mesmo deployment | COMPROVADO | Preservar evidência e manter separação entre runtime e credenciais administrativas | Worker em produção confirma papel aprovado e least privilege | P1 |
-| DB-04 | RLS comportamental | RLS/FORCE RLS e `NOBYPASSRLS` estão implementados; a identidade do runtime `tms_app` em produção está comprovada. A prova comportamental E4 permanece separada e não é inferida do log de startup | PARCIAL / E4 COMPORTAMENTAL PENDENTE | Reconciliar o artefato da sessão real `tms_app` já validada e registrar as seis asserções comportamentais sem repetir mutações desnecessárias | Evidência da sessão real com own-tenant, cross-tenant read/insert/update e ausência de mutação persistente | P0 |
+| DB-04 | RLS comportamental | Sessão real `tms_app` em produção comprovou `rolbypassrls=false`, own-tenant select e bloqueio cross-tenant em SELECT/INSERT/UPDATE, com rollback guard e sem escrita persistente | **E4 OPERACIONAL — PASS** | Preservar o artefato read-only e não repetir mutações sem necessidade operacional. | Sessão real comprova identidade, isolamento e rejeição cross-tenant sem persistência | P0 |
 | AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; evidência real de produção confirmou issuer, audience, subject, tenant_id e aceitação pelo caminho autenticado; API exige o claim e membership | **E4 OPERACIONAL — PASS** | Preservar regressão do fluxo Auth0 → Web → API → TenantContext → DB/RLS | Emitir novo token real e rastrear Auth0 → Web → API → DB | Token real com claim de tenant é aceito e operação tenant-scoped funciona; tenant incorreto é negado | P0 |
 | AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
 | API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e a matriz runtime cobre todas as rotas protegidas, permissões positivas/negativas, wildcard, bearer ausente, tenant mismatch e membership inativa | **CI/RUNTIME MATRIX — PASS** | Preservar a matriz e repetir após mudanças de autorização | Todas as rotas inventariadas permanecem protegidas e a matriz passa no CI | P1 |
@@ -2609,3 +2609,36 @@ Ainda não foi observada em logs/runtime uma chamada negativa real com `403` par
 **Classificação: API-06 — CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE.**
 
 Nenhuma permissão foi alterada em produção e nenhum token/segredo foi registrado nesta etapa.
+
+
+## 83. FASE 2 — 2026-10-05 — Reconciliação do estado de produção após API-06
+
+### Produção observada
+
+- `main` está em `e7e35824eae7fdb6fd3d68898f861f37fcac922b`, merge do PR #135.
+- Vercel Web está READY em produção no deployment `dpl_4jTG3GMNjQYPMTrPWfLM87hduK2h`, associado ao mesmo commit.
+- Vercel API está READY em produção no deployment `dpl_BTJuv3FqAR6snskJXb7QvGxMCyMz`, associado ao mesmo commit.
+- Railway `tms-worker` recebeu deployment do mesmo commit como SKIPPED; isso é compatível com a política de watch seletivo. A versão efetiva do worker permanece separada do SHA do Web/API.
+- Railway `tms-backup-worker` está SUCCESS no deployment `b845e862-9b1c-4a97-a6e9-8a19375c6bc7`, snapshot `9ef0c792-a155-4df6-a258-28c0ae130aff`.
+- O commit `e7e35824eae7fdb6fd3d68898f861f37fcac922b` possui checks SUCCESS para Vercel Web, Vercel Core API, Railway worker e Railway backup-worker.
+
+### DB-01 / DB-04
+
+- **DB-01 — E4 OPERACIONAL — PASS:** evidência live reconciliada confirma 41 registros de migração, normalização da colisão histórica 0036, presença de 0040/0041, chave primária em `schema_migrations` e ausência de versões duplicadas.
+- **DB-04 — E4 OPERACIONAL — PASS:** sessão real de `tms_app` confirmou `rolbypassrls=false`, own-tenant SELECT permitido, cross-tenant SELECT/INSERT/UPDATE bloqueados e rollback guard sem escrita persistente.
+
+### API-06
+
+A tentativa recente no endpoint de diagnóstico como operador não constitui E4 negativo porque a resposta observada foi `Authentication required`: o request não apresentou autenticação válida e, portanto, o `PermissionGuard` não foi demonstrado.
+
+**Classificação permanece: API-06 — CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE.**
+
+Não alterar permissões de produção para fabricar 403. O próximo teste válido é uma chamada autenticada no contexto funcional de operador, capturando o status HTTP `403` e o corpo `Insufficient permission`; em seguida, uma chamada autenticada de admin deve produzir `200`.
+
+### Próxima sequência
+
+1. Obter o 403 autenticado de API-06.
+2. Fechar/reconciliar REL-01 com o SHA efetivo do worker e migration head live.
+3. Executar BAK-01/DR-01 com artefato e restore reais.
+4. Reconciliar ENV-01/ENV-02 e demais P1.
+5. Somente então executar FINAL-01.
