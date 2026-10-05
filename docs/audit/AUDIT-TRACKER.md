@@ -51,7 +51,7 @@ A regra de evidência é:
 | API-06 | Endpoints de diagnóstico em produção | Cinco endpoints usam `ops:diagnostics`; migration 0035 cria a permissão e concede explicitamente ao admin; o bootstrap/teste de IAM confirma que o operador não recebe a permissão | CORRIGIDO ESTRUTURALMENTE / E4 PENDENTE | Obter em produção 403 para usuário funcional e operador, e 200 para admin autorizado, mantendo tenant-scoped | Usuário funcional comum recebe 403; operador sem `ops:diagnostics` recebe 403; admin autorizado recebe 200 | P1 |
 | WORK-01 | Deploy do worker | SHA atual foi SKIPPED; worker anterior permanece como versão efetiva | PARCIAL | Confirmar regras de watch e registrar SHA efetivo | Versão do worker é conhecida, intencional e observável | P1 |
 | WORK-02 | Contrato de negócio do worker | Caminho fonte-controlado confirmado em produção: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; evento real e replay já percorreram o worker em Railway | **E4 OPERACIONAL — PASS** | Preservar a cadeia observada e manter regressão; não repetir replay sem necessidade | Evento real publicado, durable job concluído, handler/audit/telemetry correlacionados por `event_id` e job; replay posterior registra `idempotent_replay=true` sem novo audit de processamento | P1 |
-| WORK-03 | Prontidão operacional | Worker valida `tms_app` e tenants ativos, mas ainda pode ficar idle quando `OUTBOX_TENANT_IDS` está vazio; métricas de ciclo/último sucesso ainda são insuficientes | ABERTO | Expor readiness/telemetria para processo, DB, role, tenants, outbox, durable jobs e último ciclo | É possível distinguir healthy-idle de unhealthy | P1 |
+| WORK-03 | Prontidão operacional | Worker agora emite `worker.ready`, `worker.cycle.completed` e classifica idle sem tenants como `healthy-idle`; ciclo registra duração, tenants, claimed/published/failed e readiness `healthy`/`degraded` | **CORRIGIDO NO CÓDIGO / E4 PENDENTE** | Observar esses eventos em Railway Production após promoção e confirmar ciclo saudável + healthy-idle quando aplicável | Runtime real demonstra `worker.ready`, ciclos concluídos e diferenciação healthy/degraded/healthy-idle | P1 |
 | WORK-04 | Idempotência Durable Jobs | TMS usa chave determinística do evento no fluxo normal; handler tem proteção de replay; deduplicação atômica no destino externo continua dependência externa | PARCIAL / CORRETO | Preservar chave e obter prova do destino quando integrações externas forem ativadas | Destino comprova deduplicação atômica pela mesma chave | P1 |
 | BAK-01 | Execução de backup | Deploy do backup worker foi SUCCESS; isso não prova objeto, checksum, retenção ou execução recorrente | ABERTO | Capturar/realizar uma execução real e verificar artefato, checksum, manifesto e retenção | Artefato real + verificação independente | P1 |
 | DR-01 | Restore independente | Branch isolada foi reconciliada até 0031; isso não prova restore do backup criptografado atual | ABERTO | Restaurar backup atual em infraestrutura isolada e medir execução | Restore real com RPO/RTO registrados | P1 |
@@ -2664,3 +2664,30 @@ Não alterar permissões de produção para fabricar 403. O próximo teste váli
 3. Executar BAK-01/DR-01 com artefato e restore reais.
 4. Reconciliar ENV-01/ENV-02 e demais P1.
 5. Somente então executar FINAL-01.
+
+
+## 85. FASE 2 — 2026-10-05 — WORK-03: readiness e telemetria operacional do worker
+
+### Alteração
+
+O worker passou a emitir sinais explícitos de prontidão e ciclo operacional:
+
+- `worker.ready`: emitido após validação do papel de banco `tms_app` e dos tenants configurados; registra `readiness=ready`.
+- `worker.idle`: quando `OUTBOX_TENANT_IDS` está vazio, continua sendo um estado não-fatal, mas agora é classificado explicitamente como `readiness=healthy-idle`.
+- `worker.cycle.completed`: emitido ao final de cada ciclo com duração, quantidade de tenants, itens `claimed`, `published`, `failed` e classificação `healthy` ou `degraded`.
+
+### Segurança operacional
+
+Nenhum segredo, token ou URL de banco é incluído nesses eventos. A telemetria usa somente contadores e estado operacional já derivados pelo processo.
+
+### Evidência
+
+- Branch: `audit/worker-readiness-observability-2026-10-05`.
+- Commit: `d556979e6225c0b8a60ba6efdb2287e2c5fa7386`.
+- A mudança ainda requer promoção e observação em Railway Production para E4.
+
+### Classificação
+
+**WORK-03 — CORRIGIDO NO CÓDIGO / E4 PENDENTE.**
+
+A implementação elimina a ambiguidade anterior entre worker saudável sem trabalho e worker sem prontidão. O gate E4 permanece separado até que os novos eventos sejam observados em runtime.
