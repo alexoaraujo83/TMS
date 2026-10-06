@@ -275,6 +275,33 @@ This closes the backup execution/persistence gate but does **not** by itself clo
 - Global E2: **IN PROGRESS — NOT CLOSED**.
 
 
+## E2 update — authenticated production runtime and authorization reconciliation
+
+The versioned Auth0 production checklist contains controlled Production-session evidence showing:
+
+- `authenticated=true` with the Production Auth0 issuer;
+- audience includes `urn:tms:api:production`;
+- an Auth0 subject and concrete tenant ID are present;
+- tenant-A visibility succeeds;
+- synthetic tenant-B visibility is denied/hidden;
+- the tenant-isolation probe reports `rlsIsolation=true`;
+- raw token/cookie material was not retained.
+
+This is valid runtime evidence for the identity → tenant-context portion of the chain and strengthens the RLS boundary evidence. It does **not** close the complete DB-04 behavioral gate because the evidence bundle does not prove cross-tenant writes, missing-tenant-context denial, role-bypass resistance, or a recorded real `tms_app` session. It also does not by itself prove the live Auth0 Action/binding/Connection configuration; the read-only Production export/reconciliation remains an AUTH-01 requirement.
+
+Separately, the current production authorization diagnostic has a positive/negative pair: an operator session received HTTP 403 for the diagnostic permission while an authorized administrative session received HTTP 200 with the authenticated tenant context. **API-06 — E4 PASS.**
+
+### E2 gate status after reconciliation
+
+- Identity/authenticated Production runtime: **PARTIALLY VERIFIED / substantially evidenced**.
+- Tenant claim + TenantContext: **VERIFIED by controlled runtime evidence**.
+- API authorization diagnostic: **E4 PASS**.
+- Full behavioral RLS matrix: **OPEN**.
+- Live Auth0 configuration export/reconciliation: **OPEN**.
+- Current-artifact isolated restore + measured RPO/RTO: **OPEN**.
+- E2: **IN PROGRESS — NOT CLOSED**.
+
+
 # Final Definition of Done
 
 The project may only be marked **PRODUÇÃO CONCLUÍDA** after all mandatory gates are evidenced:
