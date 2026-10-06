@@ -239,6 +239,42 @@ E2 has produced material integration evidence, but it is not complete. The next 
 
 ---
 
+## E2 update — 2026-10-05 — real scheduled backup persistence proof
+
+A new real scheduled backup cycle ran in Railway Production; no manual backup, artificial manifest insertion, restore, or mutation was used to obtain this evidence.
+
+- Service: `tms-backup-worker`.
+- Real cycle: `backup_start=20261005T020011Z`.
+- `db_fingerprint=neondb|neondb_owner|127.0.0.1/32|5432|17.11`.
+- `INSERT 0 1` was emitted at 2026-10-05T02:00:51Z.
+- Post-insert verification emitted `manifest_persisted=true` and `manifest_persisted_count=1`.
+- `backup_id=20261005T020011Z`.
+- Object: `tms/postgres/20261005T020011Z/tms-20261005T020011Z.dump.enc`.
+- Artifact size: `193632` bytes.
+- SHA-256: `b5606d25af13f4636a4d6a0fb80e8256ddf3fa4962ac69b72e69ff8ad4287da2`.
+- `public_table_count=26` and `migration_count=41`.
+- `manifest_status=recorded`, `backup_status=verified`, `retention_status=verified`.
+- Retention reported `retention_deleted_objects=0`.
+
+### Result
+
+**BAK-01 / manifest persistence: E4 OPERATIONAL — PASS.** The previous discrepancy is no longer the active blocker: the already-deployed verification code has now produced positive evidence on a real scheduled cycle after PR #122.
+
+### Remaining DR limitation
+
+This closes the backup execution/persistence gate but does **not** by itself close DR-01. Current DoD still requires restoration of the current artifact in isolated infrastructure and measured RPO/RTO evidence.
+
+## E2 status reconciliation
+
+- Backup persistence: **VERIFIED operationally**.
+- Worker runtime/readiness: **VERIFIED operationally**.
+- API authorization diagnostic gate: **VERIFIED operationally**.
+- Auth0 full login → tenant claim → API JWT → TenantContext chain: **still open unless separately evidenced**.
+- Behavioral production RLS/cross-tenant matrix: **still open**.
+- Current-artifact isolated restore + measured RPO/RTO: **still open**.
+- Global E2: **IN PROGRESS — NOT CLOSED**.
+
+
 # Final Definition of Done
 
 The project may only be marked **PRODUÇÃO CONCLUÍDA** after all mandatory gates are evidenced:
