@@ -459,3 +459,62 @@ Proceed without restarting discovery:
 ## Naming decision
 
 The audit artifact is now named **TMS Master Audit** at `docs/audit/TMS-MASTER-AUDIT.md`. The old filename `NEW-TMS-MASTER-AUDIT.md` must no longer be used as the project identity.
+
+
+## Reconciliation — 2026-10-07 — functional Transportes regression + ENV/CI checkpoint
+
+The production functional regression for the Transportes/Fretes block was completed without infrastructure or database changes.
+
+### Frontend regression — freight lifecycle
+
+- Freight edit/save: **PASS**. The production PATCH path returned HTTP 200 for a real authenticated tenant-A freight after the frontend stopped sending the non-editable `status` field in the update payload.
+- Field persistence: **PASS**. The user-visible freight record reflected the edited quantity change from 100 to 10 while the other edited fields remained consistent.
+- Freight deletion: **PASS**. The user confirmed the production UI completed the deletion successfully.
+- Status transition/history: **PASS**. Production status history showed the event as `processado`, consistent with the completed worker/outbox path.
+- Bulk-delete implementation remains present in the canonical `main` frontend with per-request success handling and confirmation; no destructive bulk operation was executed as part of this checkpoint.
+
+### ENV-01 / ENV-02 — current production state
+
+- Vercel production environment inventories for `tms-web` and `tms-core-api` were inspected read-only.
+- Production Auth0 configuration variables are present on the web project, including issuer/domain, client ID/secret, audience and JWKS configuration; secrets were not decrypted for the audit record.
+- API production has a dedicated `DATABASE_URL` marked as the `tms_app` credential and production Auth0 audience/issuer/JWKS/CORS configuration.
+- Railway Production currently reports `tms-worker` **Online**, `tms-backup-worker` **Ready**, zero active issues, zero recent failures in the inspected 24-hour window, and no pending work.
+- This checkpoint verifies current operational health and variable presence, but **does not yet constitute full ENV parity closure** across every Vercel/Railway/Neon variable value.
+
+### CI-02 — current main status
+
+Commit `75b5e04c3f770b33d69f41933eb923ba8a78f435` (freight edit/save fix) has a successful combined status with the following required production-related checks:
+
+- Vercel — `tms-core-api`: **success**
+- Vercel — `tms-web`: **success**
+- Railway — `tms-worker`: **success**
+- Railway — `tms-backup-worker`: **success**
+
+This is positive current CI/deployment evidence, but repository branch-protection/ruleset enforcement was not independently exposed by the connected GitHub tool surface; therefore CI-02 is **verified operationally, not formally closed for protection-policy completeness**.
+
+### AUTH-01 — live Auth0 configuration
+
+The canonical repository contains a production read-only Auth0 reconciliation workflow that inspects the `TMS Web` application, Production connections, Post-Login Actions, active trigger bindings and recent failed Auth0 events without modifying resources.
+
+A fresh live Auth0 export could not be executed from the current connected tool surface because no Auth0 management connector/dispatch capability is exposed in this session. Therefore **AUTH-01 remains OPEN / P0**. Existing controlled runtime evidence still confirms the Production issuer, `urn:tms:api:production` audience and concrete tenant claim, but it does not replace the required live configuration/binding export.
+
+## Updated gate matrix — 2026-10-07
+
+| Gate | State | Evidence |
+|---|---|---|
+| Transportes edit/save | **CLOSED / PASS** | Production HTTP 200 + field-level persistence |
+| Transportes delete | **PASS** | User-confirmed successful production deletion |
+| DB-04 / RLS | **CLOSED / PASS** | Restricted `tms_app` behavioral matrix |
+| WORKER / OUTBOX | **CLOSED / PASS** | Production event → outbox → durable job → worker |
+| REPLAY | **CLOSED / PASS** | 3 replay requests → 3 completed replay jobs; no duplicate business audit |
+| BAK-01 | **CLOSED / PASS** | Real scheduled manifests persisted in Production Neon |
+| DR RESTORE | **CLOSED / PASS** | Current artifact restored and verified in isolated target |
+| API-06 | **CLOSED / PASS** | Authorized 200 / unauthorized 403 diagnostic pair |
+| CI-02 | **OPERATIONAL / PENDING POLICY CLOSURE** | Current main commit has all four deployment-related checks successful |
+| ENV-01 / ENV-02 | **OPERATIONAL / PENDING PARITY CLOSURE** | Vercel env inventory + Railway production health verified |
+| AUTH-01 | **OPEN / P0** | Live Auth0 export/binding reconciliation still unavailable in current tool surface |
+| FINAL-01 | **OPEN** | Cannot close while AUTH-01 and formal ENV/CI policy gates remain unresolved |
+
+### Next action
+
+Continue directly with the remaining production-control gates; do not restart discovery and do not alter the already-passed DB/RLS, worker/outbox, replay, backup/restore or freight CRUD paths.
