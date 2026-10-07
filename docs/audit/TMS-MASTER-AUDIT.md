@@ -576,3 +576,21 @@ No Auth0 management connector or workflow-dispatch capability is exposed by the 
 ### Next action
 
 Continue with the remaining production-control gates only. Do not repeat already-passed probes, do not run additional replay tests, and do not modify production RLS/schema/data.
+
+
+## Reconciliation — 2026-10-07 — evidence documents synchronized
+
+The current audit-control documents were synchronized on `main` after cross-reading the detailed Auth0 checklist, audit tracker and historical release manifest.
+
+- Current `main` HEAD after the documentation reconciliation: `436bcc5ff613aa4ae6f44b5a2e6968a60597d426`.
+- `docs/audit/AUDIT-TRACKER.md` is the current operational finding ledger.
+- `docs/releases/RELEASE-CONTROL-2026-10-07.md` is the current release-control snapshot; it deliberately does not overwrite the historical 2026-10-05 manifest.
+- `docs/releases/RELEASE-MANIFEST-2026-10-05.md` remains historical and its superseded classifications must not be used as current gate state.
+- **AUTH-01 is explicitly OPEN / P0**: runtime issuer/audience/tenant claim evidence is valid, but live Auth0 Action/binding/Connection/export reconciliation remains unproven.
+- **DB-04, Worker/Outbox, Replay, BAK-01, DR Restore and API-06 remain CLOSED/PASS** according to the latest documented production evidence.
+- **ENV-01/ENV-02 and CI-02 remain operational but formally pending closure**; FINAL-01 remains OPEN.
+- No production data, RLS policy, role, grant, backup schedule or restore target was changed by this documentation reconciliation.
+
+### Current E2 decision
+
+**E2 remains IN PROGRESS — NOT CLOSED.** No gate is promoted from structural evidence to final production completion merely because a historical document classified it as PASS.
