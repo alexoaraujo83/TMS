@@ -518,3 +518,61 @@ A fresh live Auth0 export could not be executed from the current connected tool 
 ### Next action
 
 Continue directly with the remaining production-control gates; do not restart discovery and do not alter the already-passed DB/RLS, worker/outbox, replay, backup/restore or freight CRUD paths.
+
+## Reconciliation — 2026-10-07 — production-control continuation
+
+This checkpoint continued from the canonical `main` state without restarting discovery and without changing application data, RLS, worker/outbox, replay, backup/restore or freight CRUD behavior.
+
+### CI-02 — latest main status
+
+Commit `a7290aabbe34c47932fc90ae582130fea6f74c23` currently reports four successful production-related checks:
+
+- Vercel — `tms-web`: **success**
+- Vercel — `tms-core-api`: **success**
+- Railway — `tms-worker`: **success**
+- Railway — `tms-backup-worker`: **success**
+
+A read-only GitHub ruleset query returned an empty ruleset collection. A direct branch-protection read is not permitted by the connected GitHub integration (HTTP 403), so this is not sufficient to prove that `main` has the desired branch-protection policy. **CI-02 remains OPERATIONAL / PENDING POLICY CLOSURE.**
+
+### Production runtime health
+
+Read-only Vercel runtime-error aggregation for the last 24 hours returned **no runtime errors** for either `tms-web` or `tms-core-api`.
+
+Railway Production currently reports:
+
+- `tms-worker`: latest deployment **SUCCESS**, service healthy, no pending work.
+- `tms-backup-worker`: latest deployment **SUCCESS**, cron `0 2 * * *`, no pending work.
+
+The latest combined status and Railway state provide current deployment-health evidence; they do not replace the remaining formal Auth0 configuration or CI policy evidence.
+
+### ENV-01 / ENV-02 — read-only inventory continuation
+
+Vercel Production environment inventories were re-read for both `tms-web` and `tms-core-api` with secret decryption disabled. Required Auth0/runtime configuration keys and the production `DATABASE_URL` entries remain present according to the inventory; secret values were not retained in the audit evidence.
+
+This confirms current variable presence but still does not prove complete value parity across Vercel, Railway and Neon. **ENV-01 / ENV-02 remain OPERATIONAL / PENDING PARITY CLOSURE.**
+
+### AUTH-01
+
+No Auth0 management connector or workflow-dispatch capability is exposed by the current connected tool surface. Therefore the production read-only Auth0 export/binding reconciliation still cannot be executed from this session. Existing runtime issuer/audience/tenant-context evidence remains valid, but **AUTH-01 remains OPEN / P0**.
+
+### Current gate matrix
+
+| Gate | State |
+|---|---|
+| Transportes edit/save | **CLOSED / PASS** |
+| Transportes delete | **PASS** |
+| DB-04 / RLS | **CLOSED / PASS** |
+| WORKER / OUTBOX | **CLOSED / PASS** |
+| REPLAY | **CLOSED / PASS** |
+| BAK-01 | **CLOSED / PASS** |
+| DR RESTORE | **CLOSED / PASS** |
+| API-06 | **CLOSED / PASS** |
+| Production runtime health | **PASS** |
+| CI-02 | **OPERATIONAL / PENDING POLICY CLOSURE** |
+| ENV-01 / ENV-02 | **OPERATIONAL / PENDING PARITY CLOSURE** |
+| AUTH-01 | **OPEN / P0** |
+| FINAL-01 | **OPEN** |
+
+### Next action
+
+Continue with the remaining production-control gates only. Do not repeat already-passed probes, do not run additional replay tests, and do not modify production RLS/schema/data.
