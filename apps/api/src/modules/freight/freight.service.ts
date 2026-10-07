@@ -112,11 +112,12 @@ export class FreightService {
              where a.tenant_id = e.tenant_id
                and a.action = 'durable_job.replay_requested'
                and a.metadata->>'event_id' = e.id::text) as "replayRequested",
-           (select count(*)::int from audit_events a
-             where a.tenant_id = e.tenant_id
-               and a.action = 'freight.status_changed.processed'
-               and a.metadata->>'event_id' = e.id::text
-               and a.metadata->>'idempotent_replay' = 'true') as "replayProcessed"
+           (select count(*)::int from durable_jobs j
+             where j.tenant_id = e.tenant_id
+               and j.job_type = 'freight.status_changed'
+               and j.status = 'completed'
+               and j.idempotency_key like 'replay:' || e.id::text || ':%'
+               and j.payload->>'event_id' = e.id::text) as "replayProcessed"
          from outbox_events e
          where e.tenant_id = $1
            and e.aggregate_type = 'freight'
