@@ -1,7 +1,7 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-10-05 00:00 -03:00
+> **Última atualização:** 2026-10-06 18:00 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
 > **HEAD de main verificado nesta atualização:** `e7e35824eae7fdb6fd3d68898f861f37fcac922b`
@@ -40,7 +40,7 @@ A regra de evidência é:
 | DB-01 | Head de migração Neon | Evidência live reconciliada: `schema_migrations` com 41 registros; `0036_auth0_identity_bootstrap` único; legado `0036_project_control_center` ausente; `0040_project_control_center_reconciliation` e `0041_schema_migrations_version_integrity` presentes; PK de `schema_migrations` presente; versões duplicadas = 0 | **E4 OPERACIONAL — PASS** | Preservar consulta read-only e checksums de referência; não executar migration corretiva. | Banco live comprova head/integridade da história e ausência de colisão de versões | P0 |
 | DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
 | DB-03 | Papel de banco em runtime | API e worker possuem guard de runtime; produção agora registra o worker como `tms_app` no startup, com operação do outbox/durable jobs no mesmo deployment | COMPROVADO | Preservar evidência e manter separação entre runtime e credenciais administrativas | Worker em produção confirma papel aprovado e least privilege | P1 |
-| DB-04 | RLS comportamental | Sessão real `tms_app` em produção comprovou `rolbypassrls=false`, own-tenant select e bloqueio cross-tenant em SELECT/INSERT/UPDATE, com rollback guard e sem escrita persistente | **E4 OPERACIONAL — PASS** | Preservar o artefato read-only e não repetir mutações sem necessidade operacional. | Sessão real comprova identidade, isolamento e rejeição cross-tenant sem persistência | P0 |
+| DB-04 | RLS comportamental | Harness CI com papel não-bypass `tms_app` cobre SELECT/INSERT/UPDATE/DELETE e isolamento de contexto; API Production `/ready` também comprovou `current_user=tms_app`. A evidência Production completa ainda não demonstra, na mesma sessão, `rolbypassrls=false` + matriz cross-tenant + rollback/no-persistence. | **BLOQUEADO / E4 PENDENTE** | Executar a matriz completa com sessão Production restrita `tms_app`, sem substituir por `neondb_owner`. | Evidência única e reproduzível de identidade do papel, own-tenant, cross-tenant read/write denial, rollback/no-persistence e ausência de bypass | P0 |
 | AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; evidência real de produção confirmou issuer, audience, subject, tenant_id e aceitação pelo caminho autenticado; API exige o claim e membership | **E4 OPERACIONAL — PASS** | Preservar regressão do fluxo Auth0 → Web → API → TenantContext → DB/RLS | Emitir novo token real e rastrear Auth0 → Web → API → DB | Token real com claim de tenant é aceito e operação tenant-scoped funciona; tenant incorreto é negado | P0 |
 | AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
 | API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e a matriz runtime cobre todas as rotas protegidas, permissões positivas/negativas, wildcard, bearer ausente, tenant mismatch e membership inativa | **CI/RUNTIME MATRIX — PASS** | Preservar a matriz e repetir após mudanças de autorização | Todas as rotas inventariadas permanecem protegidas e a matriz passa no CI | P1 |
@@ -53,7 +53,7 @@ A regra de evidência é:
 | WORK-02 | Contrato de negócio do worker | Caminho fonte-controlado confirmado em produção: `freight.status_changed → outbox_events → durable_jobs → freight-status-changed.handler.ts → audit/telemetry`; evento real e replay já percorreram o worker em Railway | **E4 OPERACIONAL — PASS** | Preservar a cadeia observada e manter regressão; não repetir replay sem necessidade | Evento real publicado, durable job concluído, handler/audit/telemetry correlacionados por `event_id` e job; replay posterior registra `idempotent_replay=true` sem novo audit de processamento | P1 |
 | WORK-03 | Prontidão operacional | Railway Production confirmou `worker.ready` após validação de `tms_app`/tenants e múltiplos `worker.cycle.completed` com `readiness=healthy`, `failed=0`; deployment `54d90a24...` SUCCESS | **E4 OPERACIONAL — PASS** | Preservar os eventos como evidência de readiness/ciclo; repetir somente após mudanças funcionais relevantes | Runtime real demonstra prontidão, ciclos contínuos e ausência de falhas no período observado | P1 |
 | WORK-04 | Idempotência Durable Jobs | TMS usa chave determinística do evento no fluxo normal; handler tem proteção de replay; deduplicação atômica no destino externo continua dependência externa | PARCIAL / CORRETO | Preservar chave e obter prova do destino quando integrações externas forem ativadas | Destino comprova deduplicação atômica pela mesma chave | P1 |
-| BAK-01 | Execução de backup | Execução real em Railway Production em 2026-10-05T02:00:11Z produziu tms/postgres/20261005T020011Z/tms-20261005T020011Z.dump.enc, 193632 bytes, SHA-256 b5606d25af13f4636a4d6a0fb80e8256ddf3fa4962ac69b72e69ff8ad4287da2; manifesto persistido e backup_status=verified, retention_status=verified, retention_days=14, migration_count=41 | E4 OPERACIONAL — PASS | Preservar a evidência do objeto/checksum e repetir apenas conforme ciclo de backup ou mudança do mecanismo | Artefato real + checksum + manifesto + retenção comprovados no runtime | P1 |
+| BAK-01 | Execução de backup | Ciclos reais 2026-10-03, 10-04, 10-05 e 10-06 produziram artefatos verificados; a Neon Production agora contém 3 manifests persistidos, incluindo `20261006T020058Z`, com 26 tabelas, 41 migrations, integridade/retenção verificadas. Railway do ciclo 10-06 confirmou `manifest_persisted=true` e `INSERT 0 1`. | **E4 OPERACIONAL — PASS** | Preservar artefato/checksum/manifesto e usar somente os ciclos normais para nova evidência. | Artefato real + checksum + manifesto + retenção, com corroboracão direta na tabela Production | P1 |
 | DR-01 | Restore independente | Existe prova histórica de restore isolado Neon com finalize=false e validação read-only, mas ela cobre um recovery point antigo (28 migrations / 21 tables) e não o backup criptografado atual de 2026-10-05 | **PARCIAL / E4 ATUAL PENDENTE** | Executar restore do artefato atual em infraestrutura isolada, validar schema/dados e registrar RPO/RTO | Restore real do backup atual, validação read-only e RPO/RTO observados | P1 |
 | ENV-01 | Paridade de ambientes | Evidência histórica mostra development/staging atrás de produção e sem `schema_migrations` canônico | BLOQUEADO | Definir ownership/uso e então migrar ou aposentar de modo não destrutivo | Matriz aprovada + evidência de schema/version | P1 |
 | ENV-02 | Contrato de variáveis | Há consumidores conhecidos, mas ainda existem variáveis diretas e históricas sem reconciliação completa | PARCIAL | Classificar cada variável como obrigatória, opcional, legada, documental ou indireta | Contrato completo por ambiente, sem segredos | P1 |
@@ -1274,6 +1274,41 @@ Esta prova confirma a execução e a integridade declarada/verificada pelo próp
 A evidência histórica prova o mecanismo, mas o DoD atual exige restauração do artefato corrente e medição de RPO/RTO. O gate permanece aberto até essa prova ser executada.
 
 
+## 90. FASE 2 — 2026-10-06 — reconciliação de BAK-01 e DB-04
+
+### BAK-01 — corroboracão direta do manifesto em Production
+
+Uma consulta read-only à Neon Production confirmou que `public.backup_manifests` contém **3 linhas**. A mais recente corresponde ao cron real de 2026-10-06:
+
+- `backup_id=20261006T020058Z`;
+- `object_path=tms/postgres/20261006T020058Z/tms-20261006T020058Z.dump.enc`;
+- `bytes=193632`;
+- `public_table_count=26`;
+- `migration_count=41`;
+- `integrity_status=verified`;
+- `retention_status=verified`;
+- `manifest_version=1`;
+- `recorded_at=2026-10-06T02:01:41.551Z`.
+
+O Railway Production do mesmo ciclo registrou `INSERT 0 1`, `manifest_persisted=true`, `manifest_persisted_count=1`, `manifest_status=recorded`, `backup_status=verified` e `retention_status=verified`.
+
+**BAK-01 permanece E4 OPERACIONAL — PASS, agora com corroboracão independente na tabela de Production.**
+
+### RPO observado
+
+Os inícios dos quatro últimos ciclos reais foram 02:03:53Z (03/10), 02:03:53Z (04/10), 02:00:11Z (05/10) e 02:00:58Z (06/10). O maior intervalo observado foi aproximadamente **24h00m47s**. Isto é envelope operacional observado, não compromisso formal de negócio. O RTO permanece pendente do restore atual.
+
+### DB-04 — correção documental
+
+O `AUDIT-TRACKER.md` continha uma classificação histórica de DB-04 como PASS que não era sustentada pelo checklist de produção posterior. A classificação corrente foi corrigida para **BLOQUEADO / E4 PENDENTE**.
+
+A evidência existente é forte em E2/E3: harness real com `tms_app` não-bypass no CI, `/ready` comprovando `current_user=tms_app` na API Production e probe autenticado de SELECT tenant-scoped. Isso, porém, não equivale à matriz Production completa exigida para DB-04.
+
+Critério de fechamento preservado: sessão Production restrita demonstrando `current_user=tms_app`, `rolbypassrls=false`, own-tenant visibility, cross-tenant SELECT/INSERT/UPDATE/DELETE denial, rollback/no-persistence e isolamento de contexto.
+
+### Regra de segurança
+
+Nenhuma migration, RLS policy, grant, role, credential, Auth0 configuration, backup manual ou manifesto artificial foi criado/modificado nesta reconciliação.
 ## 89. FASE 2 — 2026-10-05 — API-06: prova E4 operacional dos diagnósticos
 
 ### Evidência runtime
