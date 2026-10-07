@@ -302,6 +302,83 @@ Separately, the current production authorization diagnostic has a positive/negat
 - E2: **IN PROGRESS — NOT CLOSED**.
 
 
+## E2 update — 2026-10-06 — direct Neon corroboration of real backup manifest persistence
+
+A read-only query against the audited Production Neon database now independently corroborates the real scheduled backup persistence.
+
+- `public.backup_manifests` currently contains **3 rows**.
+- Latest row: `backup_id=20261006T020058Z`.
+- Latest `object_path`: `tms/postgres/20261006T020058Z/tms-20261006T020058Z.dump.enc`.
+- Latest artifact size: `193632` bytes.
+- Latest SHA-256: `c42b510533d85cdf96c83800e22f151befdcf7b9daf557ee0a34dac1fa5f6e82`.
+- Latest row reports `public_table_count=26`, `migration_count=41`, `integrity_status=verified`, `retention_status=verified`, `manifest_version=1`.
+- Latest manifest `created_at=2026-10-06T02:00:58Z` and `recorded_at=2026-10-06T02:01:41.551Z`.
+- The two preceding persisted manifests are the real scheduled cycles `20261004T020353Z` and `20261003T020353Z`.
+- Railway Production logs for the 2026-10-06 cycle independently show `INSERT 0 1`, `manifest_persisted=true`, `manifest_persisted_count=1`, `manifest_status=recorded`, `backup_status=verified` and `retention_status=verified`.
+- No manual backup, artificial manifest insertion, restore, or production mutation was used.
+
+### Result
+
+**BAK-01 / manifest persistence: E4 CONFIRMED — PASS.** This is stronger than worker-log-only evidence because the same real scheduled backup is now visible as a persisted row in the Production `backup_manifests` table.
+
+### RPO observation
+
+The observed real scheduled cycles were:
+
+| Cycle | Backup start |
+|---|---|
+| 2026-10-03 | 02:03:53Z |
+| 2026-10-04 | 02:03:53Z |
+| 2026-10-05 | 02:00:11Z |
+| 2026-10-06 | 02:00:58Z |
+
+Observed inter-backup gaps are approximately **24:00:00**, **23:56:18**, and **24:00:47**. Therefore the current scheduled-backup cadence demonstrates an observed worst-case interval of approximately **24h00m47s**. At the audit observation time (2026-10-06 21:05 local / 2026-10-07 00:05Z), the latest successful backup was approximately **19h04m** old.
+
+This is an observed operational RPO envelope, not yet a formal business RPO commitment. Formal DR-01 still requires isolated restoration of the current artifact and measured restore/RTO timing.
+
+## E2 update — 2026-10-06 — DB-04 execution boundary revalidated
+
+The repository's DB-04 implementation was re-read at the audited production source revision.
+
+- `packages/database/test/rls-runtime.integration.test.ts` uses separate administrative and restricted runtime pools.
+- The runtime suite covers cross-tenant SELECT invisibility, cross-tenant INSERT rejection, tenant reassignment UPDATE rejection, cross-tenant DELETE invisibility, and pooled tenant-context non-leakage.
+- `docs/audit/DB-04-E4-RUNBOOK.md` additionally requires explicit Production-session evidence for `current_user=tms_app`, `rolbypassrls=false`, own-tenant visibility, cross-tenant read denial, cross-tenant write denial, rollback/no-persistence and post-rollback tenant-context clearing.
+- A fresh direct Neon read confirms the connector session remains `neondb_owner` with `rolbypassrls=true`. It therefore remains invalid as a DB-04 behavioral proof role.
+- The existing connected GitHub tool surface still provides workflow-run/job/artifact retrieval but no workflow-dispatch capability. No Production test credential was created, substituted, or exposed.
+- No RLS policy, grant, role, credential, AuthGuard or Production data was changed.
+
+### Result
+
+**DB-04: BLOCKED / E4 PENDING.** The implementation and CI regression path are strong, but the mandatory Production behavioral execution remains unproven. The correct closure path is still a controlled execution using the real restricted `tms_app` runtime connection, with safe evidence only.
+
+## E2 update — 2026-10-06 — current-artifact restore path reviewed
+
+The current restore control was revalidated.
+
+- `.github/workflows/restore-verify.yml` accepts a selected verified backup object only through `workflow_dispatch`.
+- The workflow uses the protected `restore-verification` environment.
+- `RESTORE_DATABASE_URL` is required to be an isolated recovery target; the workflow explicitly rejects targets that look like production/local.
+- `infra/backup/restore-verify.sh` downloads the encrypted artifact and manifest, verifies object identity, SHA-256, byte count and manifest metadata, decrypts the dump, restores it with PostgreSQL 17 `pg_restore`, then validates PostgreSQL major version, public table count and migration count.
+- The latest real artifact is now known precisely as `tms/postgres/20261006T020058Z/tms-20261006T020058Z.dump.enc`.
+- No restore was dispatched from this session because the connected GitHub tool surface has no workflow-dispatch operation; no production restore target was used.
+
+### Result
+
+**DR-01: OPEN / CONTROL PATH VERIFIED.** The isolated restore mechanism is well-defined and fail-closed, but current-artifact restore execution and measured RTO are still required before DR can be marked fully verified.
+
+## E2 gate status after 2026-10-06 reconciliation
+
+- Backup manifest persistence: **E4 CONFIRMED — PASS**, independently corroborated in Production Neon.
+- Worker runtime/readiness: **E4 PASS**.
+- API authorization diagnostic: **E4 PASS**.
+- Authenticated Production identity / tenant claim / TenantContext: **SUBSTANTIALLY VERIFIED**.
+- Full Production DB-04 behavioral RLS matrix: **BLOCKED / PENDING**.
+- Live Auth0 Production export/reconciliation: **OPEN / P0**.
+- Current-artifact isolated restore + measured RTO: **OPEN**.
+- Formal DR/RPO closure: **OPEN**.
+- Broader production observability correlation: **PARTIALLY VERIFIED**.
+- **E2 remains IN PROGRESS — NOT CLOSED.**
+
 # Final Definition of Done
 
 The project may only be marked **PRODUÇÃO CONCLUÍDA** after all mandatory gates are evidenced:
