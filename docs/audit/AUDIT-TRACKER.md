@@ -1,7 +1,7 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-10-06 18:00 -03:00
+> **Última atualização:** 2026-10-07 00:45 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
 > **HEAD de main verificado nesta atualização:** `e7e35824eae7fdb6fd3d68898f861f37fcac922b`
@@ -41,7 +41,7 @@ A regra de evidência é:
 | DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
 | DB-03 | Papel de banco em runtime | API e worker possuem guard de runtime; produção agora registra o worker como `tms_app` no startup, com operação do outbox/durable jobs no mesmo deployment | COMPROVADO | Preservar evidência e manter separação entre runtime e credenciais administrativas | Worker em produção confirma papel aprovado e least privilege | P1 |
 | DB-04 | RLS comportamental | Harness CI com papel não-bypass `tms_app` cobre SELECT/INSERT/UPDATE/DELETE e isolamento de contexto; API Production `/ready` também comprovou `current_user=tms_app`. A evidência Production completa ainda não demonstra, na mesma sessão, `rolbypassrls=false` + matriz cross-tenant + rollback/no-persistence. | **BLOQUEADO / E4 PENDENTE** | Executar a matriz completa com sessão Production restrita `tms_app`, sem substituir por `neondb_owner`. | Evidência única e reproduzível de identidade do papel, own-tenant, cross-tenant read/write denial, rollback/no-persistence e ausência de bypass | P0 |
-| AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; evidência real de produção confirmou issuer, audience, subject, tenant_id e aceitação pelo caminho autenticado; API exige o claim e membership | **E4 OPERACIONAL — PASS** | Preservar regressão do fluxo Auth0 → Web → API → TenantContext → DB/RLS | Emitir novo token real e rastrear Auth0 → Web → API → DB | Token real com claim de tenant é aceito e operação tenant-scoped funciona; tenant incorreto é negado | P0 |
+| AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; runtime de produção confirmou issuer, audience, subject e tenant_id; porém a configuração live da Action, binding do trigger, Connection e export read-only ainda não foram reconciliados de forma independente | **ABERTO / P0** | Obter export/configuração read-only de produção e reconciliar Action, versão/publicação, binding, Connection, TMS Web e app_metadata com o contrato versionado | Export live + diff contra `infra/auth0/tenant.yaml`/Action source + runtime real do claim | Configuração live comprovada e coincidente com o contrato, seguida de regressão autenticada | P0 |
 | AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
 | API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e a matriz runtime cobre todas as rotas protegidas, permissões positivas/negativas, wildcard, bearer ausente, tenant mismatch e membership inativa | **CI/RUNTIME MATRIX — PASS** | Preservar a matriz e repetir após mudanças de autorização | Todas as rotas inventariadas permanecem protegidas e a matriz passa no CI | P1 |
 | API-02 | Permissão de replay | Endpoint usa `freight:replay`; teste de autorização cobre a permissão dedicada e replay real em produção foi processado pelo worker com auditoria/telemetria | **E4 OPERACIONAL — PASS** | Preservar permissão dedicada, auditoria e regressão | Usuário autorizado executa replay; acesso sem permissão é negado; execução deixa trilha auditável | P1 |
@@ -68,6 +68,27 @@ A regra de evidência é:
 | CI-02 | Gates de promoção | Web/API/Worker podem ser promovidos separadamente | ABERTO | Definir gates explícitos por componente e release | Componente desatualizado/falho não é confundido com release completa | P1 |
 | SEC-03 | Replay sensível | Replay é mutação de produção que cria durable job e auditoria | PRECISA HARDENING | Permissão dedicada, motivo estruturado, rate/approval quando aplicável e auditoria | Replay controlado + testes negativos + trilha de auditoria | P1 |
 | FINAL-01 | DoD final | P0/P1 ainda têm evidência operacional aberta | BLOQUEADO | Fechar P0, depois P1, executar regressão e reconciliar documentação | Gates finais verdes ou aceitos formalmente com evidência | P0 |
+
+## Reconciliation — 2026-10-07 — evidências documentais consolidadas
+
+A leitura cruzada do **TMS Master Audit**, **AUTH0-PRODUCTION-CHECKLIST** e **RELEASE-MANIFEST-2026-10-05** foi reconciliada contra o estado atual de `main`.
+
+- O HEAD atual de `main` é `d37c90e84b952dcb9cfd4677fbbafa5542b35939`.
+- O **TMS Master Audit** registra como fechados: DB-04/RLS, Worker/Outbox, Replay, BAK-01, Restore/DR e API-06; estes estados são mantidos como evidência corrente e não são reabertos por documentação histórica.
+- **AUTH-01 permanece ABERTO/P0**. O runtime comprova issuer/audience/tenant claim, mas a checklist detalhada exige ainda prova independente da Action live, publicação/versão, binding, Connection, associação ao TMS Web e reconciliação com o contrato versionado. A ausência de capacidade de export/dispatch no conector atual impede declarar PASS.
+- O **RELEASE-MANIFEST-2026-10-05** é histórico e contém classificações superadas para AUTH-01, API-06, WORK-03, BAK-01 e DR-01. Ele não será tratado como fonte de estado atual; a fonte corrente é este tracker + TMS Master Audit.
+- O estado de **CI-02** permanece operacional, mas sem fechamento formal de política porque a consulta de rulesets retornou vazia e a leitura direta de branch protection não está disponível no conector.
+- **ENV-01/ENV-02** permanecem operacionais com presença de variáveis/saúde de runtime verificadas, porém sem paridade integral de valores documentada.
+- **FINAL-01 permanece ABERTO** enquanto AUTH-01 e os gates formais de ambiente/CI não forem encerrados.
+
+### Regra de evidência mantida
+
+Nenhum backup manual, manifesto artificial, restore em produção, alteração de RLS/grants/roles ou mutação de dados de produção foi usado para esta reconciliação.
+
+### Estado E2 após esta reconciliação
+
+**E2 — IN PROGRESS / NÃO FECHADO.** Os gates operacionais já comprovados permanecem fechados; o trabalho restante está concentrado em configuração live do Auth0, paridade de ambientes, política de promoção/branch protection e consolidação final do DoD.
+
 
 ## 4.0 FASE 2 — 2026-10-03 — WORK-02: prova E4 do worker em produção
 
