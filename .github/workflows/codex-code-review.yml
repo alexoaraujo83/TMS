@@ -1,0 +1,124 @@
+name: TMS — Codex Code Review via Vercel AI Gateway
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: "PR number to review manually"
+        required: true
+        type: string
+
+concurrency:
+  group: codex-review-${{ github.event.pull_request.number || inputs.pull_request_number }}
+  cancel-in-progress: true
+
+jobs:
+  codex-review:
+    name: Codex review
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      final_message: ${{ steps.run_codex.outputs.final-message }}
+
+    steps:
+      - name: Checkout PR merge ref
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.number && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Fetch PR base and head refs
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            "$PR_BASE_REF" \
+            "+refs/pull/$PR_NUMBER/head"
+
+      - name: Run Codex through Vercel AI Gateway
+        id: run_codex
+        uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1.13
+        with:
+          openai-api-key: ${{ secrets.AI_GATEWAY_API_KEY }}
+          responses-api-endpoint: https://ai-gateway.vercel.sh/v1/responses
+          model: openai/gpt-5.6-sol
+          effort: high
+          permission-profile: ":read-only"
+          prompt: |
+            You are the TMS repository's automated Code Review executor.
+
+            Review ONLY the changes introduced by this pull request.
+            Do not modify files, create commits, push branches, or access production systems.
+
+            Repository: ${{ github.repository }}
+            PR: #${{ github.event.pull_request.number }}
+            Title: ${{ github.event.pull_request.title }}
+
+            Base SHA: ${{ github.event.pull_request.base.sha }}
+            Head SHA: ${{ github.event.pull_request.head.sha }}
+
+            Review the diff with:
+              git diff --no-ext-diff --unified=80 ${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}
+
+            Prioritize:
+            1. correctness and regressions;
+            2. security, tenant isolation, Auth0/RLS boundaries;
+            3. API/web contract mismatches;
+            4. database, outbox, worker and idempotency behavior;
+            5. tests and missing failure-path coverage;
+            6. deployment/runtime configuration mistakes.
+
+            Do not report style-only issues unless they create a real defect or maintenance risk.
+
+            Output a concise review with:
+            - Findings ordered by severity: BLOCKER, HIGH, MEDIUM, LOW.
+            - File and line/range when identifiable.
+            - Why the finding is a problem.
+            - A concrete remediation.
+            - A final verdict: APPROVE, COMMENT, or REQUEST_CHANGES.
+
+  publish-review:
+    name: Publish Codex review
+    needs: codex-review
+    if: >-
+      ${{ always() &&
+          needs.codex-review.result == 'success' &&
+          needs.codex-review.outputs.final_message != '' &&
+          github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Post review as PR comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
+        with:
+          script: |
+            const body = [
+              "## Codex Code Review",
+              "",
+              "Automated review executed by GitHub Actions through Vercel AI Gateway.",
+              "",
+              process.env.CODEX_FINAL_MESSAGE
+            ].join("\\n");
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body
+            });
