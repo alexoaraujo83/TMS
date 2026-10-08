@@ -14,7 +14,7 @@
 | BAK-01 | **E4 CONFIRMED / PASS** | Real scheduled 2026-10-08 cycle persisted a verified manifest; artifact, checksum, integrity and retention corroborated directly in Production Neon. |
 | WORK-02 / WORK-03 | **E4 PASS** | Production worker/outbox flow and readiness evidence remain valid. |
 | API-06 | **E4 PASS** | Production authorization diagnostic negative/positive pair remains the current documented result. |
-| DB-04 | **BLOCKED / E4 PENDING** | Current tracker requires a fresh, explicit restricted `tms_app` behavioral matrix; do not rely on owner/bypass evidence. |
+| DB-04 | **E4 CONFIRMED / PASS** | Production restricted `tms_app` session: `rolbypassrls=false`, `rolsuper=false`; own-tenant SELECT visible; cross-tenant SELECT invisible; cross-tenant INSERT/UPDATE rejected with SQLSTATE 42501; savepoint rollback/no-persistence verified. |
 | AUTH-01 | **OPEN / P0** | Live Auth0 Action/version/binding/Connection/export reconciliation remains unproven. |
 | DR-01 | **OPEN / E4 PENDING** | Restore control path exists, but current tracker requires independently current restore/RTO evidence before closure. |
 | ENV-01 | **BLOCKED** | Full environment parity/ownership decision remains open. |
@@ -49,4 +49,33 @@ The 2026-10-08 backup was produced by the normal scheduled cron path; no manual 
 
 **E2 remains IN PROGRESS / NOT CLOSED.**
 
-No gate is promoted to final production completion from documentation alone. The next closure work remains AUTH-01, DB-04, DR-01, ENV-01/ENV-02 and CI-02, followed by FINAL-01 reconciliation.
+No gate is promoted to final production completion from documentation alone. The next closure work remains AUTH-01, DR-01, ENV-01/ENV-02 and CI-02, followed by FINAL-01 reconciliation. DB-04 is no longer a blocker.
+
+
+## 5. DB-04 — Production RLS closure
+
+The 2026-10-08 production runtime probe returned **6/6 checks PASS** in the restricted `tms_app` session.
+
+- Runtime role: `tms_app`.
+- Role security: `rolbypassrls=false`, `rolsuper=false`.
+- Own-tenant SELECT: visible.
+- Cross-tenant SELECT: invisible after switching tenant context.
+- Cross-tenant INSERT: rejected by PostgreSQL/RLS with SQLSTATE 42501.
+- Cross-tenant UPDATE / reassignment: rejected with SQLSTATE 42501.
+- Savepoint + rollback: all mutation probes reverted; no persistence.
+
+### Gate decision
+
+**DB-04 — E4 CONFIRMED / PASS / FECHADO.**
+
+No manual backup, artificial manifest, production restore, RLS change, grant change, role change or persistent production mutation was used for this evidence.
+
+## 6. Remaining gates
+
+- **AUTH-01:** OPEN / P0 — live Auth0 configuration/export reconciliation.
+- **DR-01:** OPEN / E4 PENDING — current-artifact restore and measured RTO evidence.
+- **ENV-01 / ENV-02:** operational evidence exists, formal parity closure pending.
+- **CI-02:** operational checks green, formal branch-protection/policy closure pending.
+- **FINAL-01:** OPEN until mandatory gates are closed or formally accepted with evidence.
+
+**E2 remains IN PROGRESS / NOT CLOSED.**
