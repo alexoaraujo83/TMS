@@ -1,7 +1,7 @@
 # TMS — Rastreador de Auditoria e Execução
 
 > **Status:** VIVO / lista de trabalho canônica  
-> **Última atualização:** 2026-10-07 00:45 -03:00
+> **Última atualização:** 2026-10-08 10:59 -03:00
 > **Repositório:** `alexoaraujo83/TMS`  
 > **Branch:** `main`  
 > **HEAD de main verificado nesta atualização:** `e7e35824eae7fdb6fd3d68898f861f37fcac922b`
@@ -40,7 +40,7 @@ A regra de evidência é:
 | DB-01 | Head de migração Neon | Evidência live reconciliada: `schema_migrations` com 41 registros; `0036_auth0_identity_bootstrap` único; legado `0036_project_control_center` ausente; `0040_project_control_center_reconciliation` e `0041_schema_migrations_version_integrity` presentes; PK de `schema_migrations` presente; versões duplicadas = 0 | **E4 OPERACIONAL — PASS** | Preservar consulta read-only e checksums de referência; não executar migration corretiva. | Banco live comprova head/integridade da história e ausência de colisão de versões | P0 |
 | DB-02 | Pipeline de migração | Workflow de produção define sempre `TMS_ALLOW_EXISTING_SCHEMA_BASELINE=true` | REVISÃO | Restringir baseline a bootstrap explícito ou provar formalmente por que o modo permanente é seguro | Caminho normal de produção não transforma silenciosamente schema vazio em baseline canônico | P1 |
 | DB-03 | Papel de banco em runtime | API e worker possuem guard de runtime; produção agora registra o worker como `tms_app` no startup, com operação do outbox/durable jobs no mesmo deployment | COMPROVADO | Preservar evidência e manter separação entre runtime e credenciais administrativas | Worker em produção confirma papel aprovado e least privilege | P1 |
-| DB-04 | RLS comportamental | Harness CI com papel não-bypass `tms_app` cobre SELECT/INSERT/UPDATE/DELETE e isolamento de contexto; API Production `/ready` também comprovou `current_user=tms_app`. A evidência Production completa ainda não demonstra, na mesma sessão, `rolbypassrls=false` + matriz cross-tenant + rollback/no-persistence. | **BLOQUEADO / E4 PENDENTE** | Executar a matriz completa com sessão Production restrita `tms_app`, sem substituir por `neondb_owner`. | Evidência única e reproduzível de identidade do papel, own-tenant, cross-tenant read/write denial, rollback/no-persistence e ausência de bypass | P0 |
+| DB-04 | RLS comportamental | Harness CI com papel não-bypass `tms_app` cobre SELECT/INSERT/UPDATE/DELETE e isolamento de contexto; API Production `/ready` também comprovou `current_user=tms_app`. A evidência Production completa foi obtida em sessão restrita `tms_app`: `rolbypassrls=false`, `rolsuper=false`, own-tenant SELECT, cross-tenant SELECT invisível, cross-tenant INSERT/UPDATE rejeitados com SQLSTATE 42501 e savepoint/rollback sem persistência. | **E4 OPERACIONAL — PASS / FECHADO** | Preservar a matriz comportamental como evidência de regressão; não usar `neondb_owner` para substituir a prova. | Evidência Production única e reproduzível de identidade do papel, own-tenant, cross-tenant read/write denial, rollback/no-persistence e ausência de bypass | P0 |
 | AUTH-01 | Claim tenant Auth0 | Action versionada define `https://tms-platform.io/claims/tenant_id`; runtime de produção confirmou issuer, audience, subject e tenant_id; porém a configuração live da Action, binding do trigger, Connection e export read-only ainda não foram reconciliados de forma independente | **ABERTO / P0** | Obter export/configuração read-only de produção e reconciliar Action, versão/publicação, binding, Connection, TMS Web e app_metadata com o contrato versionado | Export live + diff contra `infra/auth0/tenant.yaml`/Action source + runtime real do claim | Configuração live comprovada e coincidente com o contrato, seguida de regressão autenticada | P0 |
 | AUTH-02 | Paridade Auth0 | Contrato de variáveis existe; valores/configuração exatos do tenant Auth0 de produção não foram verificados independentemente | ABERTO | Reconciliar domínio, aplicação, API, Action, audience, issuer e JWKS sem expor segredos | Fingerprint/configuração documentada + E2E real | P1 |
 | API-01 | Cobertura de rotas protegidas | Freight usa AuthGuard + PermissionGuard e a matriz runtime cobre todas as rotas protegidas, permissões positivas/negativas, wildcard, bearer ausente, tenant mismatch e membership inativa | **CI/RUNTIME MATRIX — PASS** | Preservar a matriz e repetir após mudanças de autorização | Todas as rotas inventariadas permanecem protegidas e a matriz passa no CI | P1 |
@@ -73,7 +73,7 @@ A regra de evidência é:
 
 A leitura cruzada do **TMS Master Audit**, **AUTH0-PRODUCTION-CHECKLIST** e **RELEASE-MANIFEST-2026-10-05** foi reconciliada contra o estado atual de `main`.
 
-- O HEAD atual de `main` é `d37c90e84b952dcb9cfd4677fbbafa5542b35939`.
+- O HEAD atual de `main` é o SHA corrente do branch `main` no momento desta reconciliação.
 - O **TMS Master Audit** registra como fechados: DB-04/RLS, Worker/Outbox, Replay, BAK-01, Restore/DR e API-06; estes estados são mantidos como evidência corrente e não são reabertos por documentação histórica.
 - **AUTH-01 permanece ABERTO/P0**. O runtime comprova issuer/audience/tenant claim, mas a checklist detalhada exige ainda prova independente da Action live, publicação/versão, binding, Connection, associação ao TMS Web e reconciliação com o contrato versionado. A ausência de capacidade de export/dispatch no conector atual impede declarar PASS.
 - O **RELEASE-MANIFEST-2026-10-05** é histórico e contém classificações superadas para AUTH-01, API-06, WORK-03, BAK-01 e DR-01. Ele não será tratado como fonte de estado atual; a fonte corrente é este tracker + TMS Master Audit.
@@ -1366,3 +1366,29 @@ This reconciliation supersedes the older BAK-01 wording in this tracker where it
 The historical `RELEASE-MANIFEST-2026-10-05.md` and the older `RELEASE-CONTROL-2026-10-07.md` must not be interpreted as the latest BAK-01 state. A new 2026-10-08 release-control snapshot is the current temporal record.
 
 **Global state remains E2 IN PROGRESS / NOT CLOSED.** AUTH-01, DB-04, DR-01, ENV-01/ENV-02 and CI-02 remain open/pending according to their current evidence requirements; no gate is closed merely by documentation reconciliation.
+
+
+## Reconciliation — 2026-10-08 — DB-04 / RLS behavioral production evidence
+
+A evidência Production fornecida neste checkpoint fecha o gate **DB-04** sem alterar schema, RLS, grants, roles ou dados.
+
+### Evidência observada
+
+- Sessão runtime efetiva com papel **`tms_app`**.
+- **`rolbypassrls=false`** e **`rolsuper=false`**.
+- SELECT do próprio tenant: **PASS**.
+- Troca para tenant sintético: SELECT do frete do tenant ativo torna-se invisível (**PASS**).
+- INSERT cross-tenant: rejeitado pelo PostgreSQL/RLS com **SQLSTATE 42501** (**PASS**).
+- UPDATE/reatribuição A→B: rejeitado pelo PostgreSQL/RLS com **SQLSTATE 42501** (**PASS**).
+- Cada mutação ficou atrás de savepoint e foi revertida; **nenhuma mutação persistiu** (**PASS**).
+- Resultado global: **6/6 checks aprovados**.
+
+### Decisão do gate
+
+**DB-04 — E4 OPERACIONAL / PASS / FECHADO.**
+
+Esta é a evidência comportamental de produção exigida pelo runbook: sessão restrita, ausência de bypass, isolamento de leitura, negação de escrita cross-tenant e rollback/no-persistence.
+
+### Estado E2 após esta reconciliação
+
+**E2 — IN PROGRESS / NÃO FECHADO.** DB-04 deixa de ser blocker. Permanecem como trabalho de fechamento: AUTH-01, DR-01, ENV-01/ENV-02, CI-02 e a consolidação FINAL-01.
