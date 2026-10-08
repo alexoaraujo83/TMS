@@ -614,3 +614,40 @@ The latest real scheduled backup cycle provides a newer operational checkpoint f
 This section is the current backup-persistence evidence and supersedes older dated statements that described BAK-01 as OPEN or stopped at the 2026-10-06 artifact. Historical release documents remain immutable temporal records.
 
 **E2 remains IN PROGRESS — NOT CLOSED.**
+
+
+# Reconciliation — 2026-10-08 — DB-04 Production RLS behavioral closure
+
+This section is the current temporal reconciliation for **DB-04** and supersedes any older section that still describes the Production behavioral matrix as blocked or pending. Historical sections remain immutable records of their checkpoint state.
+
+## Production evidence
+
+The restricted runtime session used the approved `tms_app` role and returned **6/6 checks PASS**:
+
+1. Runtime role confirmed as `tms_app`.
+2. `rolbypassrls=false` and `rolsuper=false` confirmed.
+3. Own-tenant SELECT returned the expected freight row.
+4. After switching tenant context to a synthetic tenant, the original freight became invisible.
+5. Cross-tenant INSERT and tenant-reassignment UPDATE were rejected by PostgreSQL/RLS with **SQLSTATE 42501**.
+6. Mutation probes were isolated behind savepoints and rolled back; no persistent mutation remained.
+
+## Gate decision
+
+**DB-04 — E4 OPERACIONAL / PASS / FECHADO.**
+
+This closes the required behavioral RLS proof with the restricted application role rather than an owner/bypass role. The evidence demonstrates both read isolation and write denial, plus rollback/no-persistence.
+
+No RLS policy, grant, role, schema, backup schedule or persistent production data was changed to obtain this evidence.
+
+## Current E2 impact
+
+DB-04 is removed from the active blocker set. **E2 remains IN PROGRESS / NOT CLOSED.**
+
+Remaining closure work is concentrated on:
+
+- **AUTH-01 — OPEN / P0:** live Auth0 configuration/export/binding reconciliation.
+- **DR-01 — OPEN / E4 pending:** independently current restore/RTO evidence.
+- **ENV-01 / ENV-02 — pending parity closure:** complete environment/configuration reconciliation.
+- **CI-02 — pending policy closure:** branch-protection/ruleset enforcement evidence.
+- **FINAL-01 — OPEN:** final DoD only after mandatory gates are reconciled.
+
