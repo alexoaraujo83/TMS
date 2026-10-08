@@ -13,7 +13,7 @@ jobs:
     name: Codex review
     if: >-
       ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -21,6 +21,17 @@ jobs:
       final_message: ${{ steps.run_codex.outputs.final-message }}
 
     steps:
+      - name: Install Codex sandbox prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes bubblewrap apparmor-profiles
+          if [ -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict ]; then
+            sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          fi
+          command -v bwrap
+          bwrap --version
+
       - name: Checkout PR merge ref
         uses: actions/checkout@v5
         with:
@@ -86,7 +97,7 @@ jobs:
     if: >-
       ${{ needs.codex-review.result == 'success' &&
           needs.codex-review.outputs.final_message != '' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       issues: write
       pull-requests: write
@@ -104,7 +115,7 @@ jobs:
               "Automated review executed by GitHub Actions through Vercel AI Gateway.",
               "",
               process.env.CODEX_FINAL_MESSAGE
-            ].join("\\n");
+            ].join("\n");
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
