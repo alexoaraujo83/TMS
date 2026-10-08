@@ -594,3 +594,23 @@ The current audit-control documents were synchronized on `main` after cross-read
 ### Current E2 decision
 
 **E2 remains IN PROGRESS — NOT CLOSED.** No gate is promoted from structural evidence to final production completion merely because a historical document classified it as PASS.
+
+# Reconciliation — 2026-10-08 — backup persistence
+
+The latest real scheduled backup cycle provides a newer operational checkpoint for BAK-01.
+
+- Cycle: **2026-10-08T02:04:19Z**.
+- Worker evidence: `INSERT 0 1`, `manifest_persisted=true`, `manifest_persisted_count=1`.
+- Artifact: `tms/postgres/20261008T020419Z/tms-20261008T020419Z.dump.enc`.
+- Size: **194,640 bytes**; SHA-256 **db44a1ee109789601f0959307363fddf5c3da79f18943d6fa98ae06e4b737f47**.
+- Validation: PostgreSQL 17.11, 26 public tables, 41 migrations, backup and retention verified.
+- Direct Production Neon evidence confirmed manifest version 1, creation/recording timestamps, integrity verification and retention verification.
+- This evidence came from the scheduled cron path only; no manual backup or artificial manifest was used.
+
+### Gate decision
+
+**BAK-01 — E4 CONFIRMED / PASS.**
+
+This section is the current backup-persistence evidence and supersedes older dated statements that described BAK-01 as OPEN or stopped at the 2026-10-06 artifact. Historical release documents remain immutable temporal records.
+
+**E2 remains IN PROGRESS — NOT CLOSED.**
