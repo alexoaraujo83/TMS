@@ -1347,3 +1347,22 @@ O finding deixa de depender apenas da migration, código e testes: o par negativ
 ### Limite
 
 Esta prova fecha somente API-06. Ela não fecha DR-01, ENV-01/ENV-02, CI-02 ou FINAL-01.
+
+## Reconciliation — 2026-10-08 — backup persistence evidence
+
+This reconciliation supersedes the older BAK-01 wording in this tracker where it referred only to the 2026-10-06 cycle.
+
+- Latest real scheduled backup cycle: **2026-10-08T02:04:19Z**.
+- Backup worker reported: `INSERT 0 1`, `manifest_persisted=true`, `manifest_persisted_count=1`.
+- Artifact: `tms/postgres/20261008T020419Z/tms-20261008T020419Z.dump.enc`.
+- Artifact size: **194,640 bytes**.
+- SHA-256: **db44a1ee109789601f0959307363fddf5c3da79f18943d6fa98ae06e4b737f47**.
+- Backup validation: PostgreSQL 17.11, 26 public tables, 41 migrations, `backup_status=verified`, `retention_status=verified`.
+- Direct Production Neon manifest query confirmed `manifest_version=1`, `created_at=2026-10-08T02:04:19Z`, `recorded_at=2026-10-08T02:05:10.321Z`, integrity verified and retention verified.
+- No manual backup and no artificial manifest insertion were used.
+
+**BAK-01 = E4 OPERACIONAL — PASS / CONFIRMADO.**
+
+The historical `RELEASE-MANIFEST-2026-10-05.md` and the older `RELEASE-CONTROL-2026-10-07.md` must not be interpreted as the latest BAK-01 state. A new 2026-10-08 release-control snapshot is the current temporal record.
+
+**Global state remains E2 IN PROGRESS / NOT CLOSED.** AUTH-01, DB-04, DR-01, ENV-01/ENV-02 and CI-02 remain open/pending according to their current evidence requirements; no gate is closed merely by documentation reconciliation.
