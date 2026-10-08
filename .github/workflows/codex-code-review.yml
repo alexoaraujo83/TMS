@@ -1,4 +1,4 @@
-name: TMS — Codex Code Review via Vercel AI Gateway
+name: TMS — Codex Code Review via OpenAI
 
 on:
   pull_request:
@@ -49,12 +49,12 @@ jobs:
             "$PR_BASE_REF" \
             "+refs/pull/$PR_NUMBER/head"
 
-      - name: Run Codex through Vercel AI Gateway
+      - name: Run Codex through OpenAI Responses API
         id: run_codex
         uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1.13
         with:
-          openai-api-key: ${{ secrets.AI_GATEWAY_API_KEY }}
-          responses-api-endpoint: https://ai-gateway.vercel.sh/v1/responses
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          responses-api-endpoint: https://api.openai.com/v1/responses
           model: openai/gpt-5.6-sol
           effort: high
           permission-profile: ":read-only"
@@ -112,7 +112,7 @@ jobs:
             const body = [
               "## Codex Code Review",
               "",
-              "Automated review executed by GitHub Actions through Vercel AI Gateway.",
+              "Automated review executed by GitHub Actions through the OpenAI Responses API.",
               "",
               process.env.CODEX_FINAL_MESSAGE
             ].join("\n");
