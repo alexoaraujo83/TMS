@@ -3,23 +3,16 @@ name: TMS — Codex Code Review via Vercel AI Gateway
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch:
-    inputs:
-      pull_request_number:
-        description: "PR number to review manually"
-        required: true
-        type: string
 
 concurrency:
-  group: codex-review-${{ github.event.pull_request.number || inputs.pull_request_number }}
+  group: codex-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   codex-review:
     name: Codex review
     if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||
-          github.event.pull_request.head.repo.full_name == github.repository }}
+      ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -31,12 +24,11 @@ jobs:
       - name: Checkout PR merge ref
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.number && format('refs/pull/{0}/merge', github.event.pull_request.number) || github.sha }}
+          ref: ${{ format('refs/pull/{0}/merge', github.event.pull_request.number) }}
           persist-credentials: false
           fetch-depth: 1
 
       - name: Fetch PR base and head refs
-        if: ${{ github.event_name == 'pull_request' }}
         env:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -92,17 +84,15 @@ jobs:
     name: Publish Codex review
     needs: codex-review
     if: >-
-      ${{ always() &&
-          needs.codex-review.result == 'success' &&
-          needs.codex-review.outputs.final_message != '' &&
-          github.event_name == 'pull_request' }}
+      ${{ needs.codex-review.result == 'success' &&
+          needs.codex-review.outputs.final_message != '' }}
     runs-on: ubuntu-latest
     permissions:
       issues: write
       pull-requests: write
 
     steps:
-      - name: Post review as PR comment
+      - name: Post Codex review as PR comment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
