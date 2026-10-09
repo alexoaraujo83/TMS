@@ -67,8 +67,15 @@ type Dashboard = {
 
 type User = { name?: string; email?: string };
 
-const statusLabel: Record<string, string> = {
+const moduleStatusLabel: Record<string, string> = {
   planned: "Planejado",
+  in_progress: "Em andamento",
+  blocked: "Bloqueado",
+  completed: "Concluído",
+};
+
+const stageStatusLabel: Record<string, string> = {
+  pending: "Pendente",
   in_progress: "Em andamento",
   blocked: "Bloqueado",
   completed: "Concluído",
@@ -190,7 +197,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
                 {data.modules.map((module) => (
                   <article className={`control-module-card status-${module.status}`} key={module.id}>
                     <div className="control-card-top">
-                      <span>{statusLabel[module.status]}</span>
+                      <span>{moduleStatusLabel[module.status]}</span>
                       <strong>{module.progressPercent}%</strong>
                     </div>
                     <h3>{module.name}</h3>
@@ -233,7 +240,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
                   <span>Status</span>
                   <select value={stageStatus} onChange={(event) => setStageStatus(event.target.value)}>
                     <option value="all">Todos os status</option>
-                    {Object.entries(statusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    {Object.entries(stageStatusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </label>
                 <span className="control-stage-count">{visibleStages.length} de {data.stages.length} etapas</span>
@@ -248,7 +255,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
                         <td><strong>{stage.name}</strong><small>{stage.stageKey}</small></td>
                         <td>{moduleName}</td>
                         <td><span className="control-phase-tag">{stage.phase}</span></td>
-                        <td><span className={`control-stage-status status-${stage.status}`}>{statusLabel[stage.status] ?? stage.status}</span></td>
+                        <td><span className={`control-stage-status status-${stage.status}`}>{stageStatusLabel[stage.status] ?? stage.status}</span></td>
                         <td>{stage.weight}</td>
                         <td>{stage.evidenceRequired ? <span className="control-evidence-required">Obrigatória</span> : "Opcional"}</td>
                       </tr>;
