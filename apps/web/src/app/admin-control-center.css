@@ -15,8 +15,7 @@
 
 .control-stage-toolbar {
   display: grid;
-  grid-template-columns:
-    minmax(180px, 3fr) minmax(160px, 2fr) minmax(150px, 1.6fr) auto;
+  grid-template-columns: 3fr 2fr 1.6fr auto;
   align-items: end;
   gap: 12px;
   margin: 20px 0 12px;
