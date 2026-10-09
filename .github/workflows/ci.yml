@@ -111,6 +111,16 @@ jobs:
           name: database-integration-test-result
           path: artifacts/database-integration-test.txt
           if-no-files-found: ignore
+      - name: Diagnose admin stylesheet formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec prettier apps/web/src/app/admin-control-center.css > /tmp/admin-control-center-pass1.css
+          pnpm exec prettier /tmp/admin-control-center-pass1.css > /tmp/admin-control-center-pass2.css
+          echo '--- committed CSS vs Prettier pass 1 ---'
+          diff -u apps/web/src/app/admin-control-center.css /tmp/admin-control-center-pass1.css || true
+          echo '--- Prettier pass 1 vs pass 2 ---'
+          diff -u /tmp/admin-control-center-pass1.css /tmp/admin-control-center-pass2.css || true
       - run: pnpm format:fix
       - run: pnpm format:check
       - run: pnpm lint
