@@ -651,3 +651,20 @@ Remaining closure work is concentrated on:
 - **CI-02 — pending policy closure:** branch-protection/ruleset enforcement evidence.
 - **FINAL-01 — OPEN:** final DoD only after mandatory gates are reconciled.
 
+
+
+# Reconciliation — 2026-10-09 — Auth0 live export partially closes configuration uncertainty
+
+The protected read-only Auth0 export workflow completed successfully:
+
+- Run: https://github.com/alexoaraujo83/TMS/actions/runs/37877327257
+- Source commit: `e005d46dba554dd41e94347107ba04425e7fbae1`.
+- Artifact: [`auth0-production-export-evidence`](https://github.com/alexoaraujo83/TMS/actions/runs/37877327257/artifacts/11593121216), SHA-256 `f21319c710e410c17be086dfc39754ced6ad5690e0e0e40386040ab405ec963c`, retention through 2026-10-16.
+- The comparator returned `status=match`, `deployed=true`, Action `TMS — Tenant Claim`, trigger `post-login v3`, and one matching binding; exported Action code matches the repository source.
+- The workflow confirms no Auth0 import/update/create/delete was performed.
+
+The export also identifies review items: inconsistent localhost vs loopback entries across TMS Web callbacks/origins/logout URLs; an API Explorer Management API grant with broad administrative scopes; and `is_token_endpoint_ip_header_trusted=true` on the TMS Web client. These are audit findings to validate against intended policy, not authorization to mutate live Auth0.
+
+**Gate status:** AUTH-01 remains **OPEN / P0** because the full closure criteria also require binding-order/Action metadata evidence, Connection enablement reconciliation, direct user tenant metadata and membership evidence, and the negative authorization/smoke-test suite. The successful comparator is a narrow Action contract PASS, not a full tenant-security PASS.
+
+**E2 remains IN PROGRESS / NOT CLOSED.** No Auth0 settings were changed by this run.
