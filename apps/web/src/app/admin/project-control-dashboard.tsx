@@ -142,14 +142,19 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
             <h1>TMS Project Control Center</h1>
             <p>Fonte única para progresso, etapas, evidências e impedimentos do projeto.</p>
           </div>
-          <button className="button button-ghost control-refresh" onClick={() => void load()} disabled={loading}>
-            {loading ? "Atualizando…" : "↻ Atualizar"}
-          </button>
+          <div className="control-header-actions">
+            {lastUpdated && <span className="control-updated" aria-live="polite">Atualizado às {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
+            <button className="button button-ghost control-refresh" onClick={() => void load()} disabled={loading} aria-label="Atualizar dados do painel">
+              {loading ? "Atualizando…" : "↻ Atualizar"}
+            </button>
+          </div>
         </header>
 
         {error && <div className="ops-alert" role="alert"><strong>Não foi possível atualizar o painel.</strong><span>{error}</span><button className="button button-ghost" onClick={() => void load()} disabled={loading}>Tentar novamente</button></div>}
 
-        {!data && loading && <div className="control-loading" role="status" aria-live="polite">Carregando dados do TMS…</div>}\n\n        {!data && !loading && !error && <div className="control-loading">Nenhum dado disponível. Atualize para tentar novamente.</div>}
+        {!data && loading && <div className="control-loading" role="status" aria-live="polite">Carregando dados do TMS…</div>}
+
+        {!data && !loading && !error && <div className="control-loading">Nenhum dado disponível. Atualize para tentar novamente.</div>}
 
         {data && (
           <>
