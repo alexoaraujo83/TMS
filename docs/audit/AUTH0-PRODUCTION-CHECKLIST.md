@@ -381,15 +381,45 @@ Next operational step:
 
 ## 14. Reconciliation — 2026-10-08 — DB-04 closure, AUTH-01 remains open
 
-The Production restricted-role evidence closed DB-04 with 6/6 checks PASS. This checklist now treats RLS behavioral isolation as closed and keeps the independent Auth0 live-configuration gate open.
+The Production restricted-role evidence closed DB-04 with 6/6 checks PASS. This checklist treats RLS behavioral isolation as closed and keeps the independent Auth0 live-configuration gate open.
 
-**AUTH-01 remains OPEN / P0** until the read-only Production Auth0 export and comparison are executed and reviewed. The versioned workflow `.github/workflows/auth0-production-deploy-export.yml` is intentionally read-only and must be manually dispatched from GitHub Actions using the protected `production-auth0-readonly` environment. The connected tool surface in this session does not expose a workflow-dispatch operation, so no run is claimed and no Auth0 configuration has been changed.
+The next read-only Auth0 export was completed on 2026-10-09; see Section 15 for run/artifact evidence and findings. AUTH-01 remains OPEN / P0 because full closure criteria are not yet met.
 
-Required next evidence from the run:
-- workflow run URL and conclusion;
-- artifact `auth0-production-export-evidence` from that run;
-- comparison result for live Post-Login Action source, trigger version and binding against the versioned contract;
-- live TMS Web application URI/connection evidence, if included in the export;
-- a short sanitized summary of any missing or divergent resources, with secrets excluded.
+If the workflow must be rerun, use the protected `production-auth0-readonly` environment. Do not enable Client Credentials on the TMS Web client, and do not run import/update/create/delete.
 
-If the workflow fails at Client Credentials authentication, follow `infra/auth0/DEPLOY-CLI-PRODUCTION.md` to verify the dedicated Deploy CLI M2M application, its grant type and Management API authorization. Do not enable Client Credentials on the TMS Web client, and do not run import/update/create/delete.
+
+## 15. Reconciliation — 2026-10-09 — live Auth0 export reviewed
+
+The protected read-only workflow completed successfully on `main` at source commit `e005d46dba554dd41e94347107ba04425e7fbae1`.
+
+- Run: https://github.com/alexoaraujo83/TMS/actions/runs/37877327257
+- Job: `Export Auth0 Production configuration (read-only)`, conclusion `success`.
+- Artifact: [`auth0-production-export-evidence`](https://github.com/alexoaraujo83/TMS/actions/runs/37877327257/artifacts/11593121216), ID `11593121216`, SHA-256 `f21319c710e410c17be086dfc39754ced6ad5690e0e0e40386040ab405ec963c`; expires 2026-10-16.
+- The export produced `tenant.yaml` and the live Action source file.
+- The comparison script returned `status=match`, Action `TMS — Tenant Claim`, `deployed=true`, trigger `post-login v3`, exactly one matching binding, and source code matching `infra/auth0/actions/post-login.js`.
+- The workflow's safety assertion confirms no Auth0 import, update, create or delete operation was executed.
+
+### Confirmed vs still pending
+
+- [x] Live Action name and deployed state confirmed by export/comparison.
+- [x] Live Action source matches the versioned source contract.
+- [x] Expected `post-login v3` trigger and exactly one matching binding confirmed.
+- [x] Read-only export artifact retained for review.
+- [~] Binding order, immutable Action ID, last-modified timestamp and full flow contents have not yet been separately recorded as closure evidence.
+- [~] TMS Web URI configuration was present in the export but requires reconciliation with the intended application contract.
+- [ ] Confirm exact live Production Connection enablement and intended signup/user store.
+- [ ] Verify controlled test user's `app_metadata.tenant_id`, local membership, and first-login bootstrap.
+- [ ] Complete negative tenant-authorization suite and endpoint-level Production smoke test.
+- [ ] Complete security review of exported Management API client grants and obsolete/local application URI entries.
+
+### Configuration review findings — do not mutate from this export alone
+
+1. Exported TMS Web callbacks include localhost, loopback and Production callback URLs, while its exported allowed origins/web origins and logout URLs do not mirror the localhost entries consistently. Reconcile against the current intended local-development and Production contract; remove/add URI entries only after confirming the deployment requirements.
+2. The export contains an API Explorer client grant to the Auth0 Management API with extensive administrative scopes, including client, connection, action, user and tenant-management operations. Confirm this grant is intentional, restricted to the appropriate operators, and not used by runtime application flows. Do not revoke or change it automatically from this audit.
+3. Exported Production TMS Web client has `is_token_endpoint_ip_header_trusted: true`; verify its purpose and necessity against the intended Auth0 security posture.
+
+The comparison result is a **narrow PASS for the Post-Login Action source/deployed state/trigger/binding count**, not a full Auth0 tenant security certification.
+
+### Gate decision
+
+**AUTH-01 remains OPEN / P0.** This run materially closes the source-to-live Action comparison subtask, but the checklist's full closure criteria are not yet all proven. Do not promote E2 or FINAL-01 based on this workflow alone.
