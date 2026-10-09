@@ -1392,3 +1392,23 @@ Esta é a evidência comportamental de produção exigida pelo runbook: sessão 
 ### Estado E2 após esta reconciliação
 
 **E2 — IN PROGRESS / NÃO FECHADO.** DB-04 deixa de ser blocker. Permanecem como trabalho de fechamento: AUTH-01, DR-01, ENV-01/ENV-02, CI-02 e a consolidação FINAL-01.
+
+
+## Reconciliation — 2026-10-09 — Auth0 read-only export evidence
+
+The protected Auth0 Production export workflow completed successfully on `main` at commit `e005d46dba554dd41e94347107ba04425e7fbae1`.
+
+- Run: https://github.com/alexoaraujo83/TMS/actions/runs/37877327257
+- Job `Export Auth0 Production configuration (read-only)`: completed / success.
+- Artifact: [`auth0-production-export-evidence`](https://github.com/alexoaraujo83/TMS/actions/runs/37877327257/artifacts/11593121216), artifact ID `11593121216`, 9,137 bytes, SHA-256 `f21319c710e410c17be086dfc39754ced6ad5690e0e0e40386040ab405ec963c`, expires 2026-10-16.
+- Live export and comparison output: `status=match`; Action `TMS — Tenant Claim`; `deployed=true`; trigger `post-login v3`; exactly one matching binding; live Action source equals `infra/auth0/actions/post-login.js`.
+- Workflow logs explicitly confirm that no Auth0 import, update, create or delete operation ran.
+
+### Findings requiring follow-up
+
+1. The exported TMS Web callback, allowed-origin/web-origin and logout URL sets are not fully aligned for localhost vs loopback entries. Reconcile against the intended application contract before changing any URI.
+2. The export contains an API Explorer → Auth0 Management API client grant with extensive administrative scopes. Confirm necessity, ownership, usage and least-privilege posture; do not revoke automatically.
+3. The exported TMS Web client has `is_token_endpoint_ip_header_trusted: true`; verify intended use and security rationale.
+4. The artifact/comparator confirms the Action source, deployment flag, trigger version and matching-binding count. Binding order, Action ID/last-modified metadata, complete Connection enablement, direct user metadata/membership evidence and the negative authorization suite still require explicit closure evidence.
+
+**AUTH-01 remains OPEN / P0**. This is a partial pass for live Action reconciliation, not full tenant security closure. **E2 remains IN PROGRESS / NOT CLOSED.** No Auth0 configuration was mutated by the run.
