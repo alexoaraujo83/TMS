@@ -97,6 +97,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
       const response = await fetch("/api/tms/project-control", { cache: "no-store" });
       const body = (await response.json()) as Dashboard & { error?: string };
       if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+      setError("");
       setData(body);
       setLastUpdated(new Date());
     } catch (err) {
