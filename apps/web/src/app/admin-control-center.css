@@ -28,7 +28,8 @@
   font-weight: 700;
   color: #5e6673;
 }
-.control-filter input, .control-filter select {
+.control-filter input,
+.control-filter select {
   width: 100%;
   min-width: 0;
   height: 38px;
@@ -40,7 +41,8 @@
   font: inherit;
   font-size: 11px;
 }
-.control-filter input:focus, .control-filter select:focus {
+.control-filter input:focus,
+.control-filter select:focus {
   outline: 2px solid #b9afff;
   outline-offset: 1px;
   border-color: #7b68e8;
