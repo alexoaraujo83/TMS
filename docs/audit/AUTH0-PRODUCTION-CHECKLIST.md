@@ -24,9 +24,9 @@
 - [x] Post-Login binding is versioned in `infra/auth0/tenant.yaml`.
 - [~] Production Action/binding has not yet been independently proven against live Auth0.
 - [~] Live Production token/runtime evidence now proves issuer, Production audience, subject and tenant claim for a controlled authenticated session.
-- [~] Behavioral RLS evidence now proves tenant-A visibility and synthetic tenant-B isolation for the supplied probe, but the complete DB-04 suite is not yet closed.
+- [x] DB-04 Production behavioral RLS gate closed on 2026-10-08: restricted `tms_app`, `rolbypassrls=false`, `rolsuper=false`, own-tenant SELECT visible, cross-tenant SELECT invisible, cross-tenant INSERT/UPDATE rejected with SQLSTATE 42501, savepoint rollback/no-persistence; 6/6 checks PASS.
 - [!] AUTH-01 E4 is still open.
-- [!] DB-04 behavioral RLS proof remains a production gate.
+- [x] DB-04 behavioral RLS proof is closed; it is not an AUTH-01 blocker.
 - [x] Neon Production project `tms / shiny-hall-34679912` and primary `main` branch were identified read-only.
 
 ## 1. Auth0 Production live configuration — READ ONLY FIRST
@@ -165,7 +165,7 @@
 - [ ] Prove role cannot bypass RLS.
 - [ ] Record only safe evidence.
 
-**Step result:** BLOCKER/P0 — the Production Neon project/primary branch is now identified and directly inspected read-only. The connector authenticated as `neondb_owner`, which bypasses RLS, and cannot `SET ROLE tms_app`; therefore this evidence cannot close DB-04. A real restricted `tms_app` runtime session is still required for the behavioral suite.
+**Step result:** CLOSED / E4 PASS (2026-10-08) — a separate restricted Production runtime probe has now completed the behavioral suite as `tms_app` with `rolbypassrls=false`, `rolsuper=false`, cross-tenant SELECT isolation, cross-tenant INSERT/UPDATE rejection (SQLSTATE 42501), and savepoint rollback/no-persistence. The `neondb_owner` connector inspection remains insufficient by itself, but is no longer needed to close this gate.
 
 ## 10. Production environment separation
 
@@ -377,3 +377,19 @@ Next operational step:
 1. Preserve this runtime evidence as safe audit evidence without storing tokens/cookies.
 2. Capture the remaining DB-04 behavioral tests, especially cross-tenant write, missing tenant context, and role-bypass resistance.
 3. In parallel, obtain the read-only Auth0 Production export to prove the live Action/binding/Connection configuration.
+
+
+## 14. Reconciliation — 2026-10-08 — DB-04 closure, AUTH-01 remains open
+
+The Production restricted-role evidence closed DB-04 with 6/6 checks PASS. This checklist now treats RLS behavioral isolation as closed and keeps the independent Auth0 live-configuration gate open.
+
+**AUTH-01 remains OPEN / P0** until the read-only Production Auth0 export and comparison are executed and reviewed. The versioned workflow `.github/workflows/auth0-production-deploy-export.yml` is intentionally read-only and must be manually dispatched from GitHub Actions using the protected `production-auth0-readonly` environment. The connected tool surface in this session does not expose a workflow-dispatch operation, so no run is claimed and no Auth0 configuration has been changed.
+
+Required next evidence from the run:
+- workflow run URL and conclusion;
+- artifact `auth0-production-export-evidence` from that run;
+- comparison result for live Post-Login Action source, trigger version and binding against the versioned contract;
+- live TMS Web application URI/connection evidence, if included in the export;
+- a short sanitized summary of any missing or divergent resources, with secrets excluded.
+
+If the workflow fails at Client Credentials authentication, follow `infra/auth0/DEPLOY-CLI-PRODUCTION.md` to verify the dedicated Deploy CLI M2M application, its grant type and Management API authorization. Do not enable Client Credentials on the TMS Web client, and do not run import/update/create/delete.
