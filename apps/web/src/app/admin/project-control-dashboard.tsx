@@ -67,8 +67,15 @@ type Dashboard = {
 
 type User = { name?: string; email?: string };
 
-const statusLabel: Record<string, string> = {
+const moduleStatusLabel: Record<string, string> = {
   planned: "Planejado",
+  in_progress: "Em andamento",
+  blocked: "Bloqueado",
+  completed: "Concluído",
+};
+
+const stageStatusLabel: Record<string, string> = {
+  pending: "Pendente",
   in_progress: "Em andamento",
   blocked: "Bloqueado",
   completed: "Concluído",
@@ -78,6 +85,10 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [stageQuery, setStageQuery] = useState("");
+  const [stageStatus, setStageStatus] = useState("all");
+  const [selectedModule, setSelectedModule] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,7 +97,9 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
       const response = await fetch("/api/tms/project-control", { cache: "no-store" });
       const body = (await response.json()) as Dashboard & { error?: string };
       if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+      setError("");
       setData(body);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível carregar o Control Center.");
     } finally {
@@ -99,6 +112,14 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
   }, [load]);
 
   const firstName = user.name?.split(" ")[0] ?? user.email?.split("@")[0] ?? "Admin";
+  const visibleStages = (data?.stages ?? []).filter((stage) => {
+    const query = stageQuery.trim().toLocaleLowerCase();
+    const moduleName = data?.modules.find((module) => module.id === stage.moduleId)?.name ?? "";
+    const matchesQuery = !query || `${stage.stageKey} ${stage.name} ${moduleName} ${stage.phase}`.toLocaleLowerCase().includes(query);
+    const matchesStatus = stageStatus === "all" || stage.status === stageStatus;
+    const matchesModule = selectedModule === "all" || stage.moduleId === selectedModule;
+    return matchesQuery && matchesStatus && matchesModule;
+  });
 
   return (
     <div className="control-shell">
@@ -129,14 +150,19 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
             <h1>TMS Project Control Center</h1>
             <p>Fonte única para progresso, etapas, evidências e impedimentos do projeto.</p>
           </div>
-          <button className="button button-ghost control-refresh" onClick={() => void load()} disabled={loading}>
-            {loading ? "Atualizando…" : "↻ Atualizar"}
-          </button>
+          <div className="control-header-actions">
+            {lastUpdated && <span className="control-updated" aria-live="polite">Atualizado às {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
+            <button className="button button-ghost control-refresh" onClick={() => void load()} disabled={loading} aria-label="Atualizar dados do painel">
+              {loading ? "Atualizando…" : "↻ Atualizar"}
+            </button>
+          </div>
         </header>
 
-        {error && <div className="ops-alert">{error}</div>}
+        {error && <div className="ops-alert" role="alert"><strong>Não foi possível atualizar o painel.</strong><span>{error}</span><button className="button button-ghost" onClick={() => void load()} disabled={loading}>Tentar novamente</button></div>}
 
-        {!data && loading && <div className="control-loading">Carregando dados do TMS…</div>}
+        {!data && loading && <div className="control-loading" role="status" aria-live="polite">Carregando dados do TMS…</div>}
+
+        {!data && !loading && !error && <div className="control-loading">Nenhum dado disponível. Atualize para tentar novamente.</div>}
 
         {data && (
           <>
@@ -172,7 +198,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
                 {data.modules.map((module) => (
                   <article className={`control-module-card status-${module.status}`} key={module.id}>
                     <div className="control-card-top">
-                      <span>{statusLabel[module.status]}</span>
+                      <span>{moduleStatusLabel[module.status]}</span>
                       <strong>{module.progressPercent}%</strong>
                     </div>
                     <h3>{module.name}</h3>
@@ -194,11 +220,51 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
               </div>
               <div className="control-phase-strip">
                 {["discover","analyze","classify","correct","test","evidence","next"].map((phase) => {
-                  const count = data.stages.filter((stage) => stage.phase === phase).length;
-                  return <span key={phase}><b>{phase}</b><small>{count ? count : "—"}</small></span>;
+                  const phaseStages = data.stages.filter((stage) => stage.phase === phase);
+                  const completed = phaseStages.filter((stage) => stage.status === "completed").length;
+                  return <span key={phase}><b>{phase}</b><small>{phaseStages.length ? `${completed}/${phaseStages.length} concluídas` : "Sem etapas"}</small></span>;
                 })}
               </div>
-              <p className="control-note">O modelo já suporta as 7 fases do ciclo SSOT. A visão detalhada por etapa será expandida no próximo incremento.</p>
+              <div className="control-stage-toolbar">
+                <label className="control-filter">
+                  <span>Buscar etapa</span>
+                  <input value={stageQuery} onChange={(event) => setStageQuery(event.target.value)} placeholder="Nome, código, módulo ou fase" />
+                </label>
+                <label className="control-filter">
+                  <span>Módulo</span>
+                  <select value={selectedModule} onChange={(event) => setSelectedModule(event.target.value)}>
+                    <option value="all">Todos os módulos</option>
+                    {data.modules.map((module) => <option key={module.id} value={module.id}>{module.name}</option>)}
+                  </select>
+                </label>
+                <label className="control-filter">
+                  <span>Status</span>
+                  <select value={stageStatus} onChange={(event) => setStageStatus(event.target.value)}>
+                    <option value="all">Todos os status</option>
+                    {Object.entries(stageStatusLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+                <span className="control-stage-count">{visibleStages.length} de {data.stages.length} etapas</span>
+              </div>
+              <div className="control-stage-table-wrap">
+                <table className="control-stage-table">
+                  <thead><tr><th>Etapa</th><th>Módulo</th><th>Fase</th><th>Status</th><th>Peso</th><th>Evidência</th></tr></thead>
+                  <tbody>
+                    {visibleStages.map((stage) => {
+                      const moduleName = data.modules.find((module) => module.id === stage.moduleId)?.name ?? "Módulo não identificado";
+                      return <tr key={stage.id}>
+                        <td><strong>{stage.name}</strong><small>{stage.stageKey}</small></td>
+                        <td>{moduleName}</td>
+                        <td><span className="control-phase-tag">{stage.phase}</span></td>
+                        <td><span className={`control-stage-status status-${stage.status}`}>{stageStatusLabel[stage.status] ?? stage.status}</span></td>
+                        <td>{stage.weight}</td>
+                        <td>{stage.evidenceRequired ? <span className="control-evidence-required">Obrigatória</span> : "Opcional"}</td>
+                      </tr>;
+                    })}
+                    {!visibleStages.length && <tr><td className="control-stage-empty" colSpan={6}>Nenhuma etapa corresponde aos filtros selecionados.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
             </section>
 
             <section className="control-two-col">

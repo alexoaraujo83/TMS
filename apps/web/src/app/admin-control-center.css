@@ -15,8 +15,7 @@
 
 .control-stage-toolbar {
   display: grid;
-  grid-template-columns:
-    minmax(180px, 1.5fr) minmax(160px, 1fr) minmax(150px, 0.8fr) auto;
+  grid-template-columns: 3fr 2fr 1.6fr auto;
   align-items: end;
   gap: 12px;
   margin: 20px 0 12px;
@@ -158,23 +157,23 @@
   color: var(--muted) !important;
 }
 
-.ops-alert {
+.control-shell .ops-alert {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.ops-alert strong {
+.control-shell .ops-alert strong {
   font-size: 11px;
 }
 
-.ops-alert span {
+.control-shell .ops-alert span {
   flex: 1;
   min-width: 160px;
 }
 
-.ops-alert button {
+.control-shell .ops-alert button {
   border: 1px solid #e8b5b1;
   background: #fff;
   border-radius: 7px;
@@ -216,11 +215,11 @@
     min-width: 640px;
   }
 
-  .ops-alert {
+  .control-shell .ops-alert {
     align-items: flex-start;
   }
 
-  .ops-alert span {
+  .control-shell .ops-alert span {
     flex-basis: 100%;
   }
 }
