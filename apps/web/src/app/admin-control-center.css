@@ -6,28 +6,34 @@
   gap: 12px;
   flex-wrap: wrap;
 }
+
 .control-updated {
   font-size: 10px;
   color: var(--muted);
   white-space: nowrap;
 }
+
 .control-stage-toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 1.5fr) minmax(160px, 1fr) minmax(150px, 0.8fr) auto;
+  grid-template-columns:
+    minmax(180px, 1.5fr) minmax(160px, 1fr) minmax(150px, 0.8fr) auto;
   align-items: end;
   gap: 12px;
   margin: 20px 0 12px;
 }
+
 .control-filter {
   display: grid;
   gap: 6px;
   min-width: 0;
 }
+
 .control-filter > span {
   font-size: 10px;
   font-weight: 700;
   color: #5e6673;
 }
+
 .control-filter input,
 .control-filter select {
   width: 100%;
@@ -41,30 +47,35 @@
   font: inherit;
   font-size: 11px;
 }
+
 .control-filter input:focus,
 .control-filter select:focus {
   outline: 2px solid #b9afff;
   outline-offset: 1px;
   border-color: #7b68e8;
 }
+
 .control-stage-count {
   font-size: 10px;
   color: var(--muted);
   padding: 0 0 10px;
   white-space: nowrap;
 }
+
 .control-stage-table-wrap {
   width: 100%;
   overflow-x: auto;
   border: 1px solid #e8eaf0;
   border-radius: 9px;
 }
+
 .control-stage-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 690px;
   text-align: left;
 }
+
 .control-stage-table th {
   background: #f8f9fb;
   color: #687180;
@@ -75,6 +86,7 @@
   padding: 12px 13px;
   white-space: nowrap;
 }
+
 .control-stage-table td {
   padding: 12px 13px;
   border-top: 1px solid #edf0f3;
@@ -82,18 +94,21 @@
   color: #505967;
   vertical-align: middle;
 }
+
 .control-stage-table td strong {
   display: block;
   color: #222936;
   font-size: 10px;
   font-weight: 750;
 }
+
 .control-stage-table td small {
   display: block;
   margin-top: 4px;
   color: #8a92a0;
   font-size: 9px;
 }
+
 .control-phase-tag {
   display: inline-block;
   padding: 4px 7px;
@@ -103,6 +118,7 @@
   font-size: 9px;
   font-weight: 750;
 }
+
 .control-stage-status {
   display: inline-flex;
   align-items: center;
@@ -114,41 +130,50 @@
   font-weight: 750;
   white-space: nowrap;
 }
+
 .control-stage-status.status-completed {
   background: #e8f7ef;
   color: #137647;
 }
+
 .control-stage-status.status-in_progress {
   background: #eeebff;
   color: #5141b5;
 }
+
 .control-stage-status.status-blocked {
   background: #fff0ef;
   color: #b42318;
 }
+
 .control-evidence-required {
   color: #9a6200;
   font-size: 9px;
   font-weight: 750;
 }
+
 .control-stage-empty {
   text-align: center !important;
   padding: 26px !important;
   color: var(--muted) !important;
 }
+
 .ops-alert {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
+
 .ops-alert strong {
   font-size: 11px;
 }
+
 .ops-alert span {
   flex: 1;
   min-width: 160px;
 }
+
 .ops-alert button {
   border: 1px solid #e8b5b1;
   background: #fff;
@@ -158,38 +183,48 @@
   font-size: 10px;
   cursor: pointer;
 }
+
 @media (max-width: 1100px) {
   .control-stage-toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
   .control-stage-count {
     padding-bottom: 8px;
   }
 }
+
 @media (max-width: 760px) {
   .control-header-actions {
     width: 100%;
     justify-content: space-between;
   }
+
   .control-updated {
     font-size: 9px;
   }
+
   .control-stage-toolbar {
     grid-template-columns: 1fr;
   }
+
   .control-stage-count {
     padding: 2px 0;
   }
+
   .control-stage-table {
     min-width: 640px;
   }
+
   .ops-alert {
     align-items: flex-start;
   }
+
   .ops-alert span {
     flex-basis: 100%;
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   .control-shell * {
     scroll-behavior: auto !important;
