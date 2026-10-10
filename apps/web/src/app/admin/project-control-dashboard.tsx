@@ -67,11 +67,33 @@ type Dashboard = {
 
 type User = { name?: string; email?: string };
 
+type HealthCheck = {
+  id: string;
+  label: string;
+  status: "healthy" | "degraded" | "blocked" | "unknown";
+  detail: string;
+  checkedAt: string;
+  latencyMs?: number;
+};
+
+type HealthSnapshot = {
+  generatedAt: string;
+  checks: HealthCheck[];
+  note: string;
+};
+
 const moduleStatusLabel: Record<string, string> = {
   planned: "Planejado",
   in_progress: "Em andamento",
   blocked: "Bloqueado",
   completed: "Concluído",
+};
+
+const healthStatusLabel: Record<string, string> = {
+  healthy: "Saudável",
+  degraded: "Degradado",
+  blocked: "Bloqueado",
+  unknown: "Não verificado",
 };
 
 const stageStatusLabel: Record<string, string> = {
@@ -91,6 +113,12 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
   const [selectedModule, setSelectedModule] = useState("all");
   const [evidenceQuery, setEvidenceQuery] = useState("");
   const [blockerQuery, setBlockerQuery] = useState("");
+  const [health, setHealth] = useState<HealthSnapshot | null>(null);
+  const [healthError, setHealthError] = useState("");
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [traceQuery, setTraceQuery] = useState("");
+  const [traceKind, setTraceKind] = useState("correlationId");
+  const [traceNotice, setTraceNotice] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,9 +137,25 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
     }
   }, []);
 
+  const loadHealth = useCallback(async () => {
+    setHealthLoading(true);
+    setHealthError("");
+    try {
+      const response = await fetch("/api/tms/admin/health", { cache: "no-store" });
+      const body = (await response.json()) as HealthSnapshot & { error?: string };
+      if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+      setHealth(body);
+    } catch (err) {
+      setHealthError(err instanceof Error ? err.message : "Não foi possível consultar a saúde operacional.");
+    } finally {
+      setHealthLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadHealth();
+  }, [load, loadHealth]);
 
   const firstName = user.name?.split(" ")[0] ?? user.email?.split("@")[0] ?? "Admin";
   const visibleStages = (data?.stages ?? []).filter((stage) => {
@@ -145,6 +189,9 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
           <a href="#stages">◫ <span>Etapas</span></a>
           <a href="#evidence">✓ <span>Evidências</span></a>
           <a href="#blockers">! <span>Blockers</span></a>
+          <a href="#health">◉ <span>Saúde operacional</span></a>
+          <a href="#diagnostics">⌕ <span>Diagnóstico</span></a>
+          <a href="#administration">⚙ <span>Administração</span></a>
           <a href="/app">↩ <span>Operação TMS</span></a>
         </nav>
         <div className="control-sidebar-footer">
@@ -191,6 +238,32 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
                 <div><span>Branch</span><strong>{data.project.branch}</strong></div>
                 <div><span>Gate atual</span><strong>{data.project.currentGate}</strong></div>
               </div>
+            </section>
+
+            <section className="control-section" id="health">
+              <div className="control-section-head">
+                <div><span className="eyebrow">OBSERVABILIDADE</span><h2>Saúde operacional</h2></div>
+                <button className="button button-ghost" onClick={() => void loadHealth()} disabled={healthLoading}>
+                  {healthLoading ? "Verificando…" : "↻ Verificar"}
+                </button>
+              </div>
+              {healthError && <div className="ops-alert" role="alert"><strong>Falha na consulta de saúde.</strong><span>{healthError}</span></div>}
+              {!health && healthLoading && <div className="control-loading" role="status">Verificando endpoints operacionais…</div>}
+              {health && <>
+                <div className="control-health-grid">
+                  {health.checks.map((check) => (
+                    <article className="control-health-card" key={check.id}>
+                      <div className="control-health-top">
+                        <strong>{check.label}</strong>
+                        <span className={`control-health-status health-${check.status}`}>{healthStatusLabel[check.status]}</span>
+                      </div>
+                      <p>{check.detail}</p>
+                      <small>{check.latencyMs !== undefined ? `${check.latencyMs} ms · ` : ""}{new Date(check.checkedAt).toLocaleTimeString("pt-BR")}</small>
+                    </article>
+                  ))}
+                </div>
+                <p className="control-health-note">{health.note}</p>
+              </>}
             </section>
 
             <section className="control-metrics">
@@ -278,6 +351,49 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
               </div>
             </section>
 
+            <section className="control-section" id="diagnostics">
+              <div className="control-section-head">
+                <div><span className="eyebrow">CORRELATED DIAGNOSTICS</span><h2>Preparar consulta de rastreabilidade</h2></div>
+              </div>
+              <p className="control-section-description">Informe um identificador já obtido nos logs. Este painel não consulta nem expõe logs por conta própria; a pesquisa central exige integração server-side autorizada com API, worker e provedores de logs.</p>
+              <form className="control-trace-form" onSubmit={(event) => {
+                event.preventDefault();
+                const value = traceQuery.trim();
+                if (!value) { setTraceNotice("Informe um identificador antes de preparar a consulta."); return; }
+                setTraceNotice(`Consulta preparada: ${traceKind} = ${value}. Nenhum log foi consultado ou alterado.`);
+              }}>
+                <label className="control-filter">
+                  <span>Tipo de identificador</span>
+                  <select value={traceKind} onChange={(event) => setTraceKind(event.target.value)}>
+                    <option value="requestId">requestId</option>
+                    <option value="correlationId">correlationId</option>
+                    <option value="event_id">event_id</option>
+                    <option value="idempotency_key">idempotency_key</option>
+                    <option value="freightId">freightId</option>
+                    <option value="jobId">jobId</option>
+                  </select>
+                </label>
+                <label className="control-filter">
+                  <span>Valor</span>
+                  <input value={traceQuery} onChange={(event) => { setTraceQuery(event.target.value); setTraceNotice(""); }} placeholder="Cole um ID não secreto" maxLength={200} />
+                </label>
+                <button className="button button-ghost" type="submit">Preparar consulta</button>
+              </form>
+              {traceNotice && <p className="control-inline-notice" role="status">{traceNotice}</p>}
+              <div className="control-trace-chain" aria-label="Cadeia de rastreabilidade esperada">
+                <span>Web / BFF</span><b>→</b><span>Core API</span><b>→</b><span>PostgreSQL</span><b>→</b><span>Outbox</span><b>→</b><span>Durable Job</span><b>→</b><span>Handler / Auditoria</span>
+              </div>
+            </section>
+
+            <section className="control-section" id="administration">
+              <div className="control-section-head"><div><span className="eyebrow">ADMINISTRAÇÃO SEGURA</span><h2>Controles e trilhas administrativas</h2></div></div>
+              <div className="control-admin-grid">
+                <article><strong>Identidade e permissões</strong><p>O painel exige sessão Auth0; a autorização administrativa por role/permission ainda precisa ser validada no servidor antes de habilitar operações de escrita.</p><span className="control-health-status health-unknown">Validação pendente</span></article>
+                <article><strong>Auditoria</strong><p>O ledger atual exibe evidências registradas. Trilha imutável de ações administrativas exige endpoint de auditoria com ator, tenant, ação, alvo e timestamp.</p><span className="control-health-status health-unknown">Integração pendente</span></article>
+                <article><strong>Deploys e ações operacionais</strong><p>Histórico de deploy, rollback e replay só devem ser conectados a provedores autenticados, com autorização explícita, confirmação e registro de auditoria.</p><span className="control-health-status health-unknown">Integração pendente</span></article>
+              </div>
+            </section>
+
             <section className="control-two-col">
               <div className="control-section" id="evidence">
                 <div className="control-section-head"><div><span className="eyebrow">EVIDENCE LEDGER</span><h2>Evidências recentes</h2></div><span>{visibleEvidence.length} de {data.recentEvidence.length}</span></div>
@@ -292,7 +408,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
                       <div><strong>{item.evidenceCode} · {item.title}</strong><small>{item.source ?? "Fonte interna"} · {item.reference ?? "Sem referência"}</small></div>
                       <b>{item.status}</b>
                     </article>
-                  )) : <div className="control-empty">Nenhuma evidência registrada.</div>}
+                  )) : <div className="control-empty">Nenhuma evidência corresponde à busca.</div>}
                 </div>
               </div>
 
@@ -309,7 +425,7 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
                       <div><strong>{item.blockerCode} · {item.title}</strong><small>{item.moduleName ?? "Projeto"} · Próxima ação: {item.nextAction ?? "—"}</small></div>
                       <b className={`severity-${item.severity}`}>{item.severity}</b>
                     </article>
-                  )) : <div className="control-empty">Nenhum blocker ativo.</div>}
+                  )) : <div className="control-empty">Nenhum impedimento corresponde à busca.</div>}
                 </div>
               </div>
             </section>
