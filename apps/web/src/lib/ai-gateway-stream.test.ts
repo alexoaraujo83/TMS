@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { consumeOpenResponsesStream } from "./ai-gateway-stream";
+import { consumeOpenResponsesStream } from "./ai-gateway-stream.ts";
 
 function streamFromChunks(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
