@@ -93,3 +93,5 @@ export {
   type ProjectControlEvidence,
   type ProjectControlBlocker,
 } from "./project-control-repository.js";
+
+export { DiagnosticsRepository, type DiagnosticLookup, type DiagnosticRecord, type DiagnosticQueryResult } from "./diagnostics-repository.js";
