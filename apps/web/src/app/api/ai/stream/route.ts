@@ -79,7 +79,12 @@ export async function POST(request: Request) {
   }
 
   if (!modelResponse.ok || !modelResponse.body) {
-    const status = modelResponse.status === 429 ? 429 : modelResponse.status === 401 || modelResponse.status === 403 ? 503 : 502;
+    const status =
+      modelResponse.status === 429
+        ? 429
+        : modelResponse.status === 401 || modelResponse.status === 403
+          ? 503
+          : 502;
     const message =
       status === 429
         ? "A cota gratuita da Gemini API foi atingida; tente novamente após a renovação da cota."
