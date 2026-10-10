@@ -14,14 +14,14 @@ export interface CreateFreightInput {
   cargoDescription: string;
   quantity: number;
   weightKg: number;
-  volumeM3?: number;
-  linearMeters?: number;
-  customerPriceCents?: number;
-  driverPriceCents?: number;
+  volumeM3?: number | null;
+  linearMeters?: number | null;
+  customerPriceCents?: number | null;
+  driverPriceCents?: number | null;
   vehicleTypes?: readonly string[];
   bodyTypes?: readonly string[];
-  minimumFreeMeters?: number;
-  minimumCapacityKg?: number;
+  minimumFreeMeters?: number | null;
+  minimumCapacityKg?: number | null;
 }
 
 export interface FreightRow {
@@ -152,14 +152,14 @@ export class PostgresFreightRepository {
           cargo_description = coalesce($8, cargo_description),
           quantity = coalesce($9, quantity),
           weight_kg = coalesce($10, weight_kg),
-          volume_m3 = case when $11::numeric is null then volume_m3 else $11 end,
-          linear_meters = case when $12::numeric is null then linear_meters else $12 end,
-          customer_price_cents = case when $13::integer is null then customer_price_cents else $13 end,
-          driver_price_cents = case when $14::integer is null then driver_price_cents else $14 end,
+          volume_m3 = case when $19::boolean then $11::numeric else volume_m3 end,
+          linear_meters = case when $20::boolean then $12::numeric else linear_meters end,
+          customer_price_cents = case when $21::boolean then $13::integer else customer_price_cents end,
+          driver_price_cents = case when $22::boolean then $14::integer else driver_price_cents end,
           vehicle_types = coalesce($15, vehicle_types),
           body_types = coalesce($16, body_types),
-          minimum_free_meters = case when $17::numeric is null then minimum_free_meters else $17 end,
-          minimum_capacity_kg = case when $18::numeric is null then minimum_capacity_kg else $18 end,
+          minimum_free_meters = case when $23::boolean then $17::numeric else minimum_free_meters end,
+          minimum_capacity_kg = case when $24::boolean then $18::numeric else minimum_capacity_kg end,
           updated_at = now()
         where id = $1 and tenant_id = $2
         returning ${FREIGHT_COLUMNS}`,
@@ -171,6 +171,9 @@ export class PostgresFreightRepository {
           input.linearMeters ?? null, input.customerPriceCents ?? null,
           input.driverPriceCents ?? null, input.vehicleTypes ?? null, input.bodyTypes ?? null,
           input.minimumFreeMeters ?? null, input.minimumCapacityKg ?? null,
+          input.volumeM3 !== undefined, input.linearMeters !== undefined,
+          input.customerPriceCents !== undefined, input.driverPriceCents !== undefined,
+          input.minimumFreeMeters !== undefined, input.minimumCapacityKg !== undefined,
         ],
       );
       const row = result.rows[0] ?? null;
