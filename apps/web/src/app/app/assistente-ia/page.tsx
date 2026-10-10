@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { consumeOpenResponsesStream } from "../../../lib/ai-gateway-stream";
+import { consumeAssistantTextStream } from "../../../lib/assistant-stream";
 import styles from "./assistant.module.css";
 
 type GenerationStatus = "idle" | "streaming" | "complete" | "error";
@@ -50,7 +50,7 @@ export default function AssistenteIAPage() {
         throw new Error("A resposta de streaming não está disponível.");
       }
 
-      await consumeOpenResponsesStream(response.body, (delta) => {
+      await consumeAssistantTextStream(response.body, (delta) => {
         setOutput((previous) => previous + delta);
       });
       setStatus("complete");
@@ -88,7 +88,7 @@ export default function AssistenteIAPage() {
             Gere textos e análises com resposta progressiva. O conteúdo aparece
             à medida que o modelo produz cada trecho.
           </p>
-          <span className={styles.modelTag}>AI Gateway · openai/gpt-6-astra</span>
+          <span className={styles.modelTag}>Gemini API · modelo gratuito</span>
         </header>
 
         <form className={styles.panel} onSubmit={generate}>
