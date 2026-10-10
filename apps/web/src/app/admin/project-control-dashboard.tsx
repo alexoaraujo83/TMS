@@ -89,6 +89,8 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
   const [stageQuery, setStageQuery] = useState("");
   const [stageStatus, setStageStatus] = useState("all");
   const [selectedModule, setSelectedModule] = useState("all");
+  const [evidenceQuery, setEvidenceQuery] = useState("");
+  const [blockerQuery, setBlockerQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,6 +121,15 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
     const matchesStatus = stageStatus === "all" || stage.status === stageStatus;
     const matchesModule = selectedModule === "all" || stage.moduleId === selectedModule;
     return matchesQuery && matchesStatus && matchesModule;
+  });
+
+  const visibleEvidence = (data?.recentEvidence ?? []).filter((item) => {
+    const query = evidenceQuery.trim().toLocaleLowerCase();
+    return !query || `${item.evidenceCode} ${item.title} ${item.kind} ${item.status} ${item.source ?? ""} ${item.reference ?? ""}`.toLocaleLowerCase().includes(query);
+  });
+  const visibleBlockers = (data?.blockers ?? []).filter((item) => {
+    const query = blockerQuery.trim().toLocaleLowerCase();
+    return !query || `${item.blockerCode} ${item.title} ${item.severity} ${item.status} ${item.description ?? ""} ${item.nextAction ?? ""} ${item.moduleName ?? ""}`.toLocaleLowerCase().includes(query);
   });
 
   return (
@@ -269,9 +280,13 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
 
             <section className="control-two-col">
               <div className="control-section" id="evidence">
-                <div className="control-section-head"><div><span className="eyebrow">EVIDENCE LEDGER</span><h2>Evidências recentes</h2></div></div>
+                <div className="control-section-head"><div><span className="eyebrow">EVIDENCE LEDGER</span><h2>Evidências recentes</h2></div><span>{visibleEvidence.length} de {data.recentEvidence.length}</span></div>
+                <label className="control-filter">
+                  <span>Buscar evidência</span>
+                  <input value={evidenceQuery} onChange={(event) => setEvidenceQuery(event.target.value)} placeholder="Código, título, status ou referência" />
+                </label>
                 <div className="control-list">
-                  {data.recentEvidence.length ? data.recentEvidence.map((item) => (
+                  {visibleEvidence.length ? visibleEvidence.map((item) => (
                     <article key={item.id}>
                       <span className={`control-status-dot evidence-${item.status}`}>{item.status === "valid" ? "✓" : "!"}</span>
                       <div><strong>{item.evidenceCode} · {item.title}</strong><small>{item.source ?? "Fonte interna"} · {item.reference ?? "Sem referência"}</small></div>
@@ -282,9 +297,13 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
               </div>
 
               <div className="control-section" id="blockers">
-                <div className="control-section-head"><div><span className="eyebrow">BLOCKER ROUTING</span><h2>Impedimentos ativos</h2></div></div>
+                <div className="control-section-head"><div><span className="eyebrow">BLOCKER ROUTING</span><h2>Impedimentos ativos</h2></div><span>{visibleBlockers.length} de {data.blockers.length}</span></div>
+                <label className="control-filter">
+                  <span>Buscar impedimento</span>
+                  <input value={blockerQuery} onChange={(event) => setBlockerQuery(event.target.value)} placeholder="Código, título, severidade ou ação" />
+                </label>
                 <div className="control-list">
-                  {data.blockers.length ? data.blockers.map((item) => (
+                  {visibleBlockers.length ? visibleBlockers.map((item) => (
                     <article key={item.id}>
                       <span className="control-status-dot blocker">!</span>
                       <div><strong>{item.blockerCode} · {item.title}</strong><small>{item.moduleName ?? "Projeto"} · Próxima ação: {item.nextAction ?? "—"}</small></div>
