@@ -21,7 +21,7 @@ function isUnavailableSource(error: unknown): boolean {
   return (
     code.startsWith("08") ||
     ["ECONNREFUSED", "ECONNRESET", "ENETUNREACH", "ENOTFOUND", "ETIMEDOUT",
-      "57P01", "53300", "42P01", "42703", "42501"].includes(code)
+      "57P01", "53300"].includes(code)
   );
 }
 
