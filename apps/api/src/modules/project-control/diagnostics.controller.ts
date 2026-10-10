@@ -22,6 +22,15 @@ const LOOKUP_KINDS = new Set<DiagnosticLookup["kind"]>([
   "idempotencyKey",
   "freightId",
 ]);
+const LEGACY_KIND_ALIASES: Record<string, DiagnosticLookup["kind"]> = {
+  request_id: "requestId",
+  correlation_id: "correlationId",
+  outbox_event_id: "outboxEventId",
+  outbox_aggregate_id: "outboxAggregateId",
+  durable_job_id: "durableJobId",
+  idempotency_key: "idempotencyKey",
+  freight_id: "freightId",
+};
 const UUID_KINDS = new Set<DiagnosticLookup["kind"]>([
   "outboxEventId",
   "outboxAggregateId",
@@ -30,6 +39,24 @@ const UUID_KINDS = new Set<DiagnosticLookup["kind"]>([
 ]);
 const UUID_PATTERN = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const MAX_RESULTS = 50;
+
+function normalizeLookupKind(
+  kindValue?: string,
+): DiagnosticLookup["kind"] | undefined {
+  if (!kindValue) return undefined;
+
+  const trimmed = kindValue.trim();
+  if (!trimmed) return undefined;
+
+  if (LOOKUP_KINDS.has(trimmed as DiagnosticLookup["kind"])) {
+    return trimmed as DiagnosticLookup["kind"];
+  }
+
+  return (
+    LEGACY_KIND_ALIASES[trimmed] ??
+    LEGACY_KIND_ALIASES[trimmed.toLowerCase()]
+  );
+}
 
 @Controller("admin")
 @UseGuards(AuthGuard, PermissionGuard)
@@ -44,7 +71,8 @@ export class DiagnosticsController {
     @Query("value") rawValue?: string,
     @Query("limit") rawLimit?: string,
   ) {
-    if (!kindValue || !LOOKUP_KINDS.has(kindValue as DiagnosticLookup["kind"])) {
+    const kind = normalizeLookupKind(kindValue);
+    if (!kind) {
       throw new BadRequestException("Unsupported diagnostic identifier kind");
     }
 
@@ -53,7 +81,6 @@ export class DiagnosticsController {
       throw new BadRequestException("Invalid diagnostic identifier value");
     }
 
-    const kind = kindValue as DiagnosticLookup["kind"];
     if (UUID_KINDS.has(kind) && !UUID_PATTERN.test(value)) {
       throw new BadRequestException("Diagnostic identifier must be a UUID");
     }
