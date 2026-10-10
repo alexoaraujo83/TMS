@@ -116,18 +116,19 @@ export class ProjectControlRepository {
           count(distinct e.id)::text as "evidenceCount",
           count(distinct e.id) filter (where e.status = 'valid')::text as "validEvidenceCount",
           count(distinct b.id) filter (where b.status <> 'resolved')::text as "openBlockers",
-          coalesce(
-            round(
+          coalesce((
+            select round(
               100.0 * sum(
                 case
-                  when s.status = 'completed' then s.weight
-                  when s.status = 'in_progress' then s.weight * 0.5
+                  when ps.status = 'completed' then ps.weight
+                  when ps.status = 'in_progress' then ps.weight * 0.5
                   else 0
                 end
-              ) / nullif(sum(s.weight), 0)
-            ),
-            0
-          )::text as "progressPercent"
+              ) / nullif(sum(ps.weight), 0)
+            )::text
+            from project_control_stages ps
+            where ps.tenant_id = m.tenant_id and ps.module_id = m.id
+          ), '0') as "progressPercent"
         from project_control_modules m
         left join project_control_stages s
           on s.tenant_id = m.tenant_id and s.module_id = m.id
@@ -135,9 +136,10 @@ export class ProjectControlRepository {
           on e.tenant_id = m.tenant_id and e.module_id = m.id
         left join project_control_blockers b
           on b.tenant_id = m.tenant_id and b.module_id = m.id
+        where m.tenant_id = $1
         group by m.id
         order by m.sort_order asc
-      `);
+      `, [tenantId]);
 
       const stagesResult = await client.query<{
         id: string;
@@ -152,6 +154,7 @@ export class ProjectControlRepository {
         select id, module_id as "moduleId", stage_key as "stageKey",
                name, phase, status, weight, evidence_required as "evidenceRequired"
         from project_control_stages
+        where tenant_id = $1
         order by module_id, case phase
           when 'discover' then 1
           when 'analyze' then 2
@@ -161,7 +164,7 @@ export class ProjectControlRepository {
           when 'evidence' then 6
           when 'next' then 7
           else 99 end
-      `);
+      `, [tenantId]);
 
       const evidenceResult = await client.query<ProjectControlEvidence>(`
         select id,
@@ -173,9 +176,10 @@ export class ProjectControlRepository {
                reference,
                captured_at as "capturedAt"
         from project_control_evidence
+        where tenant_id = $1
         order by captured_at desc nulls last, created_at desc
         limit 8
-      `);
+      `, [tenantId]);
 
       const blockersResult = await client.query<ProjectControlBlocker>(`
         select b.id,
@@ -189,12 +193,12 @@ export class ProjectControlRepository {
         from project_control_blockers b
         left join project_control_modules m
           on m.tenant_id = b.tenant_id and m.id = b.module_id
-        where b.status <> 'resolved'
+        where b.tenant_id = $1 and b.status <> 'resolved'
         order by
           case b.severity when 'critical' then 1 when 'high' then 2 when 'medium' then 3 else 4 end,
           b.created_at asc
         limit 8
-      `);
+      `, [tenantId]);
 
       const modules = modulesResult.rows.map((row) => ({
         ...row,
@@ -244,7 +248,7 @@ export class ProjectControlRepository {
           completedStages,
           evidenceCount,
           validEvidenceCount,
-          openBlockers: blockersResult.rows.length,
+          openBlockers: modules.reduce((n, m) => n + m.openBlockers, 0),
         },
         modules,
         stages: stagesResult.rows,
