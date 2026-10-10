@@ -1,4 +1,4 @@
-name: TMS — Codex Code Review via OpenAI
+name: TMS — Codex Code Review via Vercel AI Gateway
 
 on:
   pull_request:
@@ -32,6 +32,17 @@ jobs:
           command -v bwrap
           bwrap --version
 
+      - name: Verify AI Gateway secret is configured
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AI_GATEWAY_API_KEY:-}" ]; then
+            echo "::error::Missing GitHub Actions repository secret AI_GATEWAY_API_KEY."
+            exit 1
+          fi
+          echo "AI Gateway secret is configured."
+
       - name: Checkout PR merge ref
         uses: actions/checkout@v5
         with:
@@ -49,13 +60,13 @@ jobs:
             "$PR_BASE_REF" \
             "+refs/pull/$PR_NUMBER/head"
 
-      - name: Run Codex through OpenAI Responses API
+      - name: Run Codex through Vercel AI Gateway Responses API
         id: run_codex
         uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1.13
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          responses-api-endpoint: https://api.openai.com/v1/responses
-          model: gpt-5.4
+          openai-api-key: ${{ secrets.AI_GATEWAY_API_KEY }}
+          responses-api-endpoint: https://ai-gateway.vercel.sh/v1/responses
+          model: openai/gpt-5.4
           effort: high
           permission-profile: ":read-only"
           prompt: |
@@ -112,7 +123,7 @@ jobs:
             const body = [
               "## Codex Code Review",
               "",
-              "Automated review executed by GitHub Actions through the OpenAI Responses API.",
+              "Automated review executed by GitHub Actions through Vercel AI Gateway.",
               "",
               process.env.CODEX_FINAL_MESSAGE
             ].join("\n");
