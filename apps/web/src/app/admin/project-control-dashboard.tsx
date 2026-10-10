@@ -175,6 +175,15 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
     const query = blockerQuery.trim().toLocaleLowerCase();
     return !query || `${item.blockerCode} ${item.title} ${item.severity} ${item.status} ${item.description ?? ""} ${item.nextAction ?? ""} ${item.moduleName ?? ""}`.toLocaleLowerCase().includes(query);
   });
+  const healthCounts = (health?.checks ?? []).reduce(
+    (counts, check) => ({ ...counts, [check.status]: counts[check.status] + 1 }),
+    { healthy: 0, degraded: 0, blocked: 0, unknown: 0 },
+  );
+
+  const refreshAll = useCallback(() => {
+    void load();
+    void loadHealth();
+  }, [load, loadHealth]);
 
   return (
     <div className="control-shell">
@@ -210,8 +219,8 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
           </div>
           <div className="control-header-actions">
             {lastUpdated && <span className="control-updated" aria-live="polite">Atualizado às {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
-            <button className="button button-ghost control-refresh" onClick={() => void load()} disabled={loading} aria-label="Atualizar dados do painel">
-              {loading ? "Atualizando…" : "↻ Atualizar"}
+            <button className="button button-ghost control-refresh" onClick={refreshAll} disabled={loading || healthLoading} aria-label="Atualizar dados do painel e saúde operacional">
+              {loading || healthLoading ? "Atualizando…" : "↻ Atualizar tudo"}
             </button>
           </div>
         </header>
@@ -243,13 +252,23 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
             <section className="control-section" id="health">
               <div className="control-section-head">
                 <div><span className="eyebrow">OBSERVABILIDADE</span><h2>Saúde operacional</h2></div>
-                <button className="button button-ghost" onClick={() => void loadHealth()} disabled={healthLoading}>
-                  {healthLoading ? "Verificando…" : "↻ Verificar"}
-                </button>
+                <div className="control-header-actions">
+                  {health?.generatedAt && <span className="control-updated">Snapshot: {new Date(health.generatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>}
+                  <button className="button button-ghost" onClick={() => void loadHealth()} disabled={healthLoading}>
+                    {healthLoading ? "Verificando…" : "↻ Verificar"}
+                  </button>
+                </div>
               </div>
               {healthError && <div className="ops-alert" role="alert"><strong>Falha na consulta de saúde.</strong><span>{healthError}</span></div>}
               {!health && healthLoading && <div className="control-loading" role="status">Verificando endpoints operacionais…</div>}
               {health && <>
+                <div className="control-health-summary" aria-label="Resumo dos estados operacionais">
+                  <span className="health-healthy">{healthCounts.healthy} saudáveis</span>
+                  <span className="health-degraded">{healthCounts.degraded} degradados</span>
+                  <span className="health-blocked">{healthCounts.blocked} bloqueados</span>
+                  <span className="health-unknown">{healthCounts.unknown} não verificados</span>
+                </div>
+                {healthError && <p className="control-health-note" role="status">A última verificação falhou; os estados abaixo são do snapshot anterior e não representam uma verificação atual.</p>}
                 <div className="control-health-grid">
                   {health.checks.map((check) => (
                     <article className="control-health-card" key={check.id}>
