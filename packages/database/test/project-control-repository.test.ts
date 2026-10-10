@@ -51,9 +51,9 @@ describe("ProjectControlRepository.dashboard", () => {
 
     const scopedQueries = calls.filter(({ sql }) =>
       sql.includes("from project_control_modules m") ||
-      sql.includes("from project_control_stages") ||
+      sql.includes('select id, module_id as "moduleId"') ||
       sql.includes("from project_control_evidence") ||
-      sql.includes("from project_control_blockers"),
+      sql.includes("from project_control_blockers b"),
     );
     assert.equal(scopedQueries.length, 4);
     for (const call of scopedQueries) {
