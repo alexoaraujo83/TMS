@@ -9,9 +9,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const appBaseUrl = process.env.APP_BASE_URL?.trim().replace(/\\/+$/, "");
+  const appBaseUrl = process.env.APP_BASE_URL?.trim();
+  const expectedOrigin = appBaseUrl ? new URL(appBaseUrl).origin : undefined;
   const origin = request.headers.get("origin");
-  if (origin && appBaseUrl && origin !== appBaseUrl) {
+  if (origin && expectedOrigin && origin !== expectedOrigin) {
     return NextResponse.json({ error: "Invalid request origin" }, { status: 403 });
   }
 
