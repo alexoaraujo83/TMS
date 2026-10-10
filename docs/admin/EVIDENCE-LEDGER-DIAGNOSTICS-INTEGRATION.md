@@ -1,6 +1,6 @@
 # TMS Evidence Ledger and diagnostics integration
 
-Status: implemented in the pull request; CI, deployed Web preview, and live diagnostic-source verification remain pending until their checks provide fresh evidence.
+Status: implemented in the pull request. Code/test HEAD `6067781732a1162b2bf6e0341c083800fe39223b` passed CI run [38093421408](https://github.com/alexoaraujo83/TMS/actions/runs/38093421408) and platform tooling run [38093421411](https://github.com/alexoaraujo83/TMS/actions/runs/38093421411) on 2026-10-10. Deployment of both Web and API for that HEAD and live Auth0/diagnostic-source verification remain pending because the free Vercel deployment quota is exhausted; no upgrade or card was requested. This status entry documents the verified code/test HEAD before the evidence-document update.
 
 ## Schema compatibility
 
@@ -41,6 +41,6 @@ The authenticated Next.js BFF is /api/tms/admin/diagnostics. It forwards only ki
 
 ## Verification gates
 
-Automated repository tests cover empty results, result bounds, malformed values, tenant parameter/RLS context, source failures, and the migration-backed idempotency column. API controller tests cover permission metadata, tenant derivation, supported query validation, and bounded limits.
+Automated repository tests cover empty results, result bounds, malformed values, tenant parameter/RLS context, source failures, and the migration-backed idempotency column. A PostgreSQL integration test uses the existing migrations, re-enables/forces RLS, and queries audit, outbox, durable-job idempotency, and freight identifiers using duplicate identifiers across two tenants. API controller tests cover permission metadata, tenant derivation, supported query validation, and bounded limits; service tests distinguish transient database outages (503) from schema/permission faults (500).
 
 Do not promote runtime evidence based on code presence or a preview deployment alone. Record the actual CI run, Web preview state, and a real authenticated API query after those checks finish. Live cross-tenant PostgreSQL/RLS evidence and end-to-end Web-to-worker event correlation remain separate runtime gates.
