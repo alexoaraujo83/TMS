@@ -20,6 +20,14 @@ export async function GET(request: Request) {
   }
 
   try {
+    const session = await auth0.getSession();
+    if (!session) {
+      return NextResponse.json(
+        { code: "AUTHENTICATION_REQUIRED", message: "Authentication required" },
+        { status: 401, headers: { "cache-control": "no-store" } },
+      );
+    }
+
     const fetcher = await auth0.createFetcher(request, { baseUrl: apiBaseUrl });
     const response = await fetcher.fetchWithAuth("/admin/diagnostics?" + forwarded.toString(), {
       method: "GET",

@@ -50,19 +50,19 @@ describe("DiagnosticsController", () => {
     const { controller, calls, context } = setup();
 
     await assert.rejects(
-      controller.search(context, "idempotency_key", "key-1", undefined),
+      async () => controller.search(context, "idempotency_key", "key-1", undefined),
       (error: unknown) => error instanceof BadRequestException && error.getStatus() === 400,
     );
     await assert.rejects(
-      controller.search(context, "requestId", "  ", undefined),
+      async () => controller.search(context, "requestId", "  ", undefined),
       (error: unknown) => error instanceof BadRequestException && error.getStatus() === 400,
     );
     await assert.rejects(
-      controller.search(context, "outboxEventId", "not-a-uuid", undefined),
+      async () => controller.search(context, "outboxEventId", "not-a-uuid", undefined),
       (error: unknown) => error instanceof BadRequestException && error.getStatus() === 400,
     );
     await assert.rejects(
-      controller.search(context, "requestId", "req-123", "51"),
+      async () => controller.search(context, "requestId", "req-123", "51"),
       (error: unknown) => error instanceof BadRequestException && error.getStatus() === 400,
     );
     assert.deepEqual(calls, []);
