@@ -157,3 +157,22 @@ export function rankCandidates(
         a.candidate.driverId.localeCompare(b.candidate.driverId),
     );
 }
+
+export {
+  CARGO_PROFILES,
+  LOGISTICS_OPERATION_TYPES,
+  VEHICLE_BODY_CATALOG,
+  VEHICLE_BODY_TYPES,
+  getCargoProfileRecommendations,
+  validateVehicleCompatibility,
+  type CargoDimensionsM,
+  type CargoProfile,
+  type CompatibilityStatus,
+  type LogisticsOperationType,
+  type LegalEnvelopeReference,
+  type VehicleBodyType,
+  type VehicleCompatibilityInput,
+  type VehicleCompatibilityResult,
+  type VehicleDimensionsM,
+  type VehicleReference,
+} from "./vehicle-compatibility.js";
