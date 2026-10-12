@@ -25,6 +25,7 @@ export class BackupService {
         source_run_id as "runId",
         source_run_url as "runUrl",
         source,
+        source as "origin",
         manifest_version as "manifestVersion"
       from public.backup_manifests
       where integrity_status = 'verified'
