@@ -133,7 +133,7 @@ const PROFILE_RULES: Record<
   container_iso_20: { bodies: ["porta_container"], notes: ["Conferir dimensões ISO, travas e peso bruto do conjunto"] },
   container_iso_40: { bodies: ["porta_container"], notes: ["Conferir dimensões ISO, travas e peso bruto do conjunto"] },
   carga_pesada: { bodies: ["prancha", "aberto"], vehicleTypes: ["carreta", "ls", "vanderleia", "bitrem", "rodotrem"], notes: ["Exige análise de distribuição de peso e carga por eixo"] },
-  pereciveis: { bodies: ["refrigerado"], notes: ["Registrar faixa térmica, setpoint e evidência de monitoramento"] },
+  pereciveis: { bodies: ["refrigerado"], notes: ["Registrar faixa de temperatura, setpoint e evidência de monitoramento"] },
   carga_alta: { bodies: ["prancha", "aberto"], notes: ["Medir altura total carregada e avaliar rota/autorização"] },
   graos: { bodies: ["graneleiro", "basculante"], notes: ["Confirmar produto e compatibilidade com descarga"] },
   liquidos_quimicos: { bodies: ["tanque"], notes: ["Validar classificação do produto e requisitos específicos aplicáveis"] },
