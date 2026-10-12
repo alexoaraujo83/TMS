@@ -31,8 +31,24 @@ test("web surface smoke tests", { skip: !baseUrl && "Set TMS_WEB_BASE_URL to run
     const response = await request("/admin");
     assert.ok([301, 302, 303, 307, 308].includes(response.status), `Expected redirect, received ${response.status}`);
     const location = response.headers.get("location") ?? "";
-    assert.match(location, /\/auth\/login/);
+    assert.ok(location, "Expected a non-empty authentication redirect");
     assert.doesNotMatch(location, /(?:javascript:|data:)/i);
+
+    if (location.startsWith("/")) {
+      assert.match(location, /^\/auth\/login(?:[?#]|$)/);
+      return;
+    }
+
+    const authorizationUrl = new URL(location);
+    assert.equal(authorizationUrl.protocol, "https:", "Authentication redirect must use HTTPS");
+    assert.equal(authorizationUrl.pathname, "/authorize", "Expected an identity-provider authorization endpoint");
+    const callbackUrl = authorizationUrl.searchParams.get("redirect_uri");
+    assert.ok(callbackUrl, "Authorization redirect must include redirect_uri");
+    assert.equal(
+      new URL(callbackUrl).origin,
+      baseUrl?.origin,
+      "Preview authentication callback must return to the same deployment origin",
+    );
   });
 
   await t.test("project-control data is not anonymously readable", async () => {
