@@ -82,6 +82,27 @@ type HealthSnapshot = {
   note: string;
 };
 
+type DiagnosticRecord = {
+  source: "audit_events" | "outbox_events" | "durable_jobs";
+  recordId: string;
+  occurredAt: string;
+  correlationKey: string | null;
+  status: string | null;
+  summary: string;
+};
+
+type DiagnosticResponse = {
+  status: "success" | "no_results";
+  sourceCoverage: {
+    auditEvents: "queried" | "not_applicable";
+    outboxEvents: "queried" | "not_applicable";
+    durableJobs: "queried" | "not_applicable";
+  };
+  records: DiagnosticRecord[];
+};
+
+type DiagnosticError = { title: string; message: string };
+
 const moduleStatusLabel: Record<string, string> = {
   planned: "Planejado",
   in_progress: "Em andamento",
@@ -118,7 +139,9 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
   const [healthLoading, setHealthLoading] = useState(false);
   const [traceQuery, setTraceQuery] = useState("");
   const [traceKind, setTraceKind] = useState("correlationId");
-  const [traceNotice, setTraceNotice] = useState("");
+  const [traceLoading, setTraceLoading] = useState(false);
+  const [traceResult, setTraceResult] = useState<DiagnosticResponse | null>(null);
+  const [traceError, setTraceError] = useState<DiagnosticError | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -372,35 +395,95 @@ export default function ProjectControlDashboard({ user }: { user: User }) {
 
             <section className="control-section" id="diagnostics">
               <div className="control-section-head">
-                <div><span className="eyebrow">CORRELATED DIAGNOSTICS</span><h2>Preparar consulta de rastreabilidade</h2></div>
+                <div><span className="eyebrow">CORRELATED DIAGNOSTICS</span><h2>Pesquisar rastreabilidade</h2></div>
+                <span className="control-stage-count">Somente leitura</span>
               </div>
-              <p className="control-section-description">Informe um identificador já obtido nos logs. Este painel não consulta nem expõe logs por conta própria; a pesquisa central exige integração server-side autorizada com API, worker e provedores de logs.</p>
-              <form className="control-trace-form" onSubmit={(event) => {
+              <p className="control-section-description">A consulta usa a API autenticada e as tabelas existentes. Apenas identificadores suportados são aceitos; nenhum payload bruto, token, segredo ou connection string é retornado.</p>
+              <form className="control-trace-form" onSubmit={async (event) => {
                 event.preventDefault();
                 const value = traceQuery.trim();
-                if (!value) { setTraceNotice("Informe um identificador antes de preparar a consulta."); return; }
-                setTraceNotice(`Consulta preparada: ${traceKind} = ${value}. Nenhum log foi consultado ou alterado.`);
+                if (!value) {
+                  setTraceResult(null);
+                  setTraceError({ title: "Identificador obrigatório", message: "Informe um identificador antes de consultar." });
+                  return;
+                }
+                setTraceLoading(true);
+                setTraceError(null);
+                setTraceResult(null);
+                try {
+                  const query = new URLSearchParams();
+                  query.set("kind", traceKind);
+                  query.set("value", value);
+                  query.set("limit", "25");
+                  const response = await fetch("/api/tms/admin/diagnostics?" + query.toString(), { cache: "no-store" });
+                  const body = await response.json().catch(() => null) as (DiagnosticResponse & { message?: string }) | null;
+                  if (!response.ok) {
+                    if (response.status === 401) {
+                      setTraceError({ title: "Sessão não autenticada", message: "Entre novamente para consultar diagnósticos." });
+                    } else if (response.status === 403) {
+                      setTraceError({ title: "Permissão insuficiente", message: "A conta precisa da permissão ops:diagnostics." });
+                    } else if (response.status === 503) {
+                      setTraceError({ title: "Fonte indisponível", message: "A fonte de diagnóstico não respondeu. Isso não foi tratado como uma consulta vazia." });
+                    } else if (response.status === 400) {
+                      setTraceError({ title: "Consulta inválida", message: body?.message ?? "Revise o tipo e o formato do identificador." });
+                    } else {
+                      setTraceError({ title: "Falha na consulta", message: "A API não conseguiu concluir a pesquisa. O resultado não foi marcado como vazio." });
+                    }
+                    return;
+                  }
+                  if (!body || !Array.isArray(body.records) || !body.sourceCoverage) {
+                    setTraceError({ title: "Resposta inválida", message: "A API retornou um formato de diagnóstico inesperado." });
+                    return;
+                  }
+                  setTraceResult(body);
+                } catch {
+                  setTraceError({ title: "Fonte indisponível", message: "Não foi possível alcançar a API de diagnósticos. Tente novamente." });
+                } finally {
+                  setTraceLoading(false);
+                }
               }}>
                 <label className="control-filter">
                   <span>Tipo de identificador</span>
-                  <select value={traceKind} onChange={(event) => setTraceKind(event.target.value)}>
-                    <option value="requestId">requestId</option>
-                    <option value="correlationId">correlationId</option>
-                    <option value="event_id">event_id</option>
-                    <option value="idempotency_key">idempotency_key</option>
-                    <option value="freightId">freightId</option>
-                    <option value="jobId">jobId</option>
+                  <select value={traceKind} onChange={(event) => setTraceKind(event.target.value)} disabled={traceLoading}>
+                    <option value="requestId">requestId · auditoria</option>
+                    <option value="correlationId">correlationId · auditoria</option>
+                    <option value="outboxEventId">event_id · outbox</option>
+                    <option value="idempotencyKey">idempotency_key · durable jobs</option>
+                    <option value="freightId">freightId · auditoria + outbox</option>
+                    <option value="durableJobId">jobId · durable jobs</option>
+                    <option value="outboxAggregateId">aggregateId · outbox</option>
                   </select>
                 </label>
                 <label className="control-filter">
                   <span>Valor</span>
-                  <input value={traceQuery} onChange={(event) => { setTraceQuery(event.target.value); setTraceNotice(""); }} placeholder="Cole um ID não secreto" maxLength={200} />
+                  <input value={traceQuery} onChange={(event) => setTraceQuery(event.target.value)} placeholder="Cole um ID ou chave não secreta" maxLength={200} disabled={traceLoading} />
                 </label>
-                <button className="button button-ghost" type="submit">Preparar consulta</button>
+                <button className="button button-ghost" type="submit" disabled={traceLoading}>
+                  {traceLoading ? "Consultando…" : "Pesquisar"}
+                </button>
               </form>
-              {traceNotice && <p className="control-inline-notice" role="status">{traceNotice}</p>}
+              {traceError && <div className="ops-alert" role="alert"><strong>{traceError.title}</strong><span>{traceError.message}</span></div>}
+              {traceLoading && <div className="control-loading" role="status">Consultando fontes autorizadas…</div>}
+              {traceResult?.status === "no_results" && <p className="control-inline-notice" role="status">Consulta concluída sem ocorrências. Fontes consultadas: {Object.entries(traceResult.sourceCoverage).filter((entry) => entry[1] === "queried").map((entry) => entry[0]).join(", ") || "nenhuma"}.</p>}
+              {traceResult?.status === "success" && <>
+                <p className="control-inline-notice" role="status">{traceResult.records.length} ocorrência(s) encontradas. Fontes consultadas: {Object.entries(traceResult.sourceCoverage).filter((entry) => entry[1] === "queried").map((entry) => entry[0]).join(", ") || "nenhuma"}.</p>
+                <div className="control-stage-table-wrap">
+                  <table className="control-stage-table">
+                    <thead><tr><th>Fonte</th><th>Data/hora</th><th>Status</th><th>Resumo sanitizado</th><th>Registro</th></tr></thead>
+                    <tbody>
+                      {traceResult.records.map((record) => <tr key={record.source + ":" + record.recordId}>
+                        <td>{record.source}</td>
+                        <td>{new Date(record.occurredAt).toLocaleString("pt-BR")}</td>
+                        <td>{record.status ?? "Não informado"}</td>
+                        <td>{record.summary}</td>
+                        <td><code>{record.recordId}</code></td>
+                      </tr>)}
+                    </tbody>
+                  </table>
+                </div>
+              </>}
               <div className="control-trace-chain" aria-label="Cadeia de rastreabilidade esperada">
-                <span>Web / BFF</span><b>→</b><span>Core API</span><b>→</b><span>PostgreSQL</span><b>→</b><span>Outbox</span><b>→</b><span>Durable Job</span><b>→</b><span>Handler / Auditoria</span>
+                <span>Web / BFF</span><b>→</b><span>Core API</span><b>→</b><span>PostgreSQL</span><b>→</b><span>Outbox</span><b>→</b><span>Durable Job</span><b>→</b><span>Auditoria</span>
               </div>
             </section>
 
