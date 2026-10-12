@@ -34,7 +34,7 @@ jobs:
       RUN_DB_INTEGRATION: "true"
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 24.20.0
           package-manager-cache: false
