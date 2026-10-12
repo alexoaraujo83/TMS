@@ -157,3 +157,4 @@ export function rankCandidates(
         a.candidate.driverId.localeCompare(b.candidate.driverId),
     );
 }
+

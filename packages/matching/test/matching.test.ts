@@ -6,7 +6,7 @@ import {
   rankCandidates,
   scoreCandidate,
   type MatchCandidate,
-} from "../src/index.ts";
+} from "../dist/index.js";
 
 const freight: Freight = {
   id: "00000000-0000-0000-0000-000000000001",

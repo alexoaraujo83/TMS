@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { rankCandidates, scoreCandidate } from "../src/index.ts";
+import { rankCandidates, scoreCandidate } from "../dist/index.js";
 import type { Freight } from "@tms/freight";
 
 const baseFreight: Freight = {

@@ -1,0 +1,10 @@
+# ADR-004 — Deterministic vehicle compatibility validation
+
+- **Status:** Accepted for initial domain implementation; production integration remains pending.
+- **Date:** 2026-10-11
+- **Context:** The transport manuals and additional operating rules supplied for TMS describe body types, cargo profiles, dimensions, payload, cubage, axle checks, operational modes and regulatory review. The current matching foundation ranks candidates by vehicle/body compatibility and payload, but does not provide a reusable explanation-rich dimensional validator.
+- **Decision:** Introduce a pure TypeScript compatibility module in `@tms/matching`. Keep reference catalogs and deterministic validation independent of persistence and HTTP. Use actual vehicle measurements and payload values when available. Calculate cubic volume as length × width × height and volumetric weight only when a factor is explicitly configured. Return `approved`, `pending` or `rejected` with machine-readable reasons.
+- **Safety boundary:** Reference limits (including 4.40 m height and other limits supplied in operating notes) are not treated as a universal legal determination. Exceeding a configured reference envelope triggers manual/legal review, not an automatic assertion that an AET is or is not required. Axle overload/unverified status cannot be automatically approved.
+- **Tenant/security boundary:** This initial module has no persistence or tenant bypass. Subsequent integration must use the authenticated tenant context and existing tenant-scoped vehicle/freight repositories.
+- **Consequences:** Unit tests can validate the calculations without database access. Matching/API/UI integration, authoritative legal rule sourcing, tenant-scoped vehicle specification persistence and production evidence are separate follow-up gates.
+- **Alternatives rejected:** Hardcoding all manual dimensions as guaranteed vehicle capabilities; silently assuming a universal cubing factor; duplicating the freight lifecycle or creating a parallel freight service.

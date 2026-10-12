@@ -102,6 +102,14 @@ The current audited main schema has 22 public tables and 39 migrations, with `00
 
 Freight supports dedicated, shared, complement and urgent types; route, cargo, quantity, weight, volume, linear meters, commercial/driver prices, BRL currency, collection/delivery windows and matching requirements.
 
+## 6A. Initial vehicle compatibility domain module
+
+The branch `feat/vehicle-compatibility-validation` introduces a pure, unit-tested module in `packages/matching/src/vehicle-compatibility.ts`. It defines reference body types and cargo profiles, computes cubic volume and configured volumetric weight, compares cargo dimensions against actual vehicle internal dimensions when supplied, and returns `approved`, `pending` or `rejected` with machine-readable reasons.
+
+This is a **domain-library implementation only**. It is not yet exposed through the NestJS API, persisted as tenant-specific vehicle specifications, connected to the production matching endpoint, or validated in a deployed environment. Legal-envelope figures are configurable review references, not a universal legal decision; the module does not automatically decide whether an AET is required.
+
+Operational notes and limitations: [Vehicle Compatibility](./operations/VEHICLE-COMPATIBILITY.md). Decision record: [ADR-004](./architecture/ADR-004-vehicle-compatibility-validation.md).
+
 ## 7. Lifecycle and assignment invariants
 
 Freight status supports: `draft`, `open`, `matching`, `negotiating`, `assigned`, `in_transit`, `delivered`, `cancelled`.

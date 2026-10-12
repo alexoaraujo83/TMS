@@ -10,6 +10,10 @@ Este diretório é a fonte versionada dos diagramas arquiteturais mínimos do TM
 | Deployment | [deployment.mmd](./deployment.mmd) | GitHub/CI, Vercel, Railway, Auth0, Neon, object store e controle de release |
 | Domínio | [domain.mmd](./domain.mmd) | IAM/Tenancy, Master Data, Freight, Matching, Trip, Compliance, Finance, Reliability e Audit |
 
+## ADRs relevantes
+
+- [ADR-004 — Deterministic vehicle compatibility validation](./ADR-004-vehicle-compatibility-validation.md): módulo inicial de validação física, sem alegar integração de produção.
+
 ## Regras de atualização
 
 1. Alterações de topologia, bounded context, runtime, persistência ou integração devem atualizar o diagrama correspondente na mesma mudança.
