@@ -1,0 +1,38 @@
+name: Web surface smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL HTTPS de preview/staging para testes HTTP somente leitura"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-surface-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.20.0
+          package-manager-cache: false
+      - run: npm install --global pnpm@11.24.0
+      - run: pnpm install --frozen-lockfile
+      - name: Validate target URL
+        env:
+          INPUT_BASE_URL: ${{ inputs.base_url }}
+        run: |
+          node --input-type=module -e 'const u = new URL(process.env.INPUT_BASE_URL); if (u.protocol !== "https:") throw new Error("Smoke tests require an HTTPS target"); if (u.username || u.password) throw new Error("Do not embed credentials in the target URL"); console.log("Smoke target:", u.origin)'
+      - name: Run read-only web surface tests
+        env:
+          TMS_WEB_BASE_URL: ${{ inputs.base_url }}
+        run: pnpm --filter @tms/web test
