@@ -360,3 +360,20 @@
     grid-column: auto;
   }
 }
+
+
+.control-health-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.control-health-summary > span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 10px;
+  font-weight: 750;
+}
